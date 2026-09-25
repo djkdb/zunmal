@@ -1,6 +1,6 @@
 import { CHARACTERS_BY_RARITY } from '../data/characters';
 import { GACHA_RULES, RARITIES, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL, formatWeightPercent } from '../data/rarity';
-import { DUPLICATE_REFUND, TICKET_BUNDLE, TICKET_PRICE } from '../economy/config';
+import { DUPLICATE_REFUND, PULL_COUNT, PULL_PRICE } from '../economy/config';
 import { effectivePityRate } from '../gacha/engine';
 import { RarityBadge } from './RarityBadge';
 import './RateTable.css';
@@ -40,8 +40,7 @@ export function RateTable() {
       </table>
       <ul className="notice__rules">
         <li>
-          뽑기권은 1장에 {TICKET_PRICE}코인, {TICKET_BUNDLE.count}장 묶음은 {TICKET_BUNDLE.price.toLocaleString()}
-          코인이에요.
+          1회 뽑기는 {PULL_PRICE.single}코인, {PULL_COUNT.multi}연 뽑기는 {PULL_PRICE.multi.toLocaleString()}코인이에요.
         </li>
         <li>같은 등급 안에서는 어떤 말랑이든 나올 확률이 같아요.</li>
         <li>

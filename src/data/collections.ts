@@ -1,6 +1,6 @@
 import { CHARACTERS } from './characters';
 
-/** 세트 보상 등급 — 실제 뽑기권 수는 economy/config.ts의 SET_REWARD_TICKETS */
+/** 세트 보상 등급 — 실제 코인은 economy/config.ts의 SET_REWARD_COINS */
 export type CollectionTier = 'small' | 'medium' | 'large' | 'legend' | 'ultimate';
 
 export interface Collection {
@@ -15,7 +15,7 @@ export interface Collection {
 
 /**
  * 테마 컬렉션. 한 말랑이가 여러 세트에 속할 수 있다.
- * 세트를 모두 모으면 뽑기권 보상을 한 번 받는다.
+ * 세트를 모두 모으면 코인 보상을 한 번 받는다.
  */
 export const COLLECTIONS: readonly Collection[] = [
   {

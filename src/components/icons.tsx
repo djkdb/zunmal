@@ -41,19 +41,6 @@ export function CoinIcon(props: IconProps) {
   );
 }
 
-/** 뽑기권: 양쪽에 홈이 파인 티켓 */
-export function TicketIcon(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path
-        d="M4 9 h24 v4 a3 3 0 0 0 0 6 v4 h-24 v-4 a3 3 0 0 0 0 -6 Z"
-        fill="#ff9db4"
-      />
-      <path d="M20 9.5 v13" strokeDasharray="2 2.4" strokeWidth={1.8} />
-    </Svg>
-  );
-}
-
 /** 홈: 줄무늬 차양이 달린 가게 */
 export function ShopIcon(props: IconProps) {
   return (

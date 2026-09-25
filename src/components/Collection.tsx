@@ -4,12 +4,12 @@ import { sfx } from '../audio/sfx';
 import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characters';
 import { COLLECTIONS, collectionProgress, type Collection as CollectionSet } from '../data/collections';
 import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL } from '../data/rarity';
-import { PARTNER_RARITY_BONUS, SET_REWARD_TICKETS } from '../economy/config';
+import { PARTNER_RARITY_BONUS, SET_REWARD_COINS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
 import { Modal } from './Modal';
 import { RarityBadge } from './RarityBadge';
-import { TicketIcon } from './icons';
+import { CoinIcon } from './icons';
 import './Collection.css';
 
 type Tab = 'book' | 'sets';
@@ -155,7 +155,7 @@ function SetCard({ set, onOpen }: { set: CollectionSet; onOpen(id: string): void
   const claimed = useGameStore((s) => s.claimedSets.includes(set.id));
   const claimSet = useGameStore((s) => s.claimSet);
   const progress = collectionProgress(set, new Set(Object.keys(owned)));
-  const reward = SET_REWARD_TICKETS[set.tier];
+  const reward = SET_REWARD_COINS[set.tier];
 
   return (
     <li
@@ -193,7 +193,7 @@ function SetCard({ set, onOpen }: { set: CollectionSet; onOpen(id: string): void
       </ul>
       <div className="set-card__reward">
         <span className="set-card__reward-label">
-          <TicketIcon size={22} /> 뽑기권 {reward}장
+          <CoinIcon size={22} /> {reward.toLocaleString()}코인
         </span>
         {claimed ? (
           <span className="set-card__claimed">받았어요</span>

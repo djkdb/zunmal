@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { useGameStore } from '../store/useGameStore';
-import { CoinIcon, SoundOffIcon, SoundOnIcon, TicketIcon } from './icons';
+import { CoinIcon, SoundOffIcon, SoundOnIcon } from './icons';
 import './TopBar.css';
 
 /** 값이 증가할 때마다 바뀌는 key → CSS 애니메이션 재생 */
@@ -16,14 +16,12 @@ function useBumpKey(value: number): number {
   return key;
 }
 
-/** 게임 HUD: 재화(큰 아이콘 + 숫자 + 충전 버튼)와 소리 켜기/끄기 */
+/** 게임 HUD: 코인(큰 아이콘 + 숫자 + 벌러 가기 버튼)과 소리 켜기/끄기 */
 export function TopBar() {
   const coins = useGameStore((s) => s.coins);
-  const tickets = useGameStore((s) => s.gachaTickets);
   const muted = useGameStore((s) => s.settings.muted);
   const setMuted = useGameStore((s) => s.setMuted);
   const coinKey = useBumpKey(coins);
-  const ticketKey = useBumpKey(tickets);
 
   return (
     <header className="hud">
@@ -36,17 +34,6 @@ export function TopBar() {
             {coins.toLocaleString()}
           </span>
           <Link to="/play" className="hud__plus" aria-label="미니게임으로 코인 벌러 가기" onClick={() => sfx.button()}>
-            +
-          </Link>
-        </div>
-        <div className="hud__pill hud__pill--ticket">
-          <span className="hud__icon" aria-hidden="true">
-            <TicketIcon size={38} />
-          </span>
-          <span key={ticketKey} className="hud__value bump" aria-label={`뽑기권 ${tickets}장`}>
-            {tickets}
-          </span>
-          <Link to="/gacha" className="hud__plus" aria-label="뽑기권 사러 가기" onClick={() => sfx.button()}>
             +
           </Link>
         </div>

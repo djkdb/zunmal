@@ -12,7 +12,6 @@ describe('sanitizeSave', () => {
     const data = {
       ...createInitialSave(NOW),
       coins: 1234,
-      gachaTickets: 5,
       ownedMalangs: { 'peach-mochi': { count: 3, shinyCount: 1, firstObtainedAt: 100 } },
       partnerId: 'peach-mochi',
       pityCount: 12,
@@ -32,7 +31,6 @@ describe('sanitizeSave', () => {
     const s = sanitizeSave(
       {
         coins: -50,
-        gachaTickets: 'many',
         pityCount: 9999,
         ownedMalangs: {
           'peach-mochi': { count: 2, firstObtainedAt: 5 },
@@ -49,7 +47,6 @@ describe('sanitizeSave', () => {
       NOW,
     );
     expect(s.coins).toBe(0);
-    expect(s.gachaTickets).toBe(0);
     expect(s.pityCount).toBe(49);
     expect(Object.keys(s.ownedMalangs)).toEqual(['peach-mochi']);
     expect(s.partnerId).toBe('peach-mochi');
@@ -65,8 +62,19 @@ describe('sanitizeSave', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 2', () => {
-    expect(SAVE_VERSION).toBe(2);
+  it('현재 버전은 3', () => {
+    expect(SAVE_VERSION).toBe(3);
+  });
+
+  it('v2 → v3: 남은 뽑기권을 장당 100코인으로 바꿔 코인에 더한다', () => {
+    const s = migrateSave({ coins: 250, gachaTickets: 12 }, 2, NOW);
+    expect(s.coins).toBe(250 + 12 * 100);
+    expect('gachaTickets' in s).toBe(false);
+  });
+
+  it('v2 → v3: 손상된 뽑기권 값은 무시', () => {
+    expect(migrateSave({ coins: 10, gachaTickets: 'lots' }, 2, NOW).coins).toBe(10);
+    expect(migrateSave({ coins: 10, gachaTickets: -5 }, 2, NOW).coins).toBe(10);
   });
 
   it('v1 데이터를 v2로: 반짝 0, 세트/친밀도 기본값', () => {
@@ -106,8 +114,8 @@ describe('migrateSave', () => {
       best: { 'button-malang': 210 },
     };
     const s = migrateSave(v0, 0, NOW);
-    expect(s.coins).toBe(500);
-    expect(s.gachaTickets).toBe(3);
+    // v0 뽑기권 3장 → v3에서 코인 300으로 합쳐짐
+    expect(s.coins).toBe(500 + 3 * 100);
     expect(s.ownedMalangs['peach-mochi']?.count).toBe(2);
     expect(s.ownedMalangs['starry-night']?.count).toBe(1);
     expect(s.ownedMalangs['ghost-id']).toBeUndefined();

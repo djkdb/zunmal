@@ -2,24 +2,23 @@ import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { STARTER_CHARACTER_IDS, getCharacter } from '../data/characters';
 import { collectionProgress, getCollection } from '../data/collections';
-import { PULL_COST, SET_REWARD_TICKETS } from '../economy/config';
+import { SET_REWARD_COINS } from '../economy/config';
 import {
   applyDailyReset,
   computeReward,
-  purchaseTickets,
-  type PurchaseResult,
+  payForPull,
+  type PullKind,
   type RewardBreakdown,
-  type TicketPackId,
 } from '../economy/economy';
 import { pullMulti, pullSingle, resolveDuplicates, type ResolvedPull } from '../gacha/engine';
 import { defaultRng, type RNG } from '../lib/rng';
 import { SAVE_KEY, SAVE_VERSION, createInitialSave, migrateSave, sanitizeSave, type SaveData } from './persistence';
 
-export type PullKind = keyof typeof PULL_COST;
+export type { PullKind };
 
 export type PullActionResult =
   | { ok: true; kind: PullKind; items: ResolvedPull[]; totalRefund: number }
-  | { ok: false; reason: 'insufficient-tickets' };
+  | { ok: false; reason: 'insufficient-coins' };
 
 export interface MiniGameFinishResult {
   reward: RewardBreakdown;
@@ -30,14 +29,13 @@ export interface MiniGameFinishResult {
 export interface GameActions {
   /** 첫 실행 시 시작 말랑이 선택 (이미 보유 중이면 무시) */
   chooseStarter(characterId: string, now?: Date): boolean;
-  buyTickets(packId: TicketPackId): PurchaseResult;
   pull(kind: PullKind, rng?: RNG, now?: Date): PullActionResult;
   /** 미니게임 결과 기록 + 코인 지급 (코인 계산은 economy 모듈이 담당) */
   finishMiniGame(gameId: string, score: number, now?: Date): MiniGameFinishResult;
   setPartner(characterId: string): void;
   /** 반짝 버전을 가진 파트너를 반짝 모습으로 보여줄지 */
   setPartnerShiny(shiny: boolean): void;
-  /** 완성한 컬렉션 세트의 뽑기권 보상 받기 (세트당 1회) */
+  /** 완성한 컬렉션 세트의 코인 보상 받기 (세트당 1회) */
   claimSet(collectionId: string): ClaimSetResult;
   /** 말랑이 만지기: 친밀도 증가 */
   petMalang(characterId: string, amount?: number): void;
@@ -50,7 +48,7 @@ export interface GameActions {
 export type GameState = SaveData & GameActions;
 
 export type ClaimSetResult =
-  | { ok: true; tickets: number }
+  | { ok: true; coins: number }
   | { ok: false; reason: 'unknown' | 'incomplete' | 'already-claimed' };
 
 /** 친밀도 최대치 */
@@ -100,7 +98,6 @@ const browserStorage = () => (typeof localStorage === 'undefined' ? undefined : 
 function pickSave(state: GameState): SaveData {
   return {
     coins: state.coins,
-    gachaTickets: state.gachaTickets,
     ownedMalangs: state.ownedMalangs,
     pityCount: state.pityCount,
     partnerId: state.partnerId,
@@ -132,17 +129,10 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           return true;
         },
 
-        buyTickets(packId) {
-          const state = get();
-          const result = purchaseTickets(state.coins, state.gachaTickets, packId);
-          if (result.ok) set({ coins: result.coins, gachaTickets: result.tickets });
-          return result;
-        },
-
         pull(kind, rng = defaultRng, now = new Date()) {
           const state = get();
-          const cost = PULL_COST[kind];
-          if (state.gachaTickets < cost) return { ok: false, reason: 'insufficient-tickets' };
+          const payment = payForPull(state.coins, kind);
+          if (!payment.ok) return { ok: false, reason: 'insufficient-coins' };
 
           const outcome = kind === 'multi' ? pullMulti(state.pityCount, rng) : pullSingle(state.pityCount, rng);
           const { items, totalRefund } = resolveDuplicates(outcome.results, state.ownedMalangs);
@@ -158,10 +148,9 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           }
 
           set({
-            gachaTickets: state.gachaTickets - cost,
             pityCount: outcome.pityCount,
             ownedMalangs: owned,
-            coins: state.coins + totalRefund,
+            coins: payment.coins + totalRefund,
             totalPulls: state.totalPulls + items.length,
             partnerId: state.partnerId ?? items[0]?.character.id ?? null,
           });
@@ -211,9 +200,9 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (state.claimedSets.includes(collectionId)) return { ok: false, reason: 'already-claimed' };
           const progress = collectionProgress(collection, new Set(Object.keys(state.ownedMalangs)));
           if (!progress.complete) return { ok: false, reason: 'incomplete' };
-          const tickets = SET_REWARD_TICKETS[collection.tier];
-          set({ gachaTickets: state.gachaTickets + tickets, claimedSets: [...state.claimedSets, collectionId] });
-          return { ok: true, tickets };
+          const coins = SET_REWARD_COINS[collection.tier];
+          set({ coins: state.coins + coins, claimedSets: [...state.claimedSets, collectionId] });
+          return { ok: true, coins };
         },
 
         petMalang(characterId, amount = 1) {

@@ -2,7 +2,7 @@
 
 말랑이(말랑한 젤리 캐릭터)를 수집하는 모바일 우선 웹 게임.
 
-핵심 루프: **미니게임 플레이 → 코인 획득 → 뽑기권 구매 → 캡슐 머신 → 도감 수집**
+핵심 루프: **미니게임 플레이 → 코인 획득 → 코인으로 캡슐 뽑기 → 도감 수집**
 
 ## 주요 명령어
 
@@ -26,14 +26,14 @@ src/
   styles/         global.css — 디자인 토큰, 공용 클래스
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
-  data/           characters.ts (말랑이 15종), rarity.ts (희귀도 메타·확률 가중치)
+  data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
   audio/          sfx.ts — WebAudio 합성 효과음 (파일 없음)
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
-  components/     Malang, TopBar, Shop, GachaMachine, PullResult, Collection, MiniGameLobby, MiniGameResult …
+  components/     Malang, TopBar, GachaMachine, PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
-  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage
+  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage
 ```
 
 의존 방향 (위가 아래를 import 가능, 역방향 금지):
@@ -67,10 +67,10 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - **재질은 젤리**: 버튼·게임 타일은 광택 하이라이트 + 같은 색 아랫단 + 눌리면 찌그러짐(`.btn`). 배경은 스프링클 무늬.
 - **과감한 장식**: 홈 간판(차양 + 풍선 글씨 로고)과 캡슐 머신. 등급이 높을수록 연출이 화려해진다.
 - **모양이 곧 정보**: 눌리는 것만 두꺼운 아랫단 그림자를 가진다. 패널은 평평한 외곽선이다.
-  티켓은 절취선 모양, 확률표는 테이프로 붙인 안내문, 도감은 선반 위 캡슐 창이다.
+  확률표는 테이프로 붙인 안내문, 도감은 선반 위 캡슐 창이다.
 - **금지**: 이모지 아이콘(→ `components/icons.tsx`), 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`,
   모든 요소에 같은 둥근 카드와 같은 그림자 반복, 섹션마다 등장 애니메이션.
-- **문구**: 존댓말, 짧고 구체적으로. 행동 이름은 끝까지 같게 쓴다(예: "뽑기권 사기" → "뽑기권 N장을 샀어요.").
+- **문구**: 존댓말, 짧고 구체적으로. 행동 이름은 끝까지 같게 쓴다(예: "보상 받기" → "받았어요").
 
 ## 가챠 규칙 (`gacha/engine.ts`, `data/rarity.ts`)
 
@@ -100,7 +100,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 ## 컬렉션 (`data/collections.ts`)
 
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.
-- 세트를 완성하면 한 번 뽑기권 보상(`SET_REWARD_TICKETS`, 등급 small~ultimate). 코인은 주지 않는다.
+- 세트를 완성하면 한 번 코인 보상(`SET_REWARD_COINS`, 등급 small~ultimate). 일일 상한과 무관.
 
 ## 말랑 만지기 (`pages/TouchPage.tsx`, `touch/physics.ts`, `audio/squish.ts`)
 
@@ -110,7 +110,8 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 
 ## 경제 시스템 (`economy/`)
 
-- 코인은 **미니게임에서만** 획득. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
+- **재화는 코인 하나뿐**이다 (뽑기권은 v3에서 폐지). 코인으로 바로 캡슐을 뽑는다.
+- 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
 - 보상 계산 (`computeReward`):
   ```
   baseCoins    = floor(score × gameMultiplier)
@@ -119,7 +120,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   granted      = min(earnedCoins, dailyCap − dailyEarned)
   ```
 - 일일 상한은 **Asia/Seoul 달력 날짜**가 바뀌면 초기화 (`daily.ts` 의 `seoulDateKey`).
-- 뽑기권: 1장 100 코인, 11장 묶음 1000 코인. 1회 뽑기 = 1장, 10연 = 10장.
+- 뽑기 가격(`PULL_PRICE`): 1회 100 코인, 10연 900 코인(10% 할인).
 - 모든 숫자는 `economy/config.ts` 에 주석과 함께 둔다.
 
 ## 상태 저장 (`store/`)
@@ -127,7 +128,8 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v2: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`).
+- 현재 v3: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`).
+  v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
 ## 테스트

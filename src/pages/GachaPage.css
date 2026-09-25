@@ -8,15 +8,31 @@
 
 .gacha-page__actions {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
 .gacha-page__actions .btn {
-  min-height: 58px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0;
+  min-height: 70px;
   padding-inline: 8px;
   font-size: var(--fs-m);
+  line-height: 1.15;
+}
+
+.gacha-page__sale {
+  position: absolute;
+  top: -14px;
+  right: 10px;
+  padding: 1px 9px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--lemon);
+  color: var(--ink);
+  -webkit-text-stroke: 0;
+  font-size: var(--fs-xs);
+  transform: rotate(6deg);
 }
 
 .gacha-page__cost {

@@ -5,8 +5,7 @@ import {
   GAME_MULTIPLIERS,
   PARTNER_RARITY_BONUS,
   PER_GAME_CAP,
-  TICKET_BUNDLE,
-  TICKET_PRICE,
+  PULL_PRICE,
 } from './config';
 import { seoulDateKey } from './daily';
 
@@ -75,28 +74,15 @@ export function computeReward(input: RewardInput): RewardBreakdown {
   };
 }
 
-export type TicketPackId = 'single' | 'bundle';
+export type PullKind = keyof typeof PULL_PRICE;
 
-export interface TicketPack {
-  id: TicketPackId;
-  tickets: number;
-  price: number;
-}
+export type PullPaymentResult = { ok: true; coins: number } | { ok: false; reason: 'insufficient-coins' };
 
-export const TICKET_PACKS: Readonly<Record<TicketPackId, TicketPack>> = {
-  single: { id: 'single', tickets: 1, price: TICKET_PRICE },
-  bundle: { id: 'bundle', tickets: TICKET_BUNDLE.count, price: TICKET_BUNDLE.price },
-};
-
-export type PurchaseResult =
-  | { ok: true; coins: number; tickets: number }
-  | { ok: false; reason: 'insufficient-coins' };
-
-/** 뽑기권 구매 계산 (순수 함수). */
-export function purchaseTickets(coins: number, tickets: number, packId: TicketPackId): PurchaseResult {
-  const pack = TICKET_PACKS[packId];
-  if (coins < pack.price) return { ok: false, reason: 'insufficient-coins' };
-  return { ok: true, coins: coins - pack.price, tickets: tickets + pack.tickets };
+/** 뽑기 비용 지불 계산 (순수 함수). */
+export function payForPull(coins: number, kind: PullKind): PullPaymentResult {
+  const price = PULL_PRICE[kind];
+  if (coins < price) return { ok: false, reason: 'insufficient-coins' };
+  return { ok: true, coins: coins - price };
 }
 
 export interface DailyState {

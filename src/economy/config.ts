@@ -6,24 +6,30 @@ import type { Rarity } from '../data/rarity';
  * 컴포넌트/미니게임에 숫자를 하드코딩하지 말 것.
  *
  * 설계 목표 (초기값):
- *  - 평균적인 한 판(20~30초) ≈ 100~150 코인 ≈ 뽑기권 1장 남짓.
- *  - 하루 상한 3000 코인 ≈ 뽑기권 30장 (11장 묶음 3번 = 33장) — 과도한 파밍 방지.
+ *  - 평균적인 한 판(20~30초) ≈ 100~150 코인 ≈ 1회 뽑기 1번 남짓.
+ *  - 하루 상한 3000 코인 ≈ 10연 뽑기 3번 남짓 — 과도한 파밍 방지.
+ *
+ * 재화는 코인 하나뿐이다. 코인으로 바로 캡슐을 뽑는다.
+ * 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상.
  */
 
-/** 신규 플레이어 시작 코인. 코인은 미니게임으로만 얻는다는 원칙에 따라 0. */
+/** 신규 플레이어 시작 코인. 첫 뽑기는 미니게임으로 벌어서 한다. 대신 시작 파트너 말랑이 1마리를 고른다. */
 export const STARTING_COINS = 0;
 
-/** 신규 플레이어 시작 뽑기권. 첫 경험을 위해 0 — 대신 시작 파트너 말랑이 1마리를 고른다. */
-export const STARTING_TICKETS = 0;
+/**
+ * 뽑기 가격 (코인).
+ * 10연은 10% 할인 — 모아서 한 번에 뽑을 이유를 준다 (예전 "11장 묶음"과 같은 혜택 수준).
+ */
+export const PULL_PRICE = { single: 100, multi: 900 } as const;
 
-/** 뽑기권 1장 가격 (코인). */
-export const TICKET_PRICE = 100;
+/** 1회 / 10연 뽑기에서 나오는 캡슐 수. */
+export const PULL_COUNT = { single: 1, multi: 10 } as const;
 
-/** 묶음 구매: 1000 코인에 11장 (1장 보너스, 약 9% 할인). */
-export const TICKET_BUNDLE = { count: 11, price: 1000 } as const;
-
-/** 1회 뽑기 / 10연 뽑기에 필요한 뽑기권 수. */
-export const PULL_COST = { single: 1, multi: 10 } as const;
+/**
+ * 저장 데이터 v2 이하에 남아 있던 뽑기권을 코인으로 바꿀 때의 환산값.
+ * 예전 1장 가격(100코인) 그대로 돌려준다.
+ */
+export const LEGACY_TICKET_TO_COINS = 100;
 
 /**
  * 중복 환급 코인. 이미 보유한 말랑이를 다시 뽑으면 지급.
@@ -85,14 +91,13 @@ export const PER_GAME_CAP = 200;
 export const DAILY_CAP = 3000;
 
 /**
- * 컬렉션 세트 완성 보상 (뽑기권 장수, 세트당 한 번).
- * 코인은 미니게임으로만 얻는다는 원칙에 따라 보상은 뽑기권으로 준다.
- * 시크릿이 들어간 세트일수록 크게 준다.
+ * 컬렉션 세트 완성 보상 (코인, 세트당 한 번). 일일 상한과 무관하게 지급한다.
+ * 시크릿이 들어간 세트일수록 크게 준다. (예전 뽑기권 보상 × 100)
  */
-export const SET_REWARD_TICKETS: Readonly<Record<CollectionTier, number>> = {
-  small: 3,
-  medium: 5,
-  large: 10,
-  legend: 20,
-  ultimate: 50,
+export const SET_REWARD_COINS: Readonly<Record<CollectionTier, number>> = {
+  small: 300,
+  medium: 500,
+  large: 1000,
+  legend: 2000,
+  ultimate: 5000,
 };

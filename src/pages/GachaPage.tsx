@@ -4,12 +4,11 @@ import { sfx } from '../audio/sfx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
 import { PullResult } from '../components/PullResult';
 import { RateTable } from '../components/RateTable';
-import { Shop } from '../components/Shop';
 import { GACHA_RULES, rarityRank, type Rarity } from '../data/rarity';
-import { PULL_COST } from '../economy/config';
+import { PULL_COUNT, PULL_PRICE } from '../economy/config';
 import type { ResolvedPull } from '../gacha/engine';
 import { useGameStore, type PullKind } from '../store/useGameStore';
-import { TicketIcon } from '../components/icons';
+import { CoinIcon } from '../components/icons';
 import './GachaPage.css';
 
 interface PendingResult {
@@ -18,7 +17,7 @@ interface PendingResult {
 }
 
 export function GachaPage() {
-  const tickets = useGameStore((s) => s.gachaTickets);
+  const coins = useGameStore((s) => s.coins);
   const pityCount = useGameStore((s) => s.pityCount);
   const pull = useGameStore((s) => s.pull);
 
@@ -29,6 +28,7 @@ export function GachaPage() {
 
   const busy = run !== null;
   const untilPity = GACHA_RULES.pityThreshold - pityCount;
+  const discount = Math.round((1 - PULL_PRICE.multi / (PULL_PRICE.single * PULL_COUNT.multi)) * 100);
 
   const start = (kind: PullKind) => {
     if (busy) return;
@@ -36,7 +36,7 @@ export function GachaPage() {
     const result = pull(kind);
     if (!result.ok) {
       sfx.fail();
-      setMessage('뽑기권이 모자라요. 아래에서 뽑기권을 사거나');
+      setMessage('코인이 모자라요.');
       return;
     }
     setMessage('');
@@ -46,7 +46,7 @@ export function GachaPage() {
     );
     setPending({ items: result.items, totalRefund: result.totalRefund });
     setRun({ id: Date.now(), rarity: best, shiny: result.items.some((it) => it.shiny) });
-    // 상점 쪽으로 스크롤해 있었더라도 머신 연출이 보이도록 맨 위로.
+    // 확률 안내 쪽으로 스크롤해 있었더라도 머신 연출이 보이도록 맨 위로.
     // (부드러운 스크롤은 연출 시작과 겹치면 브라우저가 중간에 취소하는 경우가 있어 즉시 이동)
     window.scrollTo({ top: 0 });
   };
@@ -68,8 +68,8 @@ export function GachaPage() {
         <GachaMachine run={run} onOpened={() => setShowResult(true)} />
         <div className="gacha-page__actions">
           {(['single', 'multi'] as const).map((kind) => {
-            const cost = PULL_COST[kind];
-            const enough = tickets >= cost;
+            const price = PULL_PRICE[kind];
+            const enough = coins >= price;
             return (
               <button
                 key={kind}
@@ -80,12 +80,17 @@ export function GachaPage() {
                   sfx.button();
                   start(kind);
                 }}
-                aria-label={`${kind === 'multi' ? '10연' : '1회'} 뽑기, 뽑기권 ${cost}장 사용${enough ? '' : ' (뽑기권 부족)'}`}
+                aria-label={`${kind === 'multi' ? `${PULL_COUNT.multi}연` : '1회'} 뽑기, ${price.toLocaleString()}코인${enough ? '' : ' (코인 부족)'}`}
               >
-                {kind === 'multi' ? '10연 뽑기' : '1회 뽑기'}
+                {kind === 'multi' && discount > 0 && (
+                  <span className="gacha-page__sale" aria-hidden="true">
+                    {discount}% 할인
+                  </span>
+                )}
+                {kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기'}
                 <span className="gacha-page__cost" aria-hidden="true">
-                  <TicketIcon size={18} />
-                  {cost}
+                  <CoinIcon size={20} />
+                  {price.toLocaleString()}
                 </span>
               </button>
             );
@@ -99,13 +104,12 @@ export function GachaPage() {
           {message && (
             <>
               {' '}
-              <Link to="/play">미니게임에서 코인을 모아 오세요.</Link>
+              <Link to="/play">미니게임에서 모아 오세요.</Link>
             </>
           )}
         </p>
       </div>
 
-      <Shop />
       <RateTable />
 
       {showResult && pending && <PullResult items={pending.items} totalRefund={pending.totalRefund} onClose={close} />}

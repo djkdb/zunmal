@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { COLLECTIONS, findUnknownMembers } from '../data/collections';
-import { DAILY_CAP, SET_REWARD_TICKETS, TICKET_PRICE } from '../economy/config';
+import { DAILY_CAP, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
 import { createSeededRng } from '../lib/rng';
 import { SAVE_KEY, SAVE_VERSION } from './persistence';
 import { MAX_AFFECTION, createGameStore, createSafeStorage } from './useGameStore';
@@ -43,31 +43,28 @@ describe('game store', () => {
     expect(store.getState().chooseStarter('peach-mochi')).toBe(false);
   });
 
-  it('뽑기권 구매는 코인을 차감', () => {
+  it('코인이 부족하면 뽑을 수 없고 코인도 그대로', () => {
     const store = makeStore();
-    store.setState({ coins: 1150 });
-    expect(store.getState().buyTickets('bundle').ok).toBe(true);
-    expect(store.getState().buyTickets('single').ok).toBe(true);
-    expect(store.getState().coins).toBe(1150 - 1000 - TICKET_PRICE);
-    expect(store.getState().gachaTickets).toBe(12);
-    expect(store.getState().buyTickets('single').ok).toBe(false);
+    store.setState({ coins: PULL_PRICE.multi - 1 });
+    expect(store.getState().pull('multi')).toEqual({ ok: false, reason: 'insufficient-coins' });
+    expect(store.getState().coins).toBe(PULL_PRICE.multi - 1);
   });
 
-  it('뽑기권이 부족하면 뽑을 수 없다', () => {
+  it('1회 뽑기는 코인을 1회 가격만큼 차감', () => {
     const store = makeStore();
-    store.setState({ gachaTickets: 9 });
-    expect(store.getState().pull('multi')).toEqual({ ok: false, reason: 'insufficient-tickets' });
-    expect(store.getState().gachaTickets).toBe(9);
+    store.setState({ coins: 250 });
+    const res = store.getState().pull('single', createSeededRng(4));
+    if (!res.ok) throw new Error('pull failed');
+    expect(store.getState().coins).toBe(250 - PULL_PRICE.single + res.totalRefund);
   });
 
-  it('10연 뽑기: 티켓 차감, 보유 반영, 환급 지급', () => {
+  it('10연 뽑기: 코인 차감, 보유 반영, 환급 지급', () => {
     const store = makeStore();
-    store.setState({ gachaTickets: 10, coins: 0 });
+    store.setState({ coins: PULL_PRICE.multi });
     const res = store.getState().pull('multi', createSeededRng(9));
     if (!res.ok) throw new Error('pull failed');
     const s = store.getState();
     expect(res.items).toHaveLength(10);
-    expect(s.gachaTickets).toBe(0);
     expect(s.totalPulls).toBe(10);
     expect(s.coins).toBe(res.totalRefund);
     const totalCount = Object.values(s.ownedMalangs).reduce((a, b) => a + b.count, 0);
@@ -137,8 +134,8 @@ describe('persist', () => {
     backend.setItem(SAVE_KEY, JSON.stringify({ version: 0, state: { coins: 900, tickets: 2, owned: ['ember-imp'] } }));
     const store = makeStore();
     await store.persist.rehydrate();
-    expect(store.getState().coins).toBe(900);
-    expect(store.getState().gachaTickets).toBe(2);
+    // v0 뽑기권 2장 → 코인으로 합쳐짐
+    expect(store.getState().coins).toBe(900 + 2 * 100);
     expect(store.getState().ownedMalangs['ember-imp']?.count).toBe(1);
   });
 
@@ -170,11 +167,11 @@ describe('컬렉션 / 친밀도 / 반짝', () => {
   it('완성한 세트만 한 번 보상을 받는다', () => {
     const store = makeStore();
     const set = COLLECTIONS.find((c) => c.id === 'dessert-shop')!;
-    store.setState({ ownedMalangs: ownAll(set.memberIds.slice(1)), gachaTickets: 0 });
+    store.setState({ ownedMalangs: ownAll(set.memberIds.slice(1)), coins: 0 });
     expect(store.getState().claimSet(set.id)).toEqual({ ok: false, reason: 'incomplete' });
     store.setState({ ownedMalangs: ownAll(set.memberIds) });
-    expect(store.getState().claimSet(set.id)).toEqual({ ok: true, tickets: SET_REWARD_TICKETS[set.tier] });
-    expect(store.getState().gachaTickets).toBe(SET_REWARD_TICKETS[set.tier]);
+    expect(store.getState().claimSet(set.id)).toEqual({ ok: true, coins: SET_REWARD_COINS[set.tier] });
+    expect(store.getState().coins).toBe(SET_REWARD_COINS[set.tier]);
     expect(store.getState().claimSet(set.id)).toEqual({ ok: false, reason: 'already-claimed' });
     expect(store.getState().claimSet('nope')).toEqual({ ok: false, reason: 'unknown' });
   });
@@ -191,7 +188,7 @@ describe('컬렉션 / 친밀도 / 반짝', () => {
 
   it('반짝 뽑기는 shinyCount를 올린다', () => {
     const store = makeStore();
-    store.setState({ gachaTickets: 1 });
+    store.setState({ coins: PULL_PRICE.single });
     // 희귀도 0 → 일반, 캐릭터 0 → 첫 일반, 반짝 0 < 1% → 반짝
     const res = store.getState().pull('single', () => 0);
     if (!res.ok) throw new Error('pull failed');
