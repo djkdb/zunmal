@@ -50,6 +50,14 @@ export function RateTable() {
         </li>
         <li>10연 뽑기에서 레어 이상이 하나도 없으면 마지막 캡슐을 레어 이상으로 바꿔 드려요.</li>
         <li>이 규칙까지 합치면 전설 이상이 나올 확률은 실제로 약 {effective}%예요.</li>
+        <li>
+          시크릿은 약 {Math.round(RARITY_WEIGHT_TOTAL / RARITY_WEIGHTS.secret).toLocaleString()}번에 한 번 나와요. 천장이
+          터질 때도 원래 비율대로 나올 수 있어요.
+        </li>
+        <li>
+          등급과 상관없이 {GACHA_RULES.shinyRate * 100}% 확률로 반짝이는 버전이 나와요. 처음 얻은 반짝 말랑이는
+          코인으로 바뀌지 않고 도감에 따로 기록돼요.
+        </li>
       </ul>
     </details>
   );

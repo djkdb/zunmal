@@ -254,3 +254,119 @@
   font-family: var(--font-display);
   font-size: 1.05rem;
 }
+
+/* ── 등급별 흔들림 연출: 높은 등급일수록 돔이 빛난다 ───────────── */
+.machine--shaking.machine--r-epic .machine__svg,
+.machine--shaking.machine--r-legendary .machine__svg,
+.machine--shaking.machine--r-mythic .machine__svg {
+  filter: drop-shadow(0 0 10px var(--machine-glow, rgba(185, 140, 255, 0.9)));
+}
+
+.machine--r-legendary {
+  --machine-glow: rgba(255, 192, 46, 0.95);
+}
+
+.machine--r-mythic .machine__svg {
+  animation:
+    machine-shake 0.15s linear infinite,
+    rainbow-glow 1.2s linear infinite;
+}
+
+/* 시크릿 예고: 화면이 어두워지고 머신만 스포트라이트, 캡슐들이 멈춘다 */
+.machine--tease::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 40%, rgba(43, 20, 90, 0.2) 0 20%, rgba(12, 6, 30, 0.88) 60%);
+  animation: tease-dim 1.5s ease-out both;
+}
+
+.machine--tease .machine__svg {
+  position: relative;
+  z-index: 26;
+  animation: tease-flicker 1.5s steps(1) both;
+}
+
+.machine--r-secret.machine--dropping .machine__svg,
+.machine--r-secret.machine--ready .machine__svg,
+.machine--r-secret.machine--opening .machine__svg {
+  filter: drop-shadow(0 0 16px rgba(143, 107, 255, 0.95));
+}
+
+.machine--tease .machine__hint {
+  position: relative;
+  z-index: 26;
+  color: #fff;
+  -webkit-text-stroke: 5px var(--ink);
+  paint-order: stroke fill;
+}
+
+@keyframes tease-dim {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tease-flicker {
+  0%,
+  22%,
+  48% {
+    filter: brightness(1);
+  }
+  12%,
+  36%,
+  60% {
+    filter: brightness(0.35);
+  }
+  80% {
+    filter: brightness(1.4) drop-shadow(0 0 22px rgba(143, 107, 255, 1));
+  }
+}
+
+/* 시크릿 캡슐: 별이 박힌 검보라 + 무지개 테두리 빛 */
+.machine__capsule--secret.has-glow {
+  animation-name: capsule-wiggle, secret-glow;
+  animation-duration: 1s, 2s;
+  animation-iteration-count: infinite, infinite;
+}
+
+@keyframes secret-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px #8f6bff) drop-shadow(0 0 22px #ff8fd1);
+  }
+  50% {
+    filter: drop-shadow(0 0 16px #7fe0ff) drop-shadow(0 0 30px #ffe07a);
+  }
+}
+
+/* 반짝 결과가 들어 있으면 캡슐 위로 빛이 한 줄 스친다 */
+.machine__capsule.is-shiny::after {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.9) 48%, rgba(255, 224, 122, 0.7) 52%, transparent 65%);
+  background-size: 250% 100%;
+  animation: shiny-sweep 1.4s ease-in-out infinite;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+@keyframes shiny-sweep {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.machine__flash--secret {
+  background:
+    radial-gradient(circle at 50% 55%, #fff 0%, rgba(255, 255, 255, 0) 35%),
+    radial-gradient(circle at 50% 55%, rgba(143, 107, 255, 0.95) 0 30%, rgba(18, 10, 46, 0.9) 70%);
+  animation-duration: 1s;
+}

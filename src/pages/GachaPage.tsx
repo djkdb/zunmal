@@ -45,7 +45,10 @@ export function GachaPage() {
       'common',
     );
     setPending({ items: result.items, totalRefund: result.totalRefund });
-    setRun({ id: Date.now(), rarity: best });
+    setRun({ id: Date.now(), rarity: best, shiny: result.items.some((it) => it.shiny) });
+    // 상점 쪽으로 스크롤해 있었더라도 머신 연출이 보이도록 맨 위로.
+    // (부드러운 스크롤은 연출 시작과 겹치면 브라우저가 중간에 취소하는 경우가 있어 즉시 이동)
+    window.scrollTo({ top: 0 });
   };
 
   const close = () => {

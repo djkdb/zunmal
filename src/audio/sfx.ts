@@ -1,3 +1,5 @@
+import type { Rarity } from '../data/rarity';
+
 /**
  * WebAudio 합성 효과음. 오디오 파일을 사용하지 않는다.
  *
@@ -14,7 +16,15 @@ export interface Sfx {
   capsuleOpen(): void;
   resultCommon(): void;
   resultRare(): void;
+  resultEpic(): void;
   resultLegendary(): void;
+  resultMythic(): void;
+  /** 시크릿 등장: 정적 → 깊은 울림 → 천상의 화음 + 메아리 */
+  resultSecret(): void;
+  /** 시크릿 캡슐이 나오기 직전의 불길한(?) 예고음 */
+  secretTease(): void;
+  /** 반짝 버전 획득 */
+  shinyChime(): void;
   success(): void;
   fail(): void;
   /** 미니게임: 가벼운 탭음. level이 높을수록 음이 올라간다 (콤보 표현). */
@@ -251,6 +261,59 @@ export class SfxEngine implements Sfx {
     });
   }
 
+  resultEpic() {
+    // 레어보다 한 단계 높은 반짝이는 상승 아르페지오 + 종소리
+    this.arpeggio([NOTE.E5, NOTE.G5, NOTE.B5, NOTE.E6], 0.07, { duration: 0.28, type: 'triangle', gain: 0.22 });
+    this.bell(NOTE.E6 * 2, 0.35, 0.8);
+    this.bell(NOTE.B5 * 2, 0.45, 0.6);
+  }
+
+  resultMythic() {
+    this.resultLegendary();
+    // 무지개처럼 쏟아지는 하강·상승 반짝임
+    const run = [NOTE.C6 * 2, NOTE.G6, NOTE.E6, NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C6 * 2, NOTE.E6 * 2];
+    run.forEach((f, i) => this.bell(f, 0.9 + i * 0.07, 0.35));
+  }
+
+  resultSecret() {
+    const r = this.ready();
+    if (!r) return;
+    // 1) 깊은 울림
+    this.tone({ freq: 55, slideTo: 40, duration: 1.4, type: 'sine', gain: 0.6, attack: 0.05 });
+    this.noise(1.2, { freq: 220, gain: 0.25, q: 0.5 });
+    // 2) 천상의 화음: 살짝 어긋난 여러 음을 겹쳐 합창처럼
+    const chord = [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.B5, NOTE.D6];
+    chord.forEach((f, i) => {
+      for (const detune of [-0.006, 0, 0.006]) {
+        this.tone({ freq: f * (1 + detune), duration: 2.6, type: 'sine', gain: 0.05, delay: 0.7 + i * 0.05, attack: 0.5 });
+      }
+    });
+    // 3) 메아리치는 별빛 아르페지오
+    const stars = [NOTE.C6, NOTE.E6, NOTE.G6, NOTE.B5 * 2, NOTE.D6 * 2, NOTE.G6 * 2];
+    stars.forEach((f, i) => {
+      this.bell(f, 1.2 + i * 0.11, 0.5);
+      this.bell(f, 1.2 + i * 0.11 + 0.33, 0.18); // 메아리
+    });
+  }
+
+  secretTease() {
+    // 낮게 웅웅거리다 멎는 소리 — "뭔가 이상하다"
+    this.tone({ freq: 70, slideTo: 140, duration: 0.9, type: 'sawtooth', gain: 0.05, attack: 0.2 });
+    this.tone({ freq: 71.5, slideTo: 143, duration: 0.9, type: 'sawtooth', gain: 0.05, attack: 0.2 });
+    this.noise(0.9, { freq: 900, gain: 0.08, q: 6 });
+  }
+
+  shinyChime() {
+    [NOTE.E6 * 2, NOTE.B5 * 2, NOTE.G6 * 2, NOTE.E6 * 2 * 1.5].forEach((f, i) => this.bell(f, i * 0.06, 0.4));
+  }
+
+  /** 맑은 종소리: 기음 + 비정수배 배음, 긴 감쇠 */
+  private bell(freq: number, delay: number, level: number) {
+    this.tone({ freq, duration: 0.9, type: 'sine', gain: 0.09 * level, delay, attack: 0.003 });
+    this.tone({ freq: freq * 2.76, duration: 0.45, type: 'sine', gain: 0.035 * level, delay, attack: 0.003 });
+    this.tone({ freq: freq * 5.4, duration: 0.2, type: 'sine', gain: 0.015 * level, delay, attack: 0.003 });
+  }
+
   success() {
     this.arpeggio([NOTE.G5, NOTE.C6, NOTE.E6, NOTE.G6], 0.09, { duration: 0.22, type: 'square', gain: 0.08 });
   }
@@ -299,11 +362,29 @@ export class SfxEngine implements Sfx {
 /** 앱 전역 효과음 인스턴스 */
 export const sfx = new SfxEngine();
 
-/** 결과 희귀도 단계에 맞는 효과음 */
-export function playResultFanfare(engine: Sfx, fanfare: 0 | 1 | 2 | 3 | 4): void {
-  if (fanfare >= 3) engine.resultLegendary();
-  else if (fanfare >= 1) engine.resultRare();
-  else engine.resultCommon();
+/** 결과 희귀도에 맞는 효과음. 반짝이면 반짝 종소리를 덧붙인다. */
+export function playRarityFanfare(engine: Sfx, rarity: Rarity, shiny = false): void {
+  switch (rarity) {
+    case 'common':
+      engine.resultCommon();
+      break;
+    case 'rare':
+      engine.resultRare();
+      break;
+    case 'epic':
+      engine.resultEpic();
+      break;
+    case 'legendary':
+      engine.resultLegendary();
+      break;
+    case 'mythic':
+      engine.resultMythic();
+      break;
+    case 'secret':
+      engine.resultSecret();
+      break;
+  }
+  if (shiny) engine.shinyChime();
 }
 
 /**

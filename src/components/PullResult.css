@@ -185,3 +185,194 @@
 .pull-close {
   margin-top: 14px;
 }
+
+/* ── 등급 차별화 ─────────────────────────────────────────────── */
+.pull-single__badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.pull-tag--shiny {
+  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffb8e0 60%, #b8e8ff);
+  animation: tag-shimmer 1.6s linear infinite;
+  background-size: 200% 100%;
+}
+
+@keyframes tag-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* 에픽: 보라 테두리 */
+.pull-modal--epic {
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 5px var(--rarity-epic);
+}
+
+/* 전설: 금빛 이중 테두리 + 빛 */
+.pull-modal--legendary {
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 5px var(--rarity-legendary),
+    0 0 0 9px var(--ink),
+    0 0 36px 12px rgba(255, 192, 46, 0.6);
+}
+
+/* 신화: 무지개가 테두리를 따라 흐른다 */
+.pull-modal--mythic {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--paper), var(--paper)) padding-box,
+    conic-gradient(from var(--spin, 0deg), #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff, #ff9fbd) border-box;
+  border-width: 6px;
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 40px 12px rgba(205, 178, 255, 0.7);
+}
+
+/* 시크릿: 모달 전체가 밤하늘로 바뀐다 */
+.pull-modal--secret {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 60% 80%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 30% 60%, rgba(255, 224, 122, 0.9) 0 1.2px, transparent 1.8px),
+    radial-gradient(ellipse at 50% 35%, #5a3bb0 0%, #2d1b5e 45%, #120a2e 100%);
+  color: #fff;
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 4px #ffe07a,
+    0 0 0 8px var(--ink),
+    0 0 60px 20px rgba(143, 107, 255, 0.8);
+}
+
+.pull-modal--secret .pull-title,
+.pull-modal--secret .pull-single__name {
+  color: #ffe07a;
+  -webkit-text-stroke: 6px var(--ink);
+  paint-order: stroke fill;
+}
+
+.pull-modal--secret .pull-single__desc,
+.pull-modal--secret .pull-summary {
+  color: #e6dcff;
+}
+
+.pull-modal--secret .modal__body {
+  animation: secret-arrive 1.2s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+
+@keyframes secret-arrive {
+  0% {
+    filter: brightness(3) blur(6px);
+    transform: scale(0.9);
+  }
+  100% {
+    filter: none;
+    transform: none;
+  }
+}
+
+.pull-single--secret .pull-rays {
+  background: repeating-conic-gradient(
+    #ffe07a 0 6deg,
+    transparent 6deg 18deg,
+    #cdb2ff 18deg 24deg,
+    transparent 24deg 36deg,
+    #8fd9ff 36deg 42deg,
+    transparent 42deg 54deg
+  );
+  animation-duration: 6s;
+  opacity: 0.95;
+}
+
+.pull-starfield {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 15% 30%, #fff 0 1.5px, transparent 2px),
+    radial-gradient(circle at 85% 20%, #ffe07a 0 2px, transparent 2.5px),
+    radial-gradient(circle at 70% 85%, #fff 0 1.5px, transparent 2px),
+    radial-gradient(circle at 25% 80%, #8fd9ff 0 2px, transparent 2.5px),
+    radial-gradient(circle at 50% 8%, #fff 0 1px, transparent 1.5px);
+  animation: twinkle 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  to {
+    opacity: 0.4;
+    transform: rotate(8deg) scale(1.03);
+  }
+}
+
+/* 반짝: 호일처럼 빛이 스친다 */
+.pull-shine {
+  position: absolute;
+  inset: 12%;
+  z-index: 2;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.85) 46%, rgba(255, 190, 230, 0.6) 52%, rgba(160, 230, 255, 0.5) 56%, transparent 70%);
+  background-size: 250% 100%;
+  mix-blend-mode: screen;
+  animation: shiny-sweep-card 1.8s ease-in-out infinite;
+}
+
+@keyframes shiny-sweep-card {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+/* 10연 카드 등급별 */
+.pull-card--secret {
+  background:
+    radial-gradient(circle at 20% 20%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 35%, #ffe07a 0 1.2px, transparent 1.8px),
+    radial-gradient(ellipse at 50% 30%, #5a3bb0, #1b1040);
+  color: #fff;
+  box-shadow:
+    0 0 0 3px #ffe07a,
+    0 0 20px 6px rgba(143, 107, 255, 0.85);
+}
+
+.pull-card.is-shiny {
+  position: relative;
+  overflow: hidden;
+}
+
+.pull-card.is-shiny::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.8) 48%, rgba(255, 200, 235, 0.5) 54%, transparent 66%);
+  background-size: 250% 100%;
+  mix-blend-mode: screen;
+  animation: shiny-sweep-card 2s ease-in-out infinite;
+}
+
+@property --spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.pull-modal--mythic[open] {
+  animation:
+    modal-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1),
+    border-spin 3s linear infinite;
+}
+
+@keyframes border-spin {
+  to {
+    --spin: 360deg;
+  }
+}

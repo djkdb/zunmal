@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { playResultFanfare, sfx } from '../audio/sfx';
+import { playRarityFanfare, sfx } from '../audio/sfx';
 import { RARITY_META, type Rarity } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import './GachaMachine.css';
@@ -26,13 +26,15 @@ const DOME_CAPSULES: { x: number; y: number; r: number; color: string; rot: numb
   { x: 102, y: 64, r: 13, color: '#f3ebdd', rot: 25 },
 ];
 
-export type MachinePhase = 'idle' | 'inserting' | 'shaking' | 'dropping' | 'ready' | 'opening';
+export type MachinePhase = 'idle' | 'inserting' | 'shaking' | 'tease' | 'dropping' | 'ready' | 'opening';
 
 export interface MachineRun {
   /** 실행마다 고유한 값 (같은 결과 재실행 구분) */
   id: number;
   /** 결과 중 가장 높은 희귀도 → 캡슐 색 */
   rarity: Rarity;
+  /** 결과에 반짝이 있는가 → 캡슐에 반짝임, 결과음에 종소리 */
+  shiny?: boolean;
 }
 
 interface GachaMachineProps {
@@ -42,8 +44,8 @@ interface GachaMachineProps {
 }
 
 const TIMINGS = {
-  normal: { inserting: 550, shaking: 1200, dropping: 650, opening: 650 },
-  reduced: { inserting: 120, shaking: 200, dropping: 120, opening: 150 },
+  normal: { inserting: 550, shaking: 1200, tease: 1500, dropping: 650, opening: 650 },
+  reduced: { inserting: 120, shaking: 200, tease: 300, dropping: 120, opening: 150 },
 } as const;
 
 function CapsuleShape({ top, id }: { top: string; id: string }) {
@@ -69,6 +71,14 @@ function CapsuleShape({ top, id }: { top: string; id: string }) {
       <g className="capsule-top">
         <path d="M-30 0 A30 30 0 0 1 30 0 Z" fill={fill} stroke="#2b2233" strokeWidth="4" strokeLinejoin="round" />
         <ellipse cx="-12" cy="-16" rx="8" ry="4.5" fill="#fff" opacity="0.7" transform="rotate(-30 -12 -16)" />
+        {top === 'cosmic' && (
+          <g fill="#ffe07a">
+            <circle cx="8" cy="-18" r="1.8" />
+            <circle cx="16" cy="-8" r="1.2" />
+            <circle cx="-4" cy="-6" r="1.4" />
+            <path d="M20 -20 l1.5 3.5 l3.5 1.5 l-3.5 1.5 l-1.5 3.5 l-1.5 -3.5 l-3.5 -1.5 l3.5 -1.5 Z" />
+          </g>
+        )}
       </g>
       <rect x="-31" y="-3" width="62" height="6" rx="3" fill="#2b2233" className="capsule-band" />
     </svg>
@@ -111,8 +121,16 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
       sfx.capsuleShake();
       if (!reduced) after(t.shaking / 2, () => sfx.capsuleShake());
     });
-    after(t.inserting + t.shaking, () => setPhase('dropping'));
-    after(t.inserting + t.shaking + t.dropping, () => {
+    // 시크릿: 불이 꺼지고 머신이 웅웅거리는 예고 단계가 한 번 더 들어간다
+    const tease = run.rarity === 'secret' ? t.tease : 0;
+    if (tease > 0) {
+      after(t.inserting + t.shaking, () => {
+        setPhase('tease');
+        sfx.secretTease();
+      });
+    }
+    after(t.inserting + t.shaking + tease, () => setPhase('dropping'));
+    after(t.inserting + t.shaking + tease + t.dropping, () => {
       sfx.tap(4);
       setPhase('ready');
     });
@@ -123,7 +141,7 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
   useEffect(() => clearTimers, []);
 
   useEffect(() => {
-    if (phase === 'ready') capsuleRef.current?.focus();
+    if (phase === 'ready') capsuleRef.current?.focus({ preventScroll: true });
   }, [phase]);
 
   const open = () => {
@@ -131,7 +149,7 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
     setPhase('opening');
     sfx.capsuleOpen();
     after(t.opening, () => {
-      playResultFanfare(sfx, RARITY_META[run.rarity].fanfare);
+      playRarityFanfare(sfx, run.rarity, run.shiny);
       onOpenedRef.current();
     });
   };
@@ -139,9 +157,10 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
   const showCapsule = run && (phase === 'dropping' || phase === 'ready' || phase === 'opening');
   const capsuleTop = run ? CAPSULE_TOP[run.rarity] : CAPSULE_TOP.common;
   const glow = run && RARITY_META[run.rarity].fanfare >= 2;
+  const rarityClass = run && phase !== 'idle' && phase !== 'inserting' ? ` machine--r-${run.rarity}` : '';
 
   return (
-    <div className={`machine machine--${phase}`}>
+    <div className={`machine machine--${phase}${rarityClass}`}>
       <svg className="machine__svg" viewBox="0 0 204 300" role="img" aria-label="말랑 캡슐 머신">
         <defs>
           <radialGradient id="machine-glass" cx="35%" cy="30%" r="80%">
@@ -216,7 +235,7 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
         <button
           ref={capsuleRef}
           type="button"
-          className={`machine__capsule machine__capsule--${run.rarity}${glow ? ' has-glow' : ''}`}
+          className={`machine__capsule machine__capsule--${run.rarity}${glow ? ' has-glow' : ''}${run.shiny ? ' is-shiny' : ''}`}
           onClick={open}
           disabled={phase !== 'ready'}
           aria-label="캡슐 열기"
@@ -227,7 +246,15 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
       {phase === 'opening' && <div className={`machine__flash machine__flash--${run?.rarity ?? 'common'}`} aria-hidden="true" />}
 
       <p className="machine__hint" aria-live="polite">
-        {phase === 'ready' ? '캡슐을 눌러서 열어보세요!' : phase === 'idle' ? '' : '두근두근…'}
+        {phase === 'ready'
+          ? run?.rarity === 'secret'
+            ? '이 캡슐… 뭔가 특별해요!'
+            : '캡슐을 눌러서 열어보세요!'
+          : phase === 'tease'
+            ? '어… 머신이 이상해요?!'
+            : phase === 'idle'
+              ? ''
+              : '두근두근…'}
       </p>
     </div>
   );
