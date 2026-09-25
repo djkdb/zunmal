@@ -152,3 +152,9 @@
   margin: 0;
   text-align: center;
 }
+
+/* 포커스 표시는 판정 링과 헷갈리지 않도록 링 바깥쪽 실선으로 */
+.rh__malang:focus-visible {
+  outline: 4px solid var(--lemon);
+  outline-offset: 34px;
+}

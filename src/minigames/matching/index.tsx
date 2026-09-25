@@ -21,11 +21,9 @@ import {
 } from './logic';
 import './Matching.css';
 
-/** 카드 뒤집는 소리. sfx에 flip이 있으면 쓰고, 없으면 가벼운 탭음으로 대신한다. */
+/** 카드 뒤집는 소리 */
 function playFlip(sfx: Sfx) {
-  const withFlip = sfx as Sfx & { flip?: () => void };
-  if (typeof withFlip.flip === 'function') withFlip.flip();
-  else sfx.tap(0);
+  sfx.flip();
 }
 
 type EndKind = 'clear' | 'timeout';
