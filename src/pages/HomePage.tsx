@@ -1,13 +1,25 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
 import { RarityBadge } from '../components/RarityBadge';
-import { CapsuleIcon, JoystickIcon, TicketIcon } from '../components/icons';
+import { BookIcon, CapsuleIcon, JoystickIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
 import { RARITY_META } from '../data/rarity';
 import { DAILY_CAP, PARTNER_RARITY_BONUS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import './HomePage.css';
+
+/** 파트너가 건네는 한마디 (상황에 따라 바뀜) */
+function useGreeting(tickets: number, dailyLeft: number, bonus: number): string {
+  return useMemo(() => {
+    if (tickets >= 10) return '뽑기권이 잔뜩! 10연 뽑기 하러 갈까요?';
+    if (tickets > 0) return '뽑기권이 있어요. 캡슐 뽑으러 가요!';
+    if (dailyLeft <= 0) return '오늘 코인은 다 모았어요. 내일 또 놀아요!';
+    if (bonus > 0) return `나랑 놀면 코인이 ${bonus}% 더 나와요!`;
+    return '미니게임 하고 코인 모아요!';
+  }, [tickets, dailyLeft, bonus]);
+}
 
 export function HomePage() {
   const partnerId = useGameStore((s) => s.partnerId);
@@ -18,47 +30,50 @@ export function HomePage() {
   const ownedCount = CHARACTERS.filter((c) => owned[c.id]).length;
   const dailyLeft = Math.max(0, DAILY_CAP - dailyEarned);
   const bonus = partner ? Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100) : 0;
+  const greeting = useGreeting(tickets, dailyLeft, bonus);
 
   return (
     <section className="page home" aria-labelledby="home-title">
+      <header className="home__sign">
+        <div className="home__awning" aria-hidden="true" />
+        <h1 id="home-title" className="home__logo">
+          <span className="home__logo-small">말랑</span>
+          <span className="home__logo-big">뽑기방</span>
+        </h1>
+      </header>
+
       {partner && (
-        <div className="home__counter">
-          <div className="home__stage">
-            <Malang character={partner} size={168} animation="idle" />
-          </div>
-          <div className="home__plate">
-            <h1 id="home-title" className="home__name">
-              {partner.name}
-            </h1>
-            <RarityBadge rarity={partner.rarity} />
-            <p className="home__bonus">
-              {bonus > 0 ? `함께 놀면 코인 +${bonus}%` : '오늘도 같이 놀자!'}
-            </p>
-          </div>
+        <div className="home__stage">
+          <p className="home__bubble">{greeting}</p>
+          <Link to="/collection" className="home__partner" aria-label={`파트너 ${partner.name}, 도감에서 바꾸기`}>
+            <Malang character={partner} size={172} animation="idle" decorative />
+          </Link>
+          <div className="home__pedestal" aria-hidden="true" />
+          <p className="home__name">
+            {partner.name} <RarityBadge rarity={partner.rarity} compact />
+          </p>
         </div>
       )}
 
       <div className="home__actions">
-        <Link to="/play" className="btn btn--mint btn--block home__action" onClick={() => sfx.button()}>
-          <JoystickIcon size={30} />
-          미니게임으로 코인 벌기
+        <Link to="/play" className="btn btn--mint btn--big btn--block" onClick={() => sfx.button()}>
+          <JoystickIcon size={34} />
+          게임하기
         </Link>
-        <Link to="/gacha" className="btn btn--primary btn--block home__action" onClick={() => sfx.button()}>
-          <CapsuleIcon size={30} />
-          캡슐 뽑으러 가기
-          {tickets > 0 && (
-            <span className="home__ticket-sticker" aria-label={`뽑기권 ${tickets}장`}>
-              <TicketIcon size={18} />
-              {tickets}
-            </span>
-          )}
-        </Link>
+        <div className="home__row">
+          <Link to="/gacha" className="btn btn--primary btn--block" onClick={() => sfx.button()}>
+            <CapsuleIcon size={28} />
+            뽑기
+            {tickets > 0 && <span className="home__count">{tickets}</span>}
+          </Link>
+          <Link to="/collection" className="btn btn--lemon btn--block" onClick={() => sfx.button()}>
+            <BookIcon size={28} />
+            도감
+          </Link>
+        </div>
       </div>
 
-      <Link to="/collection" className="home__shelf" onClick={() => sfx.button()}>
-        <span className="home__shelf-text">
-          도감 <strong>{ownedCount}</strong>/{CHARACTERS.length}
-        </span>
+      <Link to="/collection" className="home__jar" onClick={() => sfx.button()} aria-label={`도감 ${ownedCount}/${CHARACTERS.length}`}>
         <span className="home__slots" aria-hidden="true">
           {CHARACTERS.map((c) => (
             <span
@@ -68,13 +83,10 @@ export function HomePage() {
             />
           ))}
         </span>
+        <span className="home__jar-count">
+          {ownedCount}/{CHARACTERS.length}
+        </span>
       </Link>
-
-      <p className="home__daily small muted">
-        {dailyLeft > 0
-          ? `오늘 미니게임으로 코인을 ${dailyLeft.toLocaleString()}개 더 받을 수 있어요.`
-          : '오늘 받을 수 있는 코인을 모두 받았어요. 자정에 다시 채워져요.'}
-      </p>
     </section>
   );
 }

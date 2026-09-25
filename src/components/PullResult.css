@@ -96,12 +96,15 @@
 /* 획득 태그 */
 .pull-tag {
   display: inline-block;
-  padding: 0 8px;
+  max-width: 100%;
+  padding: 0 7px;
   border: 2px solid var(--ink);
   border-radius: 999px;
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pull-tag--new {
@@ -118,7 +121,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 

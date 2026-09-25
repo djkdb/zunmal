@@ -16,7 +16,7 @@ function OwnershipTag({ item }: { item: ResolvedPull }) {
   if (item.isNew) return <span className="pull-tag pull-tag--new">NEW!</span>;
   return (
     <span className="pull-tag pull-tag--dup">
-      중복 +{item.refund}코인
+      +{item.refund}코인
     </span>
   );
 }
@@ -49,7 +49,7 @@ function MultiResult({ items }: { items: readonly ResolvedPull[] }) {
           style={{ '--i': i } as CSSProperties}
           aria-label={`${i + 1}번째: ${RARITY_META[item.rarity].label} ${item.character.name}, ${item.isNew ? '새로 획득' : `이미 있어서 ${item.refund}코인 돌려받음`}`}
         >
-          <Malang character={item.character} size={64} animation="none" decorative />
+          <Malang character={item.character} size={56} animation="none" decorative />
           <span className="pull-card__name">{item.character.name}</span>
           <RarityBadge rarity={item.rarity} compact />
           <OwnershipTag item={item} />

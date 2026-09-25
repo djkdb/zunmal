@@ -7,6 +7,7 @@ import { getCharacter } from '../data/characters';
 import { getMiniGame } from '../minigames/registry';
 import type { MiniGame, MiniGameResultPayload } from '../minigames/types';
 import { useGameStore, type MiniGameFinishResult } from '../store/useGameStore';
+import './MiniGamePage.css';
 
 export function MiniGamePage() {
   const { gameId } = useParams();
@@ -16,7 +17,6 @@ export function MiniGamePage() {
         <h1 id="lobby-title" className="page-title">
           미니게임
         </h1>
-        <p className="page-subtitle">점수가 높을수록 코인을 많이 받아요. 모은 코인으로 뽑기권을 사요.</p>
         <MiniGameLobby />
       </section>
     );
@@ -27,7 +27,10 @@ export function MiniGamePage() {
   return <MiniGameRunner key={game.id} game={game} />;
 }
 
-type Phase = { kind: 'playing'; round: number } | { kind: 'result'; payload: MiniGameResultPayload; result: MiniGameFinishResult };
+type Phase =
+  | { kind: 'intro' }
+  | { kind: 'playing'; round: number }
+  | { kind: 'result'; payload: MiniGameResultPayload; result: MiniGameFinishResult };
 
 /**
  * 게임 실행 → 결과 처리.
@@ -37,7 +40,8 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
   const navigate = useNavigate();
   const partnerId = useGameStore((s) => s.partnerId);
   const finishMiniGame = useGameStore((s) => s.finishMiniGame);
-  const [phase, setPhase] = useState<Phase>({ kind: 'playing', round: 0 });
+  const [phase, setPhase] = useState<Phase>({ kind: 'intro' });
+  const best = useGameStore((s) => s.miniGameRecords[game.id]?.bestScore ?? 0);
   const roundRef = useRef(0);
   const finishedRound = useRef(-1);
 
@@ -60,6 +64,37 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
   }, [navigate]);
 
   if (!partner) return <Navigate to="/" replace />;
+
+  if (phase.kind === 'intro') {
+    const Icon = game.icon;
+    return (
+      <section className="page mg-intro" aria-labelledby="mg-intro-title">
+        <div className="mg-intro__icon" aria-hidden="true">
+          <Icon />
+        </div>
+        <h1 id="mg-intro-title" className="page-title">
+          {game.name}
+        </h1>
+        <p className="mg-intro__desc">{game.description}</p>
+        {game.controls && <p className="mg-intro__controls">{game.controls}</p>}
+        <p className="mg-intro__best">{best > 0 ? `내 최고 기록 ${best.toLocaleString()}점` : '첫 도전이에요!'}</p>
+        <button
+          type="button"
+          className="btn btn--primary btn--big btn--block"
+          autoFocus
+          onClick={() => {
+            sfx.button();
+            setPhase({ kind: 'playing', round: roundRef.current });
+          }}
+        >
+          시작!
+        </button>
+        <button type="button" className="btn btn--small" onClick={onExit}>
+          다른 게임 고르기
+        </button>
+      </section>
+    );
+  }
 
   if (phase.kind === 'result') {
     return (

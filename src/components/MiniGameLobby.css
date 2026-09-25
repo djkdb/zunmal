@@ -1,155 +1,163 @@
 .lobby {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.lobby__h2 {
-  font-size: var(--fs-m);
+  gap: 18px;
 }
 
 .lobby__partner {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
 }
 
 .lobby__partners {
   display: flex;
   gap: 8px;
+  max-width: 100%;
   overflow-x: auto;
-  /* 선택 링(box-shadow)이 스크롤 영역에 잘리지 않도록 여백 확보 */
   margin-inline: -8px;
   padding: 8px 10px 10px;
   scroll-snap-type: x proximity;
 }
 
-/* 파트너 후보: 도감과 같은 캡슐 창 */
 .lobby__partner-btn {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 60px;
-  height: 60px;
+  width: 58px;
+  height: 58px;
   padding: 0;
   border: var(--line) solid var(--ink);
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), #f3eadb;
   cursor: pointer;
   scroll-snap-align: start;
+  transition: transform 0.15s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 .lobby__partner-btn.is-selected {
   background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), var(--lemon);
   box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink);
+  transform: scale(1.08);
 }
 
 .lobby__partner-info {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
-  color: var(--ink-soft);
-}
-
-.lobby__partner-info strong {
-  font-family: var(--font-display);
-  font-weight: 400;
+  gap: 6px;
   font-size: var(--fs-s);
-  color: var(--ink);
 }
 
+.lobby__bonus {
+  padding: 1px 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--matcha);
+  font-size: var(--fs-xs);
+}
+
+/* 게임 타일: 색 젤리 판 */
 .lobby__games {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 12px;
 }
 
-/* 오락기 앞판: 눌리는 판이라 키캡 그림자를 가진다 */
-.lobby__game {
+.lobby__tile {
+  --c: var(--berry);
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 14px 14px 14px 12px;
+  gap: 6px;
+  padding: 16px 8px 14px;
   border: var(--line) solid var(--ink);
   border-radius: var(--radius-panel);
-  background: var(--paper);
-  box-shadow: var(--keycap);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 45%, #fff) 0%, var(--c) 70%);
+  box-shadow:
+    inset 0 -7px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
+    var(--keycap);
   color: var(--ink);
   text-decoration: none;
-  transition:
-    transform 0.07s ease,
-    box-shadow 0.07s ease;
+  isolation: isolate;
+  transition: transform 0.12s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
-.lobby__game:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
+.lobby__tile::before {
+  z-index: -1;
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 18%;
+  right: 18%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
 }
 
-.lobby li:nth-child(3n + 1) .lobby__game-icon {
-  background: #ffd3de;
+.lobby__tile:active {
+  transform: translateY(4px) scale(1.03, 0.94);
+  box-shadow:
+    inset 0 -4px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
+    0 1px 0 var(--ink);
 }
 
-.lobby li:nth-child(3n + 2) .lobby__game-icon {
-  background: #cdeaff;
+.lobby__tile--0 {
+  --c: var(--berry);
+}
+.lobby__tile--1 {
+  --c: var(--soda);
+}
+.lobby__tile--2 {
+  --c: var(--lemon);
+}
+.lobby__tile--3 {
+  --c: var(--matcha);
+}
+.lobby__tile--4 {
+  --c: var(--grape);
+}
+.lobby__tile--5 {
+  --c: var(--peach);
 }
 
-.lobby li:nth-child(3n) .lobby__game-icon {
-  background: #dff3d6;
-}
-
-.lobby__game-icon {
-  flex-shrink: 0;
+.lobby__tile-icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   border: var(--line) solid var(--ink);
   border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset 0 -5px 0 rgba(43, 34, 51, 0.08);
 }
 
-.lobby__game-icon svg {
-  width: 44px;
-  height: 44px;
+.lobby__tile-icon svg {
+  width: 54px;
+  height: 54px;
 }
 
-.lobby__game-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.lobby__game-name {
-  font-family: var(--font-display);
+.lobby__tile-name {
   font-size: var(--fs-m);
+  color: #fff;
+  -webkit-text-stroke: 6px var(--ink);
+  paint-order: stroke fill;
+  text-align: center;
+  line-height: 1.2;
 }
 
-.lobby__game-desc {
-  max-width: 30ch;
-  font-size: var(--fs-s);
-  line-height: 1.45;
-  color: var(--ink-soft);
-}
-
-.lobby__best {
-  position: absolute;
-  top: -12px;
-  right: 14px;
-  padding: 1px 10px;
+.lobby__tile-best {
+  padding: 1px 10px 0;
   border: 2.5px solid var(--ink);
   border-radius: 999px;
-  background: var(--lemon);
-  font-family: var(--font-display);
+  background: var(--paper);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-  transform: rotate(3deg);
 }
 
 .lobby__cap {

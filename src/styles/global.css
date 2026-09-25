@@ -1,21 +1,33 @@
+/* 카페24 써라운드: 동글동글 두꺼운 획이 말랑이와 어울리는 게임용 글꼴 (무료 폰트, 눈누 CDN) */
+@font-face {
+  font-family: 'Cafe24 Ssurround';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ------------------------------------------------------------------
- * 말랑 뽑기방 디자인 토큰
- * 크림색 배경 + 굵은 잉크 외곽선 + 둥근 UI
+ * 말랑 뽑기방 디자인 토큰 — "젤리 과자 가게"
+ * 재질: 반투명하고 광택 있는 젤리. 누르면 찌그러진다.
  * ------------------------------------------------------------------ */
 :root {
-  /* 문방구 앞 뽑기방 팔레트 — 딸기우유, 소다, 레몬, 말차 */
-  --cream: #fff4e0; /* 우유 캐러멜 바닥 */
+  /* 바탕 */
+  --cream: #fff4e0; /* 우유푸딩 */
   --cream-deep: #ffe6bf;
   --paper: #fffcf5;
-  --ink: #2b2233; /* 보랏빛 잉크 — 순검정 대신 */
-  --ink-soft: #6a5d70;
-  --berry: #ff6f91;
-  --berry-deep: #e84d74;
-  --soda: #6ec6ff;
-  --lemon: #ffd84d;
-  --matcha: #8ed081;
-  --grape: #b99cff;
-  --shelf: #e9c99a; /* 진열장 선반 */
+  --ink: #2b2233; /* 보랏빛 잉크 외곽선 */
+  --ink-soft: #7a6b80;
+
+  /* 젤리 색 */
+  --berry: #ff7aa2; /* 딸기 */
+  --berry-deep: #e8527f;
+  --soda: #5cc8ff; /* 소다 */
+  --lemon: #ffd23f; /* 레몬 */
+  --matcha: #7ed957; /* 메론 */
+  --grape: #b98cff; /* 포도 */
+  --peach: #ffa36b; /* 복숭아 */
+  --shelf: #e9c99a;
   --danger: #ff5b5b;
 
   /* 이전 이름 호환 */
@@ -26,35 +38,34 @@
   --lavender: var(--grape);
 
   --rarity-common: #cfc5b6;
-  --rarity-rare: #6ec6ff;
-  --rarity-epic: #b99cff;
+  --rarity-rare: #5cc8ff;
+  --rarity-epic: #b98cff;
   --rarity-legendary: #ffc02e;
-  --rarity-mythic: #ff6f91;
+  --rarity-mythic: #ff7aa2;
 
   --line: 3px;
-  /* 모양으로 위계 표현: 패널 > 슬롯 > 칩(완전한 알약형) */
-  --radius-panel: 22px;
-  --radius-slot: 14px;
-  --radius-s: 10px;
+  --radius-panel: 26px;
+  --radius-slot: 18px;
+  --radius-s: 12px;
   --radius-m: var(--radius-slot);
   --radius-l: var(--radius-panel);
-  /* 눌리는 것만 키캡 그림자를 가진다. 패널은 평평하다. */
-  --keycap: 0 4px 0 var(--ink);
+  --keycap: 0 5px 0 var(--ink);
   --keycap-s: 0 3px 0 var(--ink);
   --shadow-pop: var(--keycap);
   --shadow-pop-s: var(--keycap-s);
 
-  --font-display: 'Jua', 'Gowun Dodum', system-ui, sans-serif;
-  --font-body: 'Gowun Dodum', 'Jua', system-ui, sans-serif;
+  --font-display: 'Cafe24 Ssurround', 'Jua', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-body: var(--font-display);
 
-  /* 타입 스케일 (1.25 비율) */
+  /* 타입 스케일 (1.25) */
   --fs-xs: 0.8125rem;
   --fs-s: 0.9375rem;
   --fs-m: 1.25rem;
   --fs-l: 1.5625rem;
   --fs-xl: 1.9375rem;
+  --fs-xxl: 2.4375rem;
 
-  --nav-h: 72px;
+  --nav-h: 84px;
   --max-w: 480px;
   --gutter: 16px;
 
@@ -74,7 +85,10 @@ body {
 }
 
 body {
-  background: var(--cream);
+  /* 스프링클(설탕 가루) 무늬 — 과자 가게 바닥 */
+  background-color: var(--cream);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg stroke-linecap='round' stroke-width='5' opacity='0.35'%3E%3Cpath d='M14 20l8 5' stroke='%23ff7aa2'/%3E%3Cpath d='M70 12l-3 9' stroke='%235cc8ff'/%3E%3Cpath d='M100 46l8-3' stroke='%23ffd23f'/%3E%3Cpath d='M40 60l3 8' stroke='%237ed957'/%3E%3Cpath d='M86 90l-8 5' stroke='%23b98cff'/%3E%3Cpath d='M20 98l8 2' stroke='%23ffa36b'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 120px 120px;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -89,7 +103,7 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: normal;
   margin: 0;
   line-height: 1.25;
 }
@@ -103,9 +117,12 @@ button {
   color: inherit;
 }
 
-/* 키보드 포커스 표시: 마우스 클릭 시에는 숨기고 키보드 탐색 시에만 강하게 */
+strong {
+  font-weight: normal;
+}
+
 :focus-visible {
-  outline: 3px dashed var(--pink-deep);
+  outline: 3px dashed var(--berry-deep);
   outline-offset: 3px;
 }
 
@@ -134,59 +151,73 @@ button {
   padding: 0 var(--gutter) calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));
 }
 
+.app-main--game {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.app-main:focus {
+  outline: none;
+}
+
 .page {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding-top: 18px;
+  padding-top: 8px;
 }
 
-/* 페이지 제목: 가게 간판 스티커 글씨 — 타이포 자체가 장식 역할 */
+/* 풍선 글씨 제목: 흰 글자 + 잉크 외곽선 + 아래로 떨어지는 그림자 */
 .page-title {
-  align-self: flex-start;
+  align-self: center;
+  text-align: center;
   font-size: var(--fs-xl);
-  line-height: 1.1;
+  line-height: 1.15;
   color: var(--paper);
-  -webkit-text-stroke: 7px var(--ink);
+  -webkit-text-stroke: 8px var(--ink);
   paint-order: stroke fill;
-  text-shadow: 0 4px 0 var(--ink);
-  letter-spacing: 0.01em;
+  text-shadow: 0 5px 0 var(--ink);
 }
 
 .page-subtitle {
-  margin-top: -8px;
-  max-width: 34ch;
+  text-align: center;
   color: var(--ink-soft);
   font-size: var(--fs-s);
 }
 
+.section-title {
+  font-size: var(--fs-m);
+  text-align: center;
+}
+
 /* ------------------------------------------------------------------
- * 하단 내비게이션: 판매대 서랍
+ * 하단 탭 바: 떠 있는 젤리 바, 선택된 탭은 위로 솟은 젤리 방울
  * ------------------------------------------------------------------ */
 .bottom-nav {
   position: fixed;
   z-index: 20;
   left: 50%;
-  bottom: 0;
+  bottom: calc(8px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  width: 100%;
-  max-width: var(--max-w);
+  width: calc(100% - 16px);
+  max-width: calc(var(--max-w) - 16px);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  padding: 6px;
   background: var(--paper);
-  border-top: var(--line) solid var(--ink);
+  border: var(--line) solid var(--ink);
+  border-radius: 28px;
+  box-shadow: 0 5px 0 var(--ink);
 }
 
 .bottom-nav__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1px;
-  min-height: 52px;
-  border-radius: var(--radius-slot);
+  justify-content: flex-end;
+  gap: 2px;
+  min-height: 58px;
+  border-radius: 22px;
   color: var(--ink-soft);
   text-decoration: none;
   font-family: var(--font-display);
@@ -196,10 +227,12 @@ button {
 .bottom-nav__icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 30px;
+  width: 46px;
+  height: 38px;
   border-radius: 999px;
-  transition: background 0.15s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1),
+    background 0.15s ease;
 }
 
 .bottom-nav__item.is-active {
@@ -207,75 +240,146 @@ button {
 }
 
 .bottom-nav__item.is-active .bottom-nav__icon {
-  background: var(--lemon);
-  box-shadow: inset 0 0 0 2.5px var(--ink);
+  width: 52px;
+  height: 52px;
+  margin-top: -20px;
+  background: linear-gradient(180deg, #fff3a8 0%, var(--lemon) 60%);
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.12),
+    0 0 0 3px var(--ink),
+    0 5px 0 3px var(--ink);
+  transform: translateY(-2px);
+}
+
+.bottom-nav__item:active .bottom-nav__icon {
+  transform: scale(0.9, 0.82);
 }
 
 /* ------------------------------------------------------------------
- * 버튼: 오락기 버튼처럼 눌리는 키캡
+ * 젤리 버튼: 광택 하이라이트 + 같은 색 계열의 두꺼운 아랫단 + 눌리면 찌그러짐
  * ------------------------------------------------------------------ */
 .btn {
+  --c: var(--paper);
+  --fg: var(--ink);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 50px;
-  padding: 10px 20px;
+  min-height: 54px;
+  padding: 10px 22px 13px;
   border: var(--line) solid var(--ink);
   border-radius: 999px;
-  background: var(--paper);
-  box-shadow: var(--keycap);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 55%, #fff) 0%, var(--c) 55%);
+  box-shadow:
+    inset 0 -6px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
+    var(--keycap);
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: 1.125rem;
+  line-height: 1.2;
+  color: var(--fg);
   cursor: pointer;
   text-decoration: none;
-  color: var(--ink);
   transition:
-    transform 0.07s ease,
-    box-shadow 0.07s ease;
+    transform 0.12s cubic-bezier(0.3, 1.6, 0.5, 1),
+    box-shadow 0.08s ease;
   touch-action: manipulation;
   user-select: none;
+  -webkit-user-select: none;
+  isolation: isolate;
+}
+
+/* 광택: 글자 뒤, 버튼 배경 위 */
+.btn::before {
+  z-index: -1;
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 16%;
+  right: 16%;
+  height: 28%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--ink);
+  transform: translateY(4px) scale(1.03, 0.93);
+  box-shadow:
+    inset 0 -3px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
+    0 1px 0 var(--ink);
 }
 
 .btn:disabled {
   cursor: not-allowed;
-  background: var(--cream-deep);
-  color: var(--ink-soft);
-  border-style: dashed;
-  box-shadow: none;
-  transform: translateY(3px);
+  --c: #e9dfd0;
+  --fg: var(--ink-soft);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.06);
+  transform: translateY(4px);
+  -webkit-text-stroke: 0;
+}
+
+.btn:disabled::before {
+  opacity: 0.4;
+}
+
+/* 진한 젤리 버튼은 흰 글씨 + 잉크 외곽선 (게임 버튼 글씨) */
+.btn--primary,
+.btn--sky,
+.btn--mint,
+.btn--grape {
+  --fg: #fff;
+  -webkit-text-stroke: 5px var(--ink);
+  paint-order: stroke fill;
 }
 
 .btn--primary {
-  background: var(--berry);
+  --c: var(--berry);
 }
 
 .btn--mint {
-  background: var(--matcha);
+  --c: var(--matcha);
 }
 
 .btn--lemon {
-  background: var(--lemon);
+  --c: var(--lemon);
 }
 
 .btn--sky {
-  background: var(--soda);
+  --c: var(--soda);
+}
+
+.btn--grape {
+  --c: var(--grape);
 }
 
 .btn--small {
-  min-height: 42px;
-  padding: 6px 14px;
+  min-height: 44px;
+  padding: 6px 16px 9px;
   font-size: var(--fs-s);
-  box-shadow: var(--keycap-s);
+  box-shadow:
+    inset 0 -4px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
+    var(--keycap-s);
+}
+
+.btn--primary.btn--small,
+.btn--sky.btn--small,
+.btn--mint.btn--small,
+.btn--grape.btn--small {
+  -webkit-text-stroke-width: 4px;
+}
+
+.btn--big {
+  min-height: 66px;
+  font-size: var(--fs-l);
 }
 
 .btn--block {
   width: 100%;
+}
+
+.btn svg {
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -287,14 +391,17 @@ button {
   padding: 0;
   border: var(--line) solid var(--ink);
   border-radius: 50%;
-  background: var(--paper);
-  box-shadow: var(--keycap-s);
+  background: linear-gradient(180deg, #fff 0%, var(--paper) 60%);
+  box-shadow:
+    inset 0 -4px 0 rgba(43, 34, 51, 0.1),
+    var(--keycap-s);
   cursor: pointer;
   touch-action: manipulation;
+  transition: transform 0.12s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 .icon-btn:active {
-  transform: translateY(3px);
+  transform: translateY(3px) scale(1.05, 0.9);
   box-shadow: none;
 }
 
@@ -302,11 +409,12 @@ button {
   background: var(--cream-deep);
 }
 
-/* 패널: 평평한 잉크 외곽선. 눌리지 않으므로 그림자 없음 */
+/* 패널: 푸딩 접시 — 아래쪽에 살짝 그늘 */
 .card {
   background: var(--paper);
   border: var(--line) solid var(--ink);
   border-radius: var(--radius-panel);
+  box-shadow: inset 0 -6px 0 rgba(43, 34, 51, 0.06);
   padding: 16px;
 }
 
@@ -319,11 +427,11 @@ button {
   align-items: center;
   gap: 4px;
   padding: 2px 10px;
-  border: 2px solid var(--ink);
+  border: 2.5px solid var(--ink);
   border-radius: 999px;
   background: var(--paper);
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -356,32 +464,17 @@ button {
 }
 
 /* ------------------------------------------------------------------
- * 움직임 줄이기: CSS 애니메이션/전환을 사실상 제거한다.
- * JS 기반 연출은 useReducedMotion 훅으로 별도 단축한다.
- * ------------------------------------------------------------------ */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ------------------------------------------------------------------
  * 희귀도 배지 (색 + 기호 + 텍스트)
  * ------------------------------------------------------------------ */
 .rarity-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 10px;
-  border: 2px solid var(--ink);
+  padding: 2px 10px 1px;
+  border: 2.5px solid var(--ink);
   border-radius: 999px;
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: var(--fs-xs);
   line-height: 1.5;
   white-space: nowrap;
   background: var(--rarity-common);
@@ -411,32 +504,28 @@ button {
 }
 
 .rarity-badge--mythic {
-  background: linear-gradient(90deg, #ff8fab, #ffd966, #7fd8be, #8ecdf7, #c3a6ff);
+  background: linear-gradient(90deg, #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff);
 }
 
+/* ------------------------------------------------------------------
+ * 접근성 보조
+ * ------------------------------------------------------------------ */
 .skip-link {
   position: absolute;
   left: 8px;
   top: -60px;
   z-index: 100;
   padding: 8px 14px;
+  border: none;
   background: var(--ink);
   color: var(--cream);
   border-radius: var(--radius-s);
+  font-family: var(--font-display);
+  cursor: pointer;
 }
 
 .skip-link:focus {
   top: 8px;
-}
-
-.app-main:focus {
-  outline: none;
-}
-
-.skip-link {
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-display);
 }
 
 /* ------------------------------------------------------------------
@@ -447,16 +536,17 @@ button {
   max-height: calc(100dvh - 32px);
   padding: 0;
   border: var(--line) solid var(--ink);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-panel);
   background: var(--paper);
   color: var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
   overflow: hidden;
 }
 
 .modal[open] {
   display: flex;
   flex-direction: column;
-  animation: modal-in 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+  animation: modal-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 
 .modal::backdrop {
@@ -471,11 +561,21 @@ button {
 
 @keyframes modal-in {
   from {
-    transform: scale(0.85);
+    transform: scale(0.8);
     opacity: 0;
   }
 }
 
-.app-main--game {
-  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+/* ------------------------------------------------------------------
+ * 움직임 줄이기
+ * ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
