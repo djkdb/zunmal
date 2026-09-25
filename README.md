@@ -66,7 +66,7 @@ npm install
 npm run dev      # http://localhost:5173
 npm test         # 단위 테스트
 npm run build    # 타입 체크 + 프로덕션 빌드
-npm run preview  # http://localhost:4173/zunmal/
+npm run preview  # http://localhost:4173/
 ```
 
 아키텍처, 코딩 컨벤션, 가챠·경제 규칙은 [CLAUDE.md](./CLAUDE.md)에 정리되어 있습니다.
@@ -113,4 +113,7 @@ src/
 
 ## 배포
 
-`main` 브랜치에 push하면 GitHub Actions(`.github/workflows/deploy.yml`)가 테스트와 빌드를 거쳐 GitHub Pages에 배포합니다. 처음 한 번은 저장소 **Settings → Pages → Source**를 **GitHub Actions**로 설정해야 합니다.
+빌드 결과(`dist/`)는 상대 경로로 만들어지므로 어느 정적 호스팅에 올려도 동작합니다.
+
+- **GitHub Pages**: `main`에 push하면 GitHub Actions(`.github/workflows/deploy.yml`)가 테스트와 빌드를 거쳐 배포합니다. 처음 한 번은 저장소 **Settings → Pages → Source**를 **GitHub Actions**로 설정해야 합니다.
+- **Cloudflare Pages**: 빌드 명령 `npm run build`, 출력 디렉터리 `dist`, 환경변수 `NODE_VERSION=22`.

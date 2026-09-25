@@ -13,7 +13,7 @@ npm test           # Vitest 단위 테스트 (1회 실행)
 npm run test:watch # 테스트 watch 모드
 npm run typecheck  # tsc -b (strict)
 npm run build      # 타입체크 + 프로덕션 빌드 (dist/)
-npm run preview    # 빌드 결과 미리보기 (/zunmal/ base)
+npm run preview    # 빌드 결과 미리보기
 ```
 
 커밋 전에는 반드시 `npm test` 와 `npm run build` 를 통과시킨다.
@@ -137,4 +137,5 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 
 - 작업 단위별 의미 있는 커밋 (Conventional Commits: `feat:`, `fix:`, `test:`, `ci:`, `docs:`, `refactor:`).
 - 커밋 전 `npm test && npm run build`.
-- `main` 푸시 시 GitHub Actions가 테스트/빌드 후 GitHub Pages에 배포 (`.github/workflows/deploy.yml`).
+- `main` 푸시 시 GitHub Actions가 테스트/빌드 후 GitHub Pages에 배포 (`.github/workflows/deploy.yml`). Cloudflare Pages도 `main`을 연결해 배포한다.
+- 빌드는 상대 경로(`base: ./`)라 호스팅 경로와 무관하다. HashRouter를 버리면 이 전제가 깨지므로 base를 다시 정해야 한다.

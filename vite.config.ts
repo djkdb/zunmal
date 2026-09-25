@@ -2,10 +2,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// GitHub Pages는 https://<user>.github.io/<repo>/ 경로로 서빙되므로 base를 저장소 이름으로 맞춘다.
-// 로컬 개발 서버(dev)에서만 루트로 둔다. preview는 배포와 같은 경로로 확인한다.
-export default defineConfig(({ command, isPreview }) => ({
-  base: command === 'build' || isPreview ? '/zunmal/' : '/',
+// 상대 경로(./)로 빌드해 어느 주소에 올려도 동작하게 한다.
+// (GitHub Pages의 /zunmal/, Cloudflare Pages의 / 모두 가능)
+// HashRouter를 쓰므로 실제 URL 경로는 항상 index.html 하나라서 상대 경로가 안전하다.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? './' : '/',
   plugins: [react()],
   test: {
     environment: 'node',
