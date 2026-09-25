@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DAILY_CAP, TICKET_PRICE } from '../economy/config';
+import { COLLECTIONS, findUnknownMembers } from '../data/collections';
+import { DAILY_CAP, SET_REWARD_TICKETS, TICKET_PRICE } from '../economy/config';
 import { createSeededRng } from '../lib/rng';
 import { SAVE_KEY, SAVE_VERSION } from './persistence';
-import { createGameStore, createSafeStorage } from './useGameStore';
+import { MAX_AFFECTION, createGameStore, createSafeStorage } from './useGameStore';
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();
@@ -159,5 +160,50 @@ describe('persist', () => {
     const store = createGameStore(throwing);
     await store.persist.rehydrate();
     expect(() => store.getState().setMuted(true)).not.toThrow();
+  });
+});
+
+describe('컬렉션 / 친밀도 / 반짝', () => {
+  const ownAll = (ids: readonly string[]) =>
+    Object.fromEntries(ids.map((id) => [id, { count: 1, shinyCount: 0, firstObtainedAt: 0 }]));
+
+  it('완성한 세트만 한 번 보상을 받는다', () => {
+    const store = makeStore();
+    const set = COLLECTIONS.find((c) => c.id === 'dessert-shop')!;
+    store.setState({ ownedMalangs: ownAll(set.memberIds.slice(1)), gachaTickets: 0 });
+    expect(store.getState().claimSet(set.id)).toEqual({ ok: false, reason: 'incomplete' });
+    store.setState({ ownedMalangs: ownAll(set.memberIds) });
+    expect(store.getState().claimSet(set.id)).toEqual({ ok: true, tickets: SET_REWARD_TICKETS[set.tier] });
+    expect(store.getState().gachaTickets).toBe(SET_REWARD_TICKETS[set.tier]);
+    expect(store.getState().claimSet(set.id)).toEqual({ ok: false, reason: 'already-claimed' });
+    expect(store.getState().claimSet('nope')).toEqual({ ok: false, reason: 'unknown' });
+  });
+
+  it('보유한 말랑이만 친밀도가 오르고 최대치를 넘지 않는다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('soda-drop');
+    store.getState().petMalang('soda-drop', 3);
+    store.getState().petMalang('galaxy-malang', 3);
+    expect(store.getState().affection).toEqual({ 'soda-drop': 3 });
+    store.getState().petMalang('soda-drop', 1e9);
+    expect(store.getState().affection['soda-drop']).toBe(MAX_AFFECTION);
+  });
+
+  it('반짝 뽑기는 shinyCount를 올린다', () => {
+    const store = makeStore();
+    store.setState({ gachaTickets: 1 });
+    // 희귀도 0 → 일반, 캐릭터 0 → 첫 일반, 반짝 0 < 1% → 반짝
+    const res = store.getState().pull('single', () => 0);
+    if (!res.ok) throw new Error('pull failed');
+    const id = res.items[0]!.character.id;
+    expect(res.items[0]!.shiny).toBe(true);
+    expect(store.getState().ownedMalangs[id]).toMatchObject({ count: 1, shinyCount: 1 });
+  });
+});
+
+describe('컬렉션 데이터', () => {
+  it('모든 세트 멤버는 실제 캐릭터이고 세트 id는 고유', () => {
+    expect(findUnknownMembers()).toEqual([]);
+    expect(new Set(COLLECTIONS.map((c) => c.id)).size).toBe(COLLECTIONS.length);
   });
 });

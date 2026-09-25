@@ -3,6 +3,7 @@
  * Zustand/React와 무관한 순수 모듈 — 손상/구버전 데이터를 단위 테스트할 수 있다.
  */
 import { isCharacterId } from '../data/characters';
+import { isCollectionId } from '../data/collections';
 import { GACHA_RULES } from '../data/rarity';
 import { STARTING_COINS, STARTING_TICKETS } from '../economy/config';
 import { isValidDateKey, seoulDateKey } from '../economy/daily';
@@ -10,13 +11,16 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
 /**
  * 저장 스키마 버전. 구조가 바뀌면 올리고 migrateSave에 변환 단계를 추가한다.
  *  - v0: 초기 프로토타입 형식 { coins, tickets, owned: string[], pity, muted, best: {gameId: n} }
- *  - v1: 현재 형식 (SaveData)
+ *  - v1: { ..., ownedMalangs: {id: {count, firstObtainedAt}} }
+ *  - v2: 반짝 수집(shinyCount), 컬렉션 보상 수령(claimedSets), 친밀도(affection), 반짝 파트너(partnerShiny)
  */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_KEY = 'malang-gacha-save';
 
 export interface OwnedMalang {
   count: number;
+  /** 반짝 버전 보유 수 (count에 포함됨) */
+  shinyCount: number;
   /** 최초 획득 시각 (epoch ms) */
   firstObtainedAt: number;
 }
@@ -42,6 +46,12 @@ export interface SaveData {
   dailyEarnedCoins: number;
   lastDailyResetDate: string;
   totalPulls: number;
+  /** 보상을 받은 컬렉션 세트 id */
+  claimedSets: string[];
+  /** 말랑이별 친밀도 (만지기) */
+  affection: Record<string, number>;
+  /** 파트너를 반짝 모습으로 보여줄지 (반짝 보유 시) */
+  partnerShiny: boolean;
 }
 
 export function createInitialSave(now: Date = new Date()): SaveData {
@@ -56,6 +66,9 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     dailyEarnedCoins: 0,
     lastDailyResetDate: seoulDateKey(now),
     totalPulls: 0,
+    claimedSets: [],
+    affection: {},
+    partnerShiny: false,
   };
 }
 
@@ -79,7 +92,11 @@ function sanitizeOwned(value: unknown, now: number): Record<string, OwnedMalang>
     if (!isRecord(entry)) continue;
     const count = nonNegInt(entry.count, 0);
     if (count < 1) continue;
-    result[id] = { count, firstObtainedAt: nonNegInt(entry.firstObtainedAt, now) };
+    result[id] = {
+      count,
+      shinyCount: Math.min(count, nonNegInt(entry.shinyCount, 0)),
+      firstObtainedAt: nonNegInt(entry.firstObtainedAt, now),
+    };
   }
   return result;
 }
@@ -96,6 +113,22 @@ function sanitizeRecords(value: unknown): Record<string, MiniGameRecord> {
     };
   }
   return result;
+}
+
+function sanitizeAffection(value: unknown): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (!isRecord(value)) return result;
+  for (const [id, v] of Object.entries(value)) {
+    if (!isCharacterId(id)) continue;
+    const n = nonNegInt(v, 0);
+    if (n > 0) result[id] = n;
+  }
+  return result;
+}
+
+function sanitizeSetIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((v): v is string => typeof v === 'string' && isCollectionId(v)))];
 }
 
 /**
@@ -123,6 +156,9 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     dailyEarnedCoins: nonNegInt(raw.dailyEarnedCoins, 0),
     lastDailyResetDate: isValidDateKey(raw.lastDailyResetDate) ? raw.lastDailyResetDate : base.lastDailyResetDate,
     totalPulls: nonNegInt(raw.totalPulls, 0),
+    claimedSets: sanitizeSetIds(raw.claimedSets),
+    affection: sanitizeAffection(raw.affection),
+    partnerShiny: raw.partnerShiny === true,
   };
 }
 
@@ -133,7 +169,7 @@ function migrateV0toV1(raw: Record<string, unknown>, now: Date): Record<string, 
     for (const id of raw.owned) {
       if (typeof id !== 'string') continue;
       const prev = owned[id];
-      owned[id] = { count: (prev?.count ?? 0) + 1, firstObtainedAt: now.getTime() };
+      owned[id] = { count: (prev?.count ?? 0) + 1, shinyCount: 0, firstObtainedAt: now.getTime() };
     }
   }
   const records: Record<string, MiniGameRecord> = {};
@@ -161,6 +197,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   if (!isRecord(persisted)) return createInitialSave(now);
   let data: Record<string, unknown> = persisted;
   if (fromVersion < 1) data = migrateV0toV1(data, now);
-  // 향후: if (fromVersion < 2) data = migrateV1toV2(data);
+  // v1 → v2: 새 필드는 sanitize가 기본값(반짝 0, 세트 없음, 친밀도 없음)으로 채운다.
+  // 향후: if (fromVersion < 3) data = migrateV2toV3(data);
   return sanitizeSave(data, now);
 }

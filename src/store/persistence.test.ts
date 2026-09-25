@@ -13,7 +13,7 @@ describe('sanitizeSave', () => {
       ...createInitialSave(NOW),
       coins: 1234,
       gachaTickets: 5,
-      ownedMalangs: { 'peach-mochi': { count: 3, firstObtainedAt: 100 } },
+      ownedMalangs: { 'peach-mochi': { count: 3, shinyCount: 1, firstObtainedAt: 100 } },
       partnerId: 'peach-mochi',
       pityCount: 12,
       settings: { muted: true },
@@ -21,6 +21,9 @@ describe('sanitizeSave', () => {
       dailyEarnedCoins: 800,
       lastDailyResetDate: '2026-05-05',
       totalPulls: 22,
+      claimedSets: ['dessert-shop'],
+      affection: { 'peach-mochi': 42 },
+      partnerShiny: true,
     };
     expect(sanitizeSave(data, NOW)).toEqual(data);
   });
@@ -62,8 +65,35 @@ describe('sanitizeSave', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 1', () => {
-    expect(SAVE_VERSION).toBe(1);
+  it('현재 버전은 2', () => {
+    expect(SAVE_VERSION).toBe(2);
+  });
+
+  it('v1 데이터를 v2로: 반짝 0, 세트/친밀도 기본값', () => {
+    const v1 = {
+      coins: 120,
+      ownedMalangs: { 'soda-drop': { count: 2, firstObtainedAt: 5 } },
+      partnerId: 'soda-drop',
+    };
+    const s = migrateSave(v1, 1, NOW);
+    expect(s.ownedMalangs['soda-drop']).toEqual({ count: 2, shinyCount: 0, firstObtainedAt: 5 });
+    expect(s.claimedSets).toEqual([]);
+    expect(s.affection).toEqual({});
+    expect(s.partnerShiny).toBe(false);
+  });
+
+  it('v2 손상 필드 정화: 반짝 수는 보유 수를 넘지 않고, 모르는 세트/캐릭터는 제거', () => {
+    const s = sanitizeSave(
+      {
+        ownedMalangs: { 'soda-drop': { count: 1, shinyCount: 9 } },
+        claimedSets: ['dessert-shop', 'fake-set', 3, 'dessert-shop'],
+        affection: { 'soda-drop': 12.7, ghost: 5, 'peach-mochi': -3 },
+      },
+      NOW,
+    );
+    expect(s.ownedMalangs['soda-drop']?.shinyCount).toBe(1);
+    expect(s.claimedSets).toEqual(['dessert-shop']);
+    expect(s.affection).toEqual({ 'soda-drop': 12 });
   });
 
   it('v0 형식을 v1로 변환', () => {

@@ -1,3 +1,4 @@
+import type { CollectionTier } from '../data/collections';
 import type { Rarity } from '../data/rarity';
 
 /**
@@ -34,6 +35,7 @@ export const DUPLICATE_REFUND: Readonly<Record<Rarity, number>> = {
   epic: 80,
   legendary: 300,
   mythic: 1000,
+  secret: 5000,
 };
 
 /** 등록되지 않은 미니게임에 쓰는 기본 점수→코인 배율. */
@@ -63,7 +65,7 @@ export const GAME_MULTIPLIERS: Readonly<Record<string, number>> = {
 
 /**
  * 파트너 말랑이 희귀도 보너스 (baseCoins에 곱해지는 추가 비율).
- * 수집 동기를 주되 게임 실력보다 크게 작용하지 않도록 최대 30%.
+ * 수집 동기를 주되 게임 실력보다 크게 작용하지 않도록 신화 30%, 시크릿 50%.
  */
 export const PARTNER_RARITY_BONUS: Readonly<Record<Rarity, number>> = {
   common: 0,
@@ -71,6 +73,7 @@ export const PARTNER_RARITY_BONUS: Readonly<Record<Rarity, number>> = {
   epic: 0.1,
   legendary: 0.2,
   mythic: 0.3,
+  secret: 0.5,
 };
 
 /** 한 판에서 얻을 수 있는 최대 코인 (파트너 보너스 포함). */
@@ -78,3 +81,16 @@ export const PER_GAME_CAP = 200;
 
 /** 하루(Asia/Seoul 달력 기준)에 얻을 수 있는 최대 코인. */
 export const DAILY_CAP = 3000;
+
+/**
+ * 컬렉션 세트 완성 보상 (뽑기권 장수, 세트당 한 번).
+ * 코인은 미니게임으로만 얻는다는 원칙에 따라 보상은 뽑기권으로 준다.
+ * 시크릿이 들어간 세트일수록 크게 준다.
+ */
+export const SET_REWARD_TICKETS: Readonly<Record<CollectionTier, number>> = {
+  small: 3,
+  medium: 5,
+  large: 10,
+  legend: 20,
+  ultimate: 50,
+};

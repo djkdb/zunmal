@@ -124,6 +124,14 @@ export class SfxEngine implements Sfx {
     }
   }
 
+  /**
+   * 다른 합성 모듈(말랑 만지기 소리 등)이 같은 AudioContext·음소거 설정을 쓰도록 출력 노드를 빌려준다.
+   * 첫 사용자 입력 전이거나 음소거면 null.
+   */
+  getOutput(): { ctx: AudioContext; out: GainNode } | null {
+    return this.ready();
+  }
+
   private ready(): { ctx: AudioContext; out: GainNode } | null {
     if (this.muted) return null;
     const ctx = this.ensureContext();
@@ -292,7 +300,7 @@ export class SfxEngine implements Sfx {
 export const sfx = new SfxEngine();
 
 /** 결과 희귀도 단계에 맞는 효과음 */
-export function playResultFanfare(engine: Sfx, fanfare: 0 | 1 | 2 | 3): void {
+export function playResultFanfare(engine: Sfx, fanfare: 0 | 1 | 2 | 3 | 4): void {
   if (fanfare >= 3) engine.resultLegendary();
   else if (fanfare >= 1) engine.resultRare();
   else engine.resultCommon();

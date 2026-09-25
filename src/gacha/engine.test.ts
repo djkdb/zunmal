@@ -12,6 +12,7 @@ import {
   pullSingle,
   resolveDuplicates,
   rollRarity,
+  type OwnedSnapshot,
   type PullResult,
 } from './engine';
 
@@ -24,7 +25,7 @@ function tolerance(p: number, n: number): number {
 }
 
 function emptyCounts(): Record<Rarity, number> {
-  return { common: 0, rare: 0, epic: 0, legendary: 0, mythic: 0 };
+  return { common: 0, rare: 0, epic: 0, legendary: 0, mythic: 0, secret: 0 };
 }
 
 /** 항상 같은 값을 반환하는 RNG */
@@ -44,16 +45,22 @@ describe('확률 테이블', () => {
   });
 
   it('목표 확률과 일치', () => {
-    expect(RARITY_WEIGHTS).toEqual({ common: 6200, rare: 2500, epic: 950, legendary: 300, mythic: 50 });
+    expect(RARITY_WEIGHTS).toEqual({ common: 6195, rare: 2500, epic: 950, legendary: 300, mythic: 50, secret: 5 });
   });
 
-  it('희귀도별 캐릭터 수: 일반6 레어3 에픽3 전설2 신화1', () => {
-    expect(CHARACTERS).toHaveLength(15);
-    expect(CHARACTERS_BY_RARITY.common).toHaveLength(6);
-    expect(CHARACTERS_BY_RARITY.rare).toHaveLength(3);
-    expect(CHARACTERS_BY_RARITY.epic).toHaveLength(3);
-    expect(CHARACTERS_BY_RARITY.legendary).toHaveLength(2);
-    expect(CHARACTERS_BY_RARITY.mythic).toHaveLength(1);
+  it('희귀도별 캐릭터 수: 일반10 레어7 에픽6 전설4 신화2 시크릿3', () => {
+    expect(CHARACTERS).toHaveLength(32);
+    expect(CHARACTERS_BY_RARITY.common).toHaveLength(10);
+    expect(CHARACTERS_BY_RARITY.rare).toHaveLength(7);
+    expect(CHARACTERS_BY_RARITY.epic).toHaveLength(6);
+    expect(CHARACTERS_BY_RARITY.legendary).toHaveLength(4);
+    expect(CHARACTERS_BY_RARITY.mythic).toHaveLength(2);
+    expect(CHARACTERS_BY_RARITY.secret).toHaveLength(3);
+  });
+
+  it('시크릿은 극악 확률(0.05%)이고 신화보다 낮다', () => {
+    expect(RARITY_WEIGHTS.secret / RARITY_WEIGHT_TOTAL).toBe(0.0005);
+    expect(RARITY_WEIGHTS.secret).toBeLessThan(RARITY_WEIGHTS.mythic);
   });
 
   it('캐릭터 id는 고유하다', () => {
@@ -126,13 +133,15 @@ describe('천장', () => {
     expect(pullOne(10, constRng(0.95)).pityCount).toBe(11);
   });
 
-  it.each(SEEDS)('천장 확정 시 전설:신화 = 6:1 (seed %i)', (seed) => {
+  it.each(SEEDS)('천장 확정 시 전설:신화 = 6:1, 시크릿도 원래 비율로 포함 (seed %i)', (seed) => {
     const rng = createSeededRng(seed);
     const counts = emptyCounts();
     const n = 70_000;
     for (let i = 0; i < n; i++) counts[pullOne(49, rng).result.rarity]++;
     expect(counts.common + counts.rare + counts.epic).toBe(0);
-    const pMythic = 50 / 350; // 1/7
+    const pSecret = 5 / 355;
+    expect(Math.abs(counts.secret / n - pSecret)).toBeLessThan(tolerance(pSecret, n));
+    const pMythic = 50 / 355;
     expect(Math.abs(counts.mythic / n - pMythic)).toBeLessThan(tolerance(pMythic, n));
     expect(counts.legendary / counts.mythic).toBeGreaterThan(5.5);
     expect(counts.legendary / counts.mythic).toBeLessThan(6.5);
@@ -170,6 +179,20 @@ describe('천장', () => {
   });
 });
 
+describe.each(SEEDS)('반짝 확률 (seed %i)', (seed) => {
+  it('약 1%, 등급과 무관', () => {
+    const rng = createSeededRng(seed);
+    let shiny = 0;
+    let pity = 0;
+    for (let i = 0; i < N; i++) {
+      const out = pullOne(pity, rng);
+      pity = out.pityCount;
+      if (out.result.shiny) shiny++;
+    }
+    expect(Math.abs(shiny / N - GACHA_RULES.shinyRate)).toBeLessThan(tolerance(GACHA_RULES.shinyRate, N));
+  });
+});
+
 describe('단일 뽑기', () => {
   it('결과 1개와 다음 천장 카운트를 반환', () => {
     const out = pullSingle(0, createSeededRng(5));
@@ -185,7 +208,8 @@ describe('10연 뽑기', () => {
 
   it('레어 이상이 없으면 10번째를 레어 이상으로 교체', () => {
     // 처음 10번의 희귀도/캐릭터 추첨은 모두 0 → 일반. 이후 교체 추첨.
-    const seq = [...Array(20).fill(0), 0.0, 0.0];
+    // pull 1회 = 희귀도·캐릭터·반짝 3번 추첨
+    const seq = [...Array(30).fill(0), 0.0, 0.0, 0.5];
     let i = 0;
     const rng: RNG = () => seq[i++] ?? 0;
     const out = pullMulti(0, rng);
@@ -198,7 +222,8 @@ describe('10연 뽑기', () => {
   });
 
   it('교체 결과가 전설 이상이면 천장 카운트 0', () => {
-    const seq = [...Array(20).fill(0), 0.999, 0];
+    // 레어 이상 풀(2500:950:300:50:5)에서 0.995 → 신화 구간
+    const seq = [...Array(30).fill(0), 0.995, 0, 0.5];
     let i = 0;
     const rng: RNG = () => seq[i++] ?? 0;
     const out = pullMulti(5, rng);
@@ -258,12 +283,15 @@ describe('중복 환급', () => {
   const byId = (id: string) => {
     const c = CHARACTERS.find((x) => x.id === id);
     if (!c) throw new Error(id);
-    return { character: c, rarity: c.rarity, byPity: false, byGuarantee: false } satisfies PullResult;
+    return { character: c, rarity: c.rarity, byPity: false, byGuarantee: false, shiny: false } satisfies PullResult;
   };
+  const shinyOf = (id: string): PullResult => ({ ...byId(id), shiny: true });
+  const owned = (...ids: string[]) =>
+    Object.fromEntries(ids.map((id) => [id, { count: 1, shinyCount: 0 }])) as Record<string, OwnedSnapshot>;
 
   it('미보유는 신규, 보유는 희귀도별 환급', () => {
     const results = [byId('peach-mochi'), byId('ribbon-berry'), byId('galaxy-malang')];
-    const { items, totalRefund } = resolveDuplicates(results, new Set(['ribbon-berry', 'galaxy-malang']));
+    const { items, totalRefund } = resolveDuplicates(results, owned('ribbon-berry', 'galaxy-malang'));
     expect(items.map((x) => x.isNew)).toEqual([true, false, false]);
     expect(items.map((x) => x.refund)).toEqual([0, DUPLICATE_REFUND.rare, DUPLICATE_REFUND.mythic]);
     expect(totalRefund).toBe(30 + 1000);
@@ -271,13 +299,27 @@ describe('중복 환급', () => {
 
   it('같은 묶음 안의 두 번째 등장은 중복', () => {
     const results = [byId('soda-drop'), byId('soda-drop'), byId('sunset-king'), byId('sunset-king')];
-    const { items, totalRefund } = resolveDuplicates(results, new Set());
+    const { items, totalRefund } = resolveDuplicates(results, {});
     expect(items.map((x) => x.isNew)).toEqual([true, false, true, false]);
     expect(totalRefund).toBe(10 + 300);
   });
 
   it('환급 테이블 값', () => {
-    expect(DUPLICATE_REFUND).toEqual({ common: 10, rare: 30, epic: 80, legendary: 300, mythic: 1000 });
+    expect(DUPLICATE_REFUND).toEqual({ common: 10, rare: 30, epic: 80, legendary: 300, mythic: 1000, secret: 5000 });
+  });
+
+  it('이미 가진 말랑이라도 반짝을 처음 얻으면 환급 대신 새 수집', () => {
+    const { items, totalRefund } = resolveDuplicates([shinyOf('soda-drop'), shinyOf('soda-drop')], owned('soda-drop'));
+    expect(items.map((x) => [x.isNew, x.isNewShiny, x.refund])).toEqual([
+      [false, true, 0],
+      [false, false, 10],
+    ]);
+    expect(totalRefund).toBe(10);
+  });
+
+  it('처음 만난 말랑이가 반짝이면 신규이면서 반짝 신규', () => {
+    const { items } = resolveDuplicates([shinyOf('phoenix')], {});
+    expect(items[0]).toMatchObject({ isNew: true, isNewShiny: true, refund: 0 });
   });
 });
 

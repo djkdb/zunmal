@@ -16,6 +16,8 @@ export interface GachaConfig {
   pityMinRarity: Rarity;
   multiPullCount: number;
   multiGuaranteeMinRarity: Rarity;
+  /** 반짝(홀로그램) 버전 확률 */
+  shinyRate: number;
 }
 
 export const DEFAULT_GACHA_CONFIG: GachaConfig = {
@@ -25,6 +27,7 @@ export const DEFAULT_GACHA_CONFIG: GachaConfig = {
   pityMinRarity: GACHA_RULES.pityMinRarity,
   multiPullCount: GACHA_RULES.multiPullCount,
   multiGuaranteeMinRarity: GACHA_RULES.multiGuaranteeMinRarity,
+  shinyRate: GACHA_RULES.shinyRate,
 };
 
 export interface PullResult {
@@ -34,6 +37,8 @@ export interface PullResult {
   byPity: boolean;
   /** 10연 레어 이상 보장으로 교체된 결과인가 */
   byGuarantee: boolean;
+  /** 반짝(홀로그램) 버전인가 */
+  shiny: boolean;
 }
 
 export interface PullOutcome {
@@ -92,9 +97,10 @@ export function pullOne(
   const byPity = pity + 1 >= config.pityThreshold;
   const rarity = rollRarity(rng, config.weights, byPity ? config.pityMinRarity : 'common');
   const character = pickCharacter(rng, rarity, config.pools);
+  const shiny = rng() < config.shinyRate;
   const nextPity = isAtLeast(rarity, config.pityMinRarity) ? 0 : pity + 1;
   return {
-    result: { character, rarity, byPity, byGuarantee: false },
+    result: { character, rarity, byPity, byGuarantee: false, shiny },
     pityCount: nextPity,
   };
 }
@@ -128,7 +134,8 @@ export function pullMulti(pityCount: number, rng: RNG, config: GachaConfig = DEF
   if (!hasGuaranteed && results.length > 0) {
     const rarity = rollRarity(rng, config.weights, config.multiGuaranteeMinRarity);
     const character = pickCharacter(rng, rarity, config.pools);
-    results[results.length - 1] = { character, rarity, byPity: false, byGuarantee: true };
+    const shiny = rng() < config.shinyRate;
+    results[results.length - 1] = { character, rarity, byPity: false, byGuarantee: true, shiny };
     // 교체 전 마지막 결과는 레어 미만(=전설 미만)이었으므로 pity = pityBeforeLast + 1 이었다.
     pity = isAtLeast(rarity, config.pityMinRarity) ? 0 : pityBeforeLast + 1;
   }
@@ -137,27 +144,40 @@ export function pullMulti(pityCount: number, rng: RNG, config: GachaConfig = DEF
 }
 
 export interface ResolvedPull extends PullResult {
+  /** 처음 만난 말랑이인가 */
   isNew: boolean;
+  /** 이 말랑이의 반짝 버전을 처음 얻었는가 */
+  isNewShiny: boolean;
   refund: number;
+}
+
+export interface OwnedSnapshot {
+  count: number;
+  shinyCount: number;
 }
 
 /**
  * 보유 여부에 따라 신규/중복을 판정하고 환급 코인을 계산한다.
  * 같은 뽑기 묶음 안에서 앞서 나온 캐릭터도 "이미 보유"로 취급한다.
+ * 이미 가진 말랑이라도 반짝 버전을 처음 얻었다면 새 수집으로 보고 환급하지 않는다.
  */
 export function resolveDuplicates(
   results: readonly PullResult[],
-  ownedIds: ReadonlySet<string>,
+  owned: Readonly<Record<string, OwnedSnapshot | undefined>>,
   refundTable: Readonly<Record<Rarity, number>> = DUPLICATE_REFUND,
 ): { items: ResolvedPull[]; totalRefund: number } {
-  const seen = new Set(ownedIds);
+  const seen = new Set(Object.keys(owned).filter((id) => (owned[id]?.count ?? 0) > 0));
+  const seenShiny = new Set(Object.keys(owned).filter((id) => (owned[id]?.shinyCount ?? 0) > 0));
   let totalRefund = 0;
   const items = results.map((r) => {
-    const isNew = !seen.has(r.character.id);
-    seen.add(r.character.id);
-    const refund = isNew ? 0 : refundTable[r.rarity];
+    const id = r.character.id;
+    const isNew = !seen.has(id);
+    const isNewShiny = r.shiny && !seenShiny.has(id);
+    seen.add(id);
+    if (r.shiny) seenShiny.add(id);
+    const refund = isNew || isNewShiny ? 0 : refundTable[r.rarity];
     totalRefund += refund;
-    return { ...r, isNew, refund };
+    return { ...r, isNew, isNewShiny, refund };
   });
   return { items, totalRefund };
 }

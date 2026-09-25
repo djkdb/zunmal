@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { STARTER_CHARACTER_IDS, getCharacter } from '../data/characters';
-import { PULL_COST } from '../economy/config';
+import { collectionProgress, getCollection } from '../data/collections';
+import { PULL_COST, SET_REWARD_TICKETS } from '../economy/config';
 import {
   applyDailyReset,
   computeReward,
@@ -34,6 +35,12 @@ export interface GameActions {
   /** 미니게임 결과 기록 + 코인 지급 (코인 계산은 economy 모듈이 담당) */
   finishMiniGame(gameId: string, score: number, now?: Date): MiniGameFinishResult;
   setPartner(characterId: string): void;
+  /** 반짝 버전을 가진 파트너를 반짝 모습으로 보여줄지 */
+  setPartnerShiny(shiny: boolean): void;
+  /** 완성한 컬렉션 세트의 뽑기권 보상 받기 (세트당 1회) */
+  claimSet(collectionId: string): ClaimSetResult;
+  /** 말랑이 만지기: 친밀도 증가 */
+  petMalang(characterId: string, amount?: number): void;
   setMuted(muted: boolean): void;
   /** 서울 날짜 변경 시 일일 획득량 초기화 */
   refreshDaily(now?: Date): void;
@@ -41,6 +48,13 @@ export interface GameActions {
 }
 
 export type GameState = SaveData & GameActions;
+
+export type ClaimSetResult =
+  | { ok: true; tickets: number }
+  | { ok: false; reason: 'unknown' | 'incomplete' | 'already-claimed' };
+
+/** 친밀도 최대치 */
+export const MAX_AFFECTION = 9999;
 
 /**
  * localStorage 접근과 JSON 파싱을 모두 try/catch로 감싼 저장소.
@@ -95,6 +109,9 @@ function pickSave(state: GameState): SaveData {
     dailyEarnedCoins: state.dailyEarnedCoins,
     lastDailyResetDate: state.lastDailyResetDate,
     totalPulls: state.totalPulls,
+    claimedSets: state.claimedSets,
+    affection: state.affection,
+    partnerShiny: state.partnerShiny,
   };
 }
 
@@ -109,7 +126,7 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (Object.keys(state.ownedMalangs).length > 0) return false;
           if (!STARTER_CHARACTER_IDS.includes(characterId)) return false;
           set({
-            ownedMalangs: { [characterId]: { count: 1, firstObtainedAt: now.getTime() } },
+            ownedMalangs: { [characterId]: { count: 1, shinyCount: 0, firstObtainedAt: now.getTime() } },
             partnerId: characterId,
           });
           return true;
@@ -128,13 +145,14 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (state.gachaTickets < cost) return { ok: false, reason: 'insufficient-tickets' };
 
           const outcome = kind === 'multi' ? pullMulti(state.pityCount, rng) : pullSingle(state.pityCount, rng);
-          const { items, totalRefund } = resolveDuplicates(outcome.results, new Set(Object.keys(state.ownedMalangs)));
+          const { items, totalRefund } = resolveDuplicates(outcome.results, state.ownedMalangs);
 
           const owned = { ...state.ownedMalangs };
           for (const item of items) {
             const prev = owned[item.character.id];
             owned[item.character.id] = {
               count: (prev?.count ?? 0) + 1,
+              shinyCount: (prev?.shinyCount ?? 0) + (item.shiny ? 1 : 0),
               firstObtainedAt: prev?.firstObtainedAt ?? now.getTime(),
             };
           }
@@ -180,6 +198,30 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
 
         setPartner(characterId) {
           if (get().ownedMalangs[characterId]) set({ partnerId: characterId });
+        },
+
+        setPartnerShiny(shiny) {
+          set({ partnerShiny: shiny });
+        },
+
+        claimSet(collectionId) {
+          const state = get();
+          const collection = getCollection(collectionId);
+          if (!collection) return { ok: false, reason: 'unknown' };
+          if (state.claimedSets.includes(collectionId)) return { ok: false, reason: 'already-claimed' };
+          const progress = collectionProgress(collection, new Set(Object.keys(state.ownedMalangs)));
+          if (!progress.complete) return { ok: false, reason: 'incomplete' };
+          const tickets = SET_REWARD_TICKETS[collection.tier];
+          set({ gachaTickets: state.gachaTickets + tickets, claimedSets: [...state.claimedSets, collectionId] });
+          return { ok: true, tickets };
+        },
+
+        petMalang(characterId, amount = 1) {
+          const state = get();
+          if (!state.ownedMalangs[characterId]) return;
+          const prev = state.affection[characterId] ?? 0;
+          const next = Math.min(MAX_AFFECTION, prev + Math.max(0, Math.floor(amount)));
+          if (next !== prev) set({ affection: { ...state.affection, [characterId]: next } });
         },
 
         setMuted(muted) {

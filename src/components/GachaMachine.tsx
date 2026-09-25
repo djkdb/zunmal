@@ -11,6 +11,7 @@ const CAPSULE_TOP: Record<Rarity, string> = {
   epic: '#c79bff',
   legendary: '#ffc94d',
   mythic: 'rainbow',
+  secret: 'cosmic',
 };
 
 /** 돔 안에 보이는 장식용 캡슐 배치 */
@@ -46,10 +47,15 @@ const TIMINGS = {
 } as const;
 
 function CapsuleShape({ top, id }: { top: string; id: string }) {
-  const fill = top === 'rainbow' ? `url(#${id}-rainbow)` : top;
+  const fill = top === 'rainbow' ? `url(#${id}-rainbow)` : top === 'cosmic' ? `url(#${id}-cosmic)` : top;
   return (
     <svg viewBox="-34 -34 68 68" width="100%" height="100%" aria-hidden="true" focusable="false">
       <defs>
+        <radialGradient id={`${id}-cosmic`} cx="35%" cy="30%" r="80%">
+          <stop offset="0" stopColor="#8f6bff" />
+          <stop offset="0.55" stopColor="#2d1b5e" />
+          <stop offset="1" stopColor="#120a2e" />
+        </radialGradient>
         <linearGradient id={`${id}-rainbow`} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#ff8fab" />
           <stop offset="0.3" stopColor="#ffd966" />

@@ -42,6 +42,7 @@
   --rarity-epic: #b98cff;
   --rarity-legendary: #ffc02e;
   --rarity-mythic: #ff7aa2;
+  --rarity-secret: #2d1b5e;
 
   --line: 3px;
   --radius-panel: 26px;
@@ -505,6 +506,22 @@ strong {
 
 .rarity-badge--mythic {
   background: linear-gradient(90deg, #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff);
+}
+
+/* 시크릿: 밤하늘 바탕 + 무지개 반짝 테두리 + 흰 글씨 */
+.rarity-badge--secret {
+  background:
+    radial-gradient(circle at 20% 40%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 1.5px),
+    linear-gradient(135deg, #1b1040, #4b2a8f 60%, #1b1040);
+  color: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px #ffe07a;
+}
+
+.rarity-badge--secret svg path,
+.rarity-badge--secret svg circle {
+  fill: #ffe07a;
 }
 
 /* ------------------------------------------------------------------

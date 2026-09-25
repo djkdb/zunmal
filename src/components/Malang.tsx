@@ -73,6 +73,13 @@ const SHAPES: Record<MalangShape, ShapeSpec> = {
     top: 30,
     eyeGap: 15,
   },
+  crystal: {
+    // 둥근 모서리의 보석 실루엣
+    body: 'M60 14 Q64 14 67 17 L100 50 Q104 54 102 59 L68 107 Q60 116 52 107 L18 59 Q16 54 20 50 L53 17 Q56 14 60 14 Z',
+    faceY: 64,
+    top: 16,
+    eyeGap: 13,
+  },
   star: {
     body: roundedStarPath(60, 66, 54, 32),
     faceY: 70,
