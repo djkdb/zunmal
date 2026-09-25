@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
 import { RarityBadge } from '../components/RarityBadge';
+import { CapsuleIcon, JoystickIcon, TicketIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
+import { RARITY_META } from '../data/rarity';
 import { DAILY_CAP, PARTNER_RARITY_BONUS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import './HomePage.css';
@@ -15,60 +17,64 @@ export function HomePage() {
   const partner = partnerId ? getCharacter(partnerId) : undefined;
   const ownedCount = CHARACTERS.filter((c) => owned[c.id]).length;
   const dailyLeft = Math.max(0, DAILY_CAP - dailyEarned);
+  const bonus = partner ? Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100) : 0;
 
   return (
     <section className="page home" aria-labelledby="home-title">
-      <h1 id="home-title" className="visually-hidden">
-        말랑 뽑기방 홈
-      </h1>
-
       {partner && (
-        <div className="card home__hero">
+        <div className="home__counter">
           <div className="home__stage">
-            <Malang character={partner} size={150} animation="idle" />
+            <Malang character={partner} size={168} animation="idle" />
           </div>
-          <div className="home__partner">
-            <p className="small muted">나의 파트너</p>
-            <p className="home__partner-name">{partner.name}</p>
+          <div className="home__plate">
+            <h1 id="home-title" className="home__name">
+              {partner.name}
+            </h1>
             <RarityBadge rarity={partner.rarity} />
-            <p className="small">
-              미니게임 코인 보너스 <strong>+{Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100)}%</strong>
+            <p className="home__bonus">
+              {bonus > 0 ? `함께 놀면 코인 +${bonus}%` : '오늘도 같이 놀자!'}
             </p>
           </div>
         </div>
       )}
 
-      <div className="home__loop" aria-label="게임 순서">
-        <span>🎮 미니게임</span>
-        <span aria-hidden="true">→</span>
-        <span>🪙 코인</span>
-        <span aria-hidden="true">→</span>
-        <span>🎫 뽑기권</span>
-        <span aria-hidden="true">→</span>
-        <span>📖 도감</span>
-      </div>
-
       <div className="home__actions">
         <Link to="/play" className="btn btn--mint btn--block home__action" onClick={() => sfx.button()}>
-          🎮 미니게임 하러 가기
+          <JoystickIcon size={30} />
+          미니게임으로 코인 벌기
         </Link>
         <Link to="/gacha" className="btn btn--primary btn--block home__action" onClick={() => sfx.button()}>
-          🎰 뽑기방 가기 {tickets > 0 && <span className="chip">🎫 {tickets}</span>}
+          <CapsuleIcon size={30} />
+          캡슐 뽑으러 가기
+          {tickets > 0 && (
+            <span className="home__ticket-sticker" aria-label={`뽑기권 ${tickets}장`}>
+              <TicketIcon size={18} />
+              {tickets}
+            </span>
+          )}
         </Link>
       </div>
 
-      <div className="home__stats">
-        <Link to="/collection" className="card card--tight home__stat" onClick={() => sfx.button()}>
-          <span className="small muted">도감</span>
-          <span className="home__stat-value">
-            {ownedCount} / {CHARACTERS.length}
-          </span>
-        </Link>
-        <div className="card card--tight home__stat">
-          <span className="small muted">오늘 남은 코인 한도</span>
-          <span className="home__stat-value">{dailyLeft.toLocaleString()}</span>
-        </div>
-      </div>
+      <Link to="/collection" className="home__shelf" onClick={() => sfx.button()}>
+        <span className="home__shelf-text">
+          도감 <strong>{ownedCount}</strong>/{CHARACTERS.length}
+        </span>
+        <span className="home__slots" aria-hidden="true">
+          {CHARACTERS.map((c) => (
+            <span
+              key={c.id}
+              className={`home__slot${owned[c.id] ? ' is-filled' : ''}`}
+              style={owned[c.id] ? { background: `var(${RARITY_META[c.rarity].colorVar})` } : undefined}
+            />
+          ))}
+        </span>
+      </Link>
+
+      <p className="home__daily small muted">
+        {dailyLeft > 0
+          ? `오늘 미니게임으로 코인을 ${dailyLeft.toLocaleString()}개 더 받을 수 있어요.`
+          : '오늘 받을 수 있는 코인을 모두 받았어요. 자정에 다시 채워져요.'}
+      </p>
     </section>
   );
 }

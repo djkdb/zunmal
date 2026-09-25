@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { useGameStore } from '../store/useGameStore';
+import { CoinIcon, SoundOffIcon, SoundOnIcon, TicketIcon } from './icons';
 import './TopBar.css';
 
 /** 값이 증가할 때마다 바뀌는 key → CSS 애니메이션 재생 */
@@ -25,23 +26,18 @@ export function TopBar() {
 
   return (
     <header className="top-bar">
-      <Link to="/" className="top-bar__logo" aria-label="말랑 뽑기방 홈">
-        <span aria-hidden="true">🍮</span>
-        <span className="top-bar__title">말랑 뽑기방</span>
+      <Link to="/" className="top-bar__logo">
+        말랑 뽑기방
       </Link>
       <div className="top-bar__stats">
         <span className="stat-pill" aria-label={`코인 ${coins.toLocaleString()}개`}>
-          <span aria-hidden="true" className="stat-pill__icon stat-pill__icon--coin">
-            C
-          </span>
+          <CoinIcon size={24} />
           <span key={coinKey} className="stat-pill__value bump">
             {coins.toLocaleString()}
           </span>
         </span>
         <span className="stat-pill" aria-label={`뽑기권 ${tickets}장`}>
-          <span aria-hidden="true" className="stat-pill__icon">
-            🎫
-          </span>
+          <TicketIcon size={24} />
           <span key={ticketKey} className="stat-pill__value bump">
             {tickets}
           </span>
@@ -59,7 +55,7 @@ export function TopBar() {
             }
           }}
         >
-          <span aria-hidden="true">{muted ? '🔇' : '🔊'}</span>
+          {muted ? <SoundOffIcon size={22} /> : <SoundOnIcon size={22} />}
         </button>
       </div>
     </header>

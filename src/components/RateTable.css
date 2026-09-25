@@ -1,43 +1,87 @@
-.rate-table__summary {
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  min-height: 32px;
-  list-style-position: inside;
+/* 벽에 붙인 안내문: 약간 기울어진 종이 + 양쪽 모서리 테이프 */
+.notice {
+  position: relative;
+  margin: 6px 4px 0;
+  padding: 16px 14px 14px;
+  background: var(--paper);
+  border: 2px solid rgba(43, 34, 51, 0.55);
+  border-radius: 3px;
+  transform: rotate(-0.6deg);
+  box-shadow: 2px 3px 0 rgba(43, 34, 51, 0.12);
 }
 
-.rate-table__table {
+.notice::before,
+.notice::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  width: 62px;
+  height: 20px;
+  background: rgba(255, 216, 77, 0.75);
+  border-left: 2px dashed rgba(43, 34, 51, 0.2);
+  border-right: 2px dashed rgba(43, 34, 51, 0.2);
+}
+
+.notice::before {
+  left: 14px;
+  transform: rotate(-6deg);
+}
+
+.notice::after {
+  right: 14px;
+  transform: rotate(5deg);
+}
+
+.notice__summary {
+  cursor: pointer;
+  min-height: 32px;
+  font-family: var(--font-display);
+  font-size: var(--fs-m);
+  list-style-position: inside;
+  border-radius: var(--radius-s);
+}
+
+.notice__table {
   width: 100%;
   margin-top: 10px;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--fs-s);
   font-variant-numeric: tabular-nums;
 }
 
-.rate-table__table th,
-.rate-table__table td {
-  padding: 6px 2px;
-  border-bottom: 1px dashed rgba(43, 34, 51, 0.25);
+.notice__table th,
+.notice__table td {
+  padding: 7px 2px;
+  border-bottom: 1.5px solid rgba(43, 34, 51, 0.18);
   text-align: right;
 }
 
-.rate-table__table th[scope='row'],
-.rate-table__table thead th:first-child {
+.notice__table th[scope='row'],
+.notice__table thead th:first-child {
   text-align: left;
   font-weight: 400;
 }
 
-.rate-table__table thead th {
+.notice__table thead th {
   font-family: var(--font-display);
   font-weight: 400;
+  font-size: var(--fs-xs);
   color: var(--ink-soft);
 }
 
-.rate-table__notes {
-  margin: 10px 0 0;
-  padding-left: 18px;
+.notice__pool {
+  margin-left: 4px;
+  font-size: var(--fs-xs);
   color: var(--ink-soft);
+}
+
+.notice__rules {
+  margin: 12px 0 0;
+  padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  font-size: var(--fs-s);
+  line-height: 1.55;
+  color: var(--ink-soft);
 }

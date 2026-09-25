@@ -16,8 +16,7 @@ function OwnershipTag({ item }: { item: ResolvedPull }) {
   if (item.isNew) return <span className="pull-tag pull-tag--new">NEW!</span>;
   return (
     <span className="pull-tag pull-tag--dup">
-      중복 +{item.refund} <span aria-hidden="true">C</span>
-      <span className="visually-hidden">코인</span>
+      중복 +{item.refund}코인
     </span>
   );
 }
@@ -48,7 +47,7 @@ function MultiResult({ items }: { items: readonly ResolvedPull[] }) {
           key={i}
           className={`pull-card pull-card--${item.rarity}`}
           style={{ '--i': i } as CSSProperties}
-          aria-label={`${i + 1}번째: ${RARITY_META[item.rarity].label} ${item.character.name}, ${item.isNew ? '새로 획득' : `중복, ${item.refund} 코인 환급`}`}
+          aria-label={`${i + 1}번째: ${RARITY_META[item.rarity].label} ${item.character.name}, ${item.isNew ? '새로 획득' : `이미 있어서 ${item.refund}코인 돌려받음`}`}
         >
           <Malang character={item.character} size={64} animation="none" decorative />
           <span className="pull-card__name">{item.character.name}</span>
@@ -75,11 +74,13 @@ export function PullResult({ items, totalRefund, onClose }: PullResultProps) {
         {single ? '말랑이를 만났어요!' : `${items.length}연 뽑기 결과`}
       </h2>
       {single ? <SingleResult item={single} /> : <MultiResult items={items} />}
-      <p className="pull-summary small">
-        새 말랑이 {newCount}마리
-        {totalRefund > 0 && <> · 중복 환급 +{totalRefund.toLocaleString()} 코인</>}
-      </p>
-      <button type="button" className="btn btn--primary btn--block" onClick={onClose} autoFocus>
+      {!single && (
+        <p className="pull-summary small">
+          새로 만난 말랑이 {newCount}마리
+          {totalRefund > 0 && <>, 중복된 말랑이는 {totalRefund.toLocaleString()}코인으로 돌려받았어요</>}
+        </p>
+      )}
+      <button type="button" className="btn btn--primary btn--block pull-close" onClick={onClose} autoFocus>
         확인
       </button>
     </Modal>

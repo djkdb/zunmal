@@ -1,11 +1,11 @@
 .lobby {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
 }
 
 .lobby__h2 {
-  font-size: 1.1rem;
+  font-size: var(--fs-m);
 }
 
 .lobby__partner {
@@ -18,30 +18,45 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 4px 2px 8px;
+  /* 선택 링(box-shadow)이 스크롤 영역에 잘리지 않도록 여백 확보 */
+  margin-inline: -8px;
+  padding: 8px 10px 10px;
   scroll-snap-type: x proximity;
 }
 
+/* 파트너 후보: 도감과 같은 캡슐 창 */
 .lobby__partner-btn {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
+  padding: 0;
   border: var(--line) solid var(--ink);
-  border-radius: var(--radius-m);
-  background: var(--paper);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), #f3eadb;
   cursor: pointer;
   scroll-snap-align: start;
 }
 
 .lobby__partner-btn.is-selected {
-  background: var(--lemon);
-  box-shadow: var(--shadow-pop-s);
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), var(--lemon);
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink);
 }
 
-.lobby__cap {
-  text-align: center;
+.lobby__partner-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  color: var(--ink-soft);
+}
+
+.lobby__partner-info strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-s);
+  color: var(--ink);
 }
 
 .lobby__games {
@@ -50,16 +65,25 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
+/* 오락기 앞판: 눌리는 판이라 키캡 그림자를 가진다 */
 .lobby__game {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  padding: 14px 14px 14px 12px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  box-shadow: var(--keycap);
   color: var(--ink);
   text-decoration: none;
-  transition: transform 0.1s ease;
+  transition:
+    transform 0.07s ease,
+    box-shadow 0.07s ease;
 }
 
 .lobby__game:active {
@@ -67,15 +91,26 @@
   box-shadow: 0 1px 0 var(--ink);
 }
 
+.lobby li:nth-child(3n + 1) .lobby__game-icon {
+  background: #ffd3de;
+}
+
+.lobby li:nth-child(3n + 2) .lobby__game-icon {
+  background: #cdeaff;
+}
+
+.lobby li:nth-child(3n) .lobby__game-icon {
+  background: #dff3d6;
+}
+
 .lobby__game-icon {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border: var(--line) solid var(--ink);
-  border-radius: var(--radius-m);
-  background: var(--cream-deep);
+  border-radius: 50%;
 }
 
 .lobby__game-icon svg {
@@ -86,33 +121,37 @@
 .lobby__game-body {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
   flex: 1;
 }
 
 .lobby__game-name {
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: var(--fs-m);
 }
 
 .lobby__game-desc {
+  max-width: 30ch;
+  font-size: var(--fs-s);
+  line-height: 1.45;
   color: var(--ink-soft);
-  line-height: 1.35;
 }
 
-.lobby__game-best {
-  margin-top: 2px;
+.lobby__best {
+  position: absolute;
+  top: -12px;
+  right: 14px;
+  padding: 1px 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--lemon);
   font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  transform: rotate(3deg);
 }
 
-.lobby__game-play {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: var(--line) solid var(--ink);
-  border-radius: 50%;
-  background: var(--pink);
-  font-size: 0.9rem;
+.lobby__cap {
+  text-align: center;
 }

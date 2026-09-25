@@ -182,7 +182,7 @@ const buttonMalang: MiniGame = {
   id: 'button-malang',
   name: '말랑 누르기',
   description: '20초 동안 말랑이를 최대한 많이 눌러요. 연속으로 누르면 콤보 보너스!',
-  controls: '터치 · 클릭 · Space/Enter',
+  controls: '터치, 클릭, Space 또는 Enter',
   icon: ButtonMalangIcon,
   Component: ButtonMalangGame,
 };

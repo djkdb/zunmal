@@ -5,7 +5,7 @@
 }
 
 .shop__title {
-  font-size: 1.2rem;
+  font-size: var(--fs-m);
 }
 
 .shop__packs {
@@ -14,34 +14,94 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.shop__pack {
+/* 절취선 티켓 */
+.ticket {
+  --stub: 128px;
+  --notch-bg: var(--cream);
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr var(--stub);
+  min-height: 72px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: #ffd3de;
+}
+
+.ticket--bundle {
+  background: #cdeaff;
+}
+
+.ticket::before,
+.ticket::after {
+  /* 절취선 위아래의 반원 홈 */
+  content: '';
+  position: absolute;
+  right: calc(var(--stub) - 12px);
+  width: 24px;
+  height: 24px;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: var(--notch-bg);
+}
+
+.ticket::before {
+  top: -15px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  transform: rotate(-45deg);
+}
+
+.ticket::after {
+  bottom: -15px;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  transform: rotate(-45deg);
+}
+
+.ticket__body {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 8px 8px 12px;
-  border: 2px dashed rgba(43, 34, 51, 0.3);
-  border-radius: var(--radius-m);
-}
-
-.shop__pack-info {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  gap: 4px 10px;
+  padding: 10px 14px;
 }
 
-.shop__pack-name {
+.ticket__count {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: var(--fs-m);
 }
 
-.shop__bonus {
-  background: var(--mint);
-  font-size: 0.75rem;
+.ticket__count strong {
+  font-weight: 400;
+  font-size: var(--fs-xl);
+  line-height: 1;
+  margin-right: 2px;
+}
+
+.ticket__bonus {
+  padding: 1px 9px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  transform: rotate(-5deg);
+}
+
+.ticket__stub {
+  display: grid;
+  place-items: center;
+  border-left: 3px dashed var(--ink);
+  padding: 8px;
+}
+
+.ticket__buy {
+  width: 100%;
+  padding-inline: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .shop__message {

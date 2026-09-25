@@ -3,11 +3,12 @@ import { sfx } from '../audio/sfx';
 import { TICKET_PACKS, type TicketPackId } from '../economy/economy';
 import { TICKET_PRICE } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
+import { CoinIcon } from './icons';
 import './Shop.css';
 
 const PACK_ORDER: TicketPackId[] = ['single', 'bundle'];
 
-/** 뽑기권 상점. 가격은 economy/config에서 가져온다. */
+/** 뽑기권 판매대. 각 묶음은 절취선이 있는 티켓 모양이며 가격은 economy/config에서 가져온다. */
 export function Shop() {
   const coins = useGameStore((s) => s.coins);
   const buyTickets = useGameStore((s) => s.buyTickets);
@@ -17,38 +18,43 @@ export function Shop() {
     const result = buyTickets(id);
     if (result.ok) {
       sfx.coin();
-      setMessage(`뽑기권 ${TICKET_PACKS[id].tickets}장을 샀어요!`);
+      setMessage(`뽑기권 ${TICKET_PACKS[id].tickets}장을 샀어요.`);
     } else {
       sfx.fail();
-      setMessage('코인이 부족해요. 미니게임으로 코인을 모아보세요.');
+      setMessage('코인이 모자라요. 미니게임에서 코인을 더 모아 오세요.');
     }
   };
 
   return (
-    <section className="card shop" aria-labelledby="shop-title">
+    <section className="shop" aria-labelledby="shop-title">
       <h2 id="shop-title" className="shop__title">
-        🎫 뽑기권 상점
+        뽑기권 사기
       </h2>
       <ul className="shop__packs">
         {PACK_ORDER.map((id) => {
           const pack = TICKET_PACKS[id];
-          const bonus = pack.tickets * TICKET_PRICE - pack.price;
+          const bonus = (pack.tickets * TICKET_PRICE - pack.price) / TICKET_PRICE;
           const affordable = coins >= pack.price;
           return (
-            <li key={id} className="shop__pack">
-              <div className="shop__pack-info">
-                <span className="shop__pack-name">뽑기권 {pack.tickets}장</span>
-                {bonus > 0 && <span className="chip shop__bonus">+{bonus / TICKET_PRICE}장 보너스</span>}
+            <li key={id} className={`ticket ticket--${id}`}>
+              <div className="ticket__body">
+                <span className="ticket__count">
+                  <strong>{pack.tickets}</strong>장
+                </span>
+                {bonus > 0 && <span className="ticket__bonus">{bonus}장 덤</span>}
               </div>
-              <button
-                type="button"
-                className={`btn btn--small ${affordable ? 'btn--lemon' : ''}`}
-                disabled={!affordable}
-                onClick={() => buy(id)}
-                aria-label={`뽑기권 ${pack.tickets}장, ${pack.price.toLocaleString()} 코인에 구매${affordable ? '' : ' (코인 부족)'}`}
-              >
-                <span aria-hidden="true">C</span> {pack.price.toLocaleString()}
-              </button>
+              <div className="ticket__stub">
+                <button
+                  type="button"
+                  className="btn btn--small btn--lemon ticket__buy"
+                  disabled={!affordable}
+                  onClick={() => buy(id)}
+                  aria-label={`뽑기권 ${pack.tickets}장을 ${pack.price.toLocaleString()} 코인에 사기${affordable ? '' : ', 코인 부족'}`}
+                >
+                  <CoinIcon size={20} />
+                  {pack.price.toLocaleString()}
+                </button>
+              </div>
             </li>
           );
         })}

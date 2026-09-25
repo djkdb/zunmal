@@ -9,6 +9,7 @@ import { GACHA_RULES, rarityRank, type Rarity } from '../data/rarity';
 import { PULL_COST } from '../economy/config';
 import type { ResolvedPull } from '../gacha/engine';
 import { useGameStore, type PullKind } from '../store/useGameStore';
+import { TicketIcon } from '../components/icons';
 import './GachaPage.css';
 
 interface PendingResult {
@@ -35,7 +36,7 @@ export function GachaPage() {
     const result = pull(kind);
     if (!result.ok) {
       sfx.fail();
-      setMessage('뽑기권이 부족해요. 상점에서 뽑기권을 사거나 미니게임으로 코인을 모아요.');
+      setMessage('뽑기권이 모자라요. 아래에서 뽑기권을 사거나');
       return;
     }
     setMessage('');
@@ -57,10 +58,10 @@ export function GachaPage() {
   return (
     <section className="page gacha-page" aria-labelledby="gacha-title">
       <h1 id="gacha-title" className="page-title">
-        🎰 캡슐 뽑기
+        캡슐 뽑기
       </h1>
 
-      <div className="card gacha-page__machine">
+      <div className="gacha-page__machine">
         <GachaMachine run={run} onOpened={() => setShowResult(true)} />
         <div className="gacha-page__actions">
           {(['single', 'multi'] as const).map((kind) => {
@@ -80,21 +81,22 @@ export function GachaPage() {
               >
                 {kind === 'multi' ? '10연 뽑기' : '1회 뽑기'}
                 <span className="gacha-page__cost" aria-hidden="true">
-                  🎫{cost}
+                  <TicketIcon size={18} />
+                  {cost}
                 </span>
               </button>
             );
           })}
         </div>
         <p className="gacha-page__pity small">
-          전설 이상 확정까지 <strong>{untilPity}</strong>회
+          앞으로 <strong>{untilPity}</strong>번 안에 전설 이상이 꼭 나와요
         </p>
         <p className="gacha-page__message small" role="status" aria-live="polite">
           {message}
           {message && (
             <>
               {' '}
-              <Link to="/play">미니게임 하러 가기</Link>
+              <Link to="/play">미니게임에서 코인을 모아 오세요.</Link>
             </>
           )}
         </p>

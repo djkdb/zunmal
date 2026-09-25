@@ -3,36 +3,58 @@
  * 크림색 배경 + 굵은 잉크 외곽선 + 둥근 UI
  * ------------------------------------------------------------------ */
 :root {
-  --cream: #fff6e6;
-  --cream-deep: #ffe9c7;
-  --paper: #fffdf8;
-  --ink: #2b2233;
-  --ink-soft: #5e5266;
-  --pink: #ff8fab;
-  --pink-deep: #ff5d8f;
-  --mint: #7fd8be;
-  --sky: #8ecdf7;
-  --lemon: #ffd966;
-  --lavender: #c3a6ff;
-  --danger: #ff6b6b;
+  /* 문방구 앞 뽑기방 팔레트 — 딸기우유, 소다, 레몬, 말차 */
+  --cream: #fff4e0; /* 우유 캐러멜 바닥 */
+  --cream-deep: #ffe6bf;
+  --paper: #fffcf5;
+  --ink: #2b2233; /* 보랏빛 잉크 — 순검정 대신 */
+  --ink-soft: #6a5d70;
+  --berry: #ff6f91;
+  --berry-deep: #e84d74;
+  --soda: #6ec6ff;
+  --lemon: #ffd84d;
+  --matcha: #8ed081;
+  --grape: #b99cff;
+  --shelf: #e9c99a; /* 진열장 선반 */
+  --danger: #ff5b5b;
 
-  --rarity-common: #bdb3a4;
-  --rarity-rare: #5fa8ff;
-  --rarity-epic: #b57bff;
-  --rarity-legendary: #ffb627;
-  --rarity-mythic: #ff5da2;
+  /* 이전 이름 호환 */
+  --pink: var(--berry);
+  --pink-deep: var(--berry-deep);
+  --mint: var(--matcha);
+  --sky: var(--soda);
+  --lavender: var(--grape);
+
+  --rarity-common: #cfc5b6;
+  --rarity-rare: #6ec6ff;
+  --rarity-epic: #b99cff;
+  --rarity-legendary: #ffc02e;
+  --rarity-mythic: #ff6f91;
 
   --line: 3px;
-  --radius-s: 12px;
-  --radius-m: 18px;
-  --radius-l: 28px;
-  --shadow-pop: 0 4px 0 var(--ink);
-  --shadow-pop-s: 0 2px 0 var(--ink);
+  /* 모양으로 위계 표현: 패널 > 슬롯 > 칩(완전한 알약형) */
+  --radius-panel: 22px;
+  --radius-slot: 14px;
+  --radius-s: 10px;
+  --radius-m: var(--radius-slot);
+  --radius-l: var(--radius-panel);
+  /* 눌리는 것만 키캡 그림자를 가진다. 패널은 평평하다. */
+  --keycap: 0 4px 0 var(--ink);
+  --keycap-s: 0 3px 0 var(--ink);
+  --shadow-pop: var(--keycap);
+  --shadow-pop-s: var(--keycap-s);
 
   --font-display: 'Jua', 'Gowun Dodum', system-ui, sans-serif;
   --font-body: 'Gowun Dodum', 'Jua', system-ui, sans-serif;
 
-  --nav-h: 68px;
+  /* 타입 스케일 (1.25 비율) */
+  --fs-xs: 0.8125rem;
+  --fs-s: 0.9375rem;
+  --fs-m: 1.25rem;
+  --fs-l: 1.5625rem;
+  --fs-xl: 1.9375rem;
+
+  --nav-h: 72px;
   --max-w: 480px;
   --gutter: 16px;
 
@@ -53,8 +75,6 @@ body {
 
 body {
   background: var(--cream);
-  background-image: radial-gradient(circle at 1px 1px, rgba(43, 34, 51, 0.08) 1.5px, transparent 0);
-  background-size: 22px 22px;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -117,21 +137,31 @@ button {
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-top: 12px;
+  gap: 18px;
+  padding-top: 18px;
 }
 
+/* 페이지 제목: 가게 간판 스티커 글씨 — 타이포 자체가 장식 역할 */
 .page-title {
-  font-size: 1.6rem;
+  align-self: flex-start;
+  font-size: var(--fs-xl);
+  line-height: 1.1;
+  color: var(--paper);
+  -webkit-text-stroke: 7px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--ink);
+  letter-spacing: 0.01em;
 }
 
 .page-subtitle {
+  margin-top: -8px;
+  max-width: 34ch;
   color: var(--ink-soft);
-  font-size: 0.95rem;
+  font-size: var(--fs-s);
 }
 
 /* ------------------------------------------------------------------
- * 하단 내비게이션
+ * 하단 내비게이션: 판매대 서랍
  * ------------------------------------------------------------------ */
 .bottom-nav {
   position: fixed;
@@ -143,11 +173,10 @@ button {
   max-width: var(--max-w);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  gap: 4px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
   background: var(--paper);
   border-top: var(--line) solid var(--ink);
-  border-radius: var(--radius-m) var(--radius-m) 0 0;
 }
 
 .bottom-nav__item {
@@ -155,55 +184,57 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  border-radius: var(--radius-s);
-  border: 2px solid transparent;
+  gap: 1px;
+  min-height: 52px;
+  border-radius: var(--radius-slot);
   color: var(--ink-soft);
   text-decoration: none;
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: var(--fs-xs);
 }
 
 .bottom-nav__icon {
-  font-size: 1.3rem;
-  line-height: 1.1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 30px;
+  border-radius: 999px;
+  transition: background 0.15s ease;
 }
 
 .bottom-nav__item.is-active {
   color: var(--ink);
+}
+
+.bottom-nav__item.is-active .bottom-nav__icon {
   background: var(--lemon);
-  border-color: var(--ink);
+  box-shadow: inset 0 0 0 2.5px var(--ink);
 }
 
 /* ------------------------------------------------------------------
- * 공용 컴포넌트: 버튼 / 카드 / 칩
+ * 버튼: 오락기 버튼처럼 눌리는 키캡
  * ------------------------------------------------------------------ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 48px;
-  padding: 10px 18px;
+  gap: 8px;
+  min-height: 50px;
+  padding: 10px 20px;
   border: var(--line) solid var(--ink);
   border-radius: 999px;
   background: var(--paper);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--keycap);
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.0625rem;
   cursor: pointer;
   text-decoration: none;
   color: var(--ink);
   transition:
-    transform 0.08s ease,
-    box-shadow 0.08s ease,
-    background 0.15s ease;
+    transform 0.07s ease,
+    box-shadow 0.07s ease;
   touch-action: manipulation;
   user-select: none;
-}
-
-.btn:hover:not(:disabled) {
-  transform: translateY(-1px);
 }
 
 .btn:active:not(:disabled) {
@@ -213,17 +244,19 @@ button {
 
 .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  background: var(--cream-deep);
+  color: var(--ink-soft);
+  border-style: dashed;
   box-shadow: none;
   transform: translateY(3px);
 }
 
 .btn--primary {
-  background: var(--pink);
+  background: var(--berry);
 }
 
 .btn--mint {
-  background: var(--mint);
+  background: var(--matcha);
 }
 
 .btn--lemon {
@@ -231,14 +264,14 @@ button {
 }
 
 .btn--sky {
-  background: var(--sky);
+  background: var(--soda);
 }
 
 .btn--small {
-  min-height: 40px;
+  min-height: 42px;
   padding: 6px 14px;
-  font-size: 0.95rem;
-  box-shadow: var(--shadow-pop-s);
+  font-size: var(--fs-s);
+  box-shadow: var(--keycap-s);
 }
 
 .btn--block {
@@ -251,17 +284,17 @@ button {
   justify-content: center;
   width: 44px;
   height: 44px;
+  padding: 0;
   border: var(--line) solid var(--ink);
   border-radius: 50%;
   background: var(--paper);
-  box-shadow: var(--shadow-pop-s);
+  box-shadow: var(--keycap-s);
   cursor: pointer;
-  font-size: 1.2rem;
   touch-action: manipulation;
 }
 
 .icon-btn:active {
-  transform: translateY(2px);
+  transform: translateY(3px);
   box-shadow: none;
 }
 
@@ -269,11 +302,11 @@ button {
   background: var(--cream-deep);
 }
 
+/* 패널: 평평한 잉크 외곽선. 눌리지 않으므로 그림자 없음 */
 .card {
   background: var(--paper);
   border: var(--line) solid var(--ink);
-  border-radius: var(--radius-l);
-  box-shadow: var(--shadow-pop);
+  border-radius: var(--radius-panel);
   padding: 16px;
 }
 
@@ -319,7 +352,7 @@ button {
 }
 
 .small {
-  font-size: 0.85rem;
+  font-size: var(--fs-xs);
 }
 
 /* ------------------------------------------------------------------
@@ -417,7 +450,6 @@ button {
   border-radius: var(--radius-l);
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 6px 0 var(--ink);
   overflow: hidden;
 }
 

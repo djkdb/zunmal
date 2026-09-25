@@ -409,7 +409,7 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         <button type="button" className="btn cc__move" aria-label="왼쪽으로 이동 (누르고 있기)" {...holdButton(-1)}>
           ◀
         </button>
-        <p className="small muted cc__help">화면을 누른 채 좌우로 움직이거나 ← → 키</p>
+        <p className="small muted cc__help">화면을 누른 채 좌우로 밀거나 방향키로 움직여요</p>
         <button type="button" className="btn cc__move" aria-label="오른쪽으로 이동 (누르고 있기)" {...holdButton(1)}>
           ▶
         </button>
@@ -435,7 +435,7 @@ const capsuleCatch: MiniGame = {
   id: 'capsule-catch',
   name: '캡슐 받기',
   description: '30초 동안 떨어지는 캡슐을 받아요. 황금 캡슐은 보너스, 가시 폭탄은 조심!',
-  controls: '드래그 · ← → / A D · 화면 버튼',
+  controls: '화면 드래그, 방향키 또는 A/D, 화면 버튼',
   icon: CapsuleCatchIcon,
   Component: CapsuleCatchGame,
 };

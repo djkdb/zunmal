@@ -24,13 +24,10 @@ export function Collection() {
 
   return (
     <div className="collection">
-      <div className="card card--tight collection__progress">
-        <div className="row row--between">
-          <span className="collection__progress-label">수집 현황</span>
-          <span className="collection__progress-value">
-            {ownedCount} / {CHARACTERS.length}
-          </span>
-        </div>
+      <div className="collection__progress">
+        <p className="collection__progress-value">
+          <strong>{ownedCount}</strong>마리 만났어요 <span className="muted">/ {CHARACTERS.length}</span>
+        </p>
         <div
           className="progress"
           role="progressbar"
@@ -65,14 +62,18 @@ export function Collection() {
                       aria-label={`${c.name}, ${entry.count}마리 보유${isPartner ? ', 현재 파트너' : ''}. 자세히 보기`}
                     >
                       {isPartner && <span className="collection__partner-tag">파트너</span>}
-                      <Malang character={c} size={72} animation="none" decorative />
+                      <span className="collection__window">
+                        <Malang character={c} size={66} animation="none" decorative />
+                      </span>
                       <span className="collection__name">{c.name}</span>
-                      <span className="collection__count">×{entry.count}</span>
+                      {entry.count > 1 && <span className="collection__count">{entry.count}마리</span>}
                     </button>
                   ) : (
                     <div className="collection__card is-locked" aria-label="아직 만나지 못한 말랑이">
-                      <Malang character={c} size={72} animation="none" silhouette decorative />
-                      <span className="collection__name">???</span>
+                      <span className="collection__window">
+                        <Malang character={c} size={66} animation="none" silhouette decorative />
+                      </span>
+                      <span className="collection__name" aria-hidden="true" />
                     </div>
                   )}
                 </li>
@@ -92,7 +93,8 @@ export function Collection() {
             </h2>
             <p className="muted">{detail.description}</p>
             <p className="small">
-              보유 {owned[detail.id]?.count}마리 · 파트너 코인 보너스 {formatBonus(PARTNER_RARITY_BONUS[detail.rarity])}
+              {owned[detail.id]?.count}마리 가지고 있어요. 파트너로 데려가면 미니게임 코인{' '}
+              {formatBonus(PARTNER_RARITY_BONUS[detail.rarity])}.
             </p>
             <div className="collection-detail__actions">
               <button

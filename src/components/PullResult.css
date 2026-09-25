@@ -178,3 +178,7 @@
   text-align: center;
   color: var(--ink-soft);
 }
+
+.pull-close {
+  margin-top: 14px;
+}

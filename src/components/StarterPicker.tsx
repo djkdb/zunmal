@@ -14,13 +14,12 @@ export function StarterPicker() {
 
   return (
     <section className="page starter" aria-labelledby="starter-title">
-      <div className="card starter__intro">
+      <div className="starter__intro">
         <h1 id="starter-title" className="page-title">
-          말랑 뽑기방에 어서 와!
+          어서 오세요, 말랑 뽑기방이에요
         </h1>
         <p className="muted">
-          함께 미니게임을 할 첫 번째 파트너 말랑이를 골라줘. 미니게임으로 코인을 모으고, 뽑기권으로 새 말랑이를
-          만나보자.
+          처음 함께할 말랑이를 골라 주세요. 미니게임으로 코인을 모아 캡슐을 뽑으면 새 말랑이를 만날 수 있어요.
         </p>
       </div>
       <div className="starter__options" role="radiogroup" aria-label="시작 말랑이">

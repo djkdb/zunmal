@@ -14,9 +14,9 @@ export function MiniGamePage() {
     return (
       <section className="page" aria-labelledby="lobby-title">
         <h1 id="lobby-title" className="page-title">
-          🎮 미니게임
+          미니게임
         </h1>
-        <p className="page-subtitle">게임 점수만큼 코인을 받아 뽑기권을 살 수 있어요.</p>
+        <p className="page-subtitle">점수가 높을수록 코인을 많이 받아요. 모은 코인으로 뽑기권을 사요.</p>
         <MiniGameLobby />
       </section>
     );

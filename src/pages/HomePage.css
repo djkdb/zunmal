@@ -1,77 +1,125 @@
-.home__hero {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background:
-    radial-gradient(circle at 25% 60%, rgba(255, 143, 171, 0.25), transparent 55%),
-    var(--paper);
+/* 판매대: 파트너가 나무 선반 위에 올라서 있다 */
+.home__counter {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 4px 12px;
+  padding: 8px 4px 0;
 }
 
 .home__stage {
-  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  padding: 0 4px;
+  margin-bottom: 4px;
 }
 
-.home__partner {
+.home__counter::after {
+  /* 나무 선반 */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16px;
+  background: var(--shelf);
+  border: var(--line) solid var(--ink);
+  border-radius: 6px;
+}
+
+.home__plate {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 6px;
+  padding-bottom: 26px;
   min-width: 0;
 }
 
-.home__partner-name {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  line-height: 1.2;
+.home__name {
+  font-size: var(--fs-l);
+  line-height: 1.15;
+  word-break: keep-all;
 }
 
-.home__loop {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 6px;
-  font-family: var(--font-display);
-  font-size: 0.9rem;
+.home__bonus {
+  font-size: var(--fs-s);
   color: var(--ink-soft);
 }
 
 .home__actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  margin-top: 8px;
 }
 
 .home__action {
-  min-height: 56px;
-  font-size: 1.15rem;
+  justify-content: flex-start;
+  min-height: 62px;
+  padding-left: 16px;
+  font-size: var(--fs-m);
+  border-radius: var(--radius-panel);
 }
 
-.home__stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.home__ticket-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px 10px 2px 6px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--lemon);
+  font-size: var(--fs-s);
+  transform: rotate(-4deg);
 }
 
-.home__stat {
+/* 도감 진행: 15칸 캡슐 슬롯 */
+.home__shelf {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+  padding: 12px 14px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-slot);
+  background: var(--paper);
   color: var(--ink);
   text-decoration: none;
-  box-shadow: var(--shadow-pop-s);
 }
 
-.home__stat-value {
+.home__shelf-text {
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: var(--fs-s);
 }
 
-@media (max-width: 380px) {
-  .home__hero {
-    flex-direction: column;
-    text-align: center;
-  }
-  .home__partner {
-    align-items: center;
-  }
+.home__shelf-text strong {
+  font-weight: 400;
+  font-size: var(--fs-m);
+}
+
+.home__slots {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 3px;
+}
+
+.home__slot {
+  aspect-ratio: 1;
+  border: 2px dashed rgba(43, 34, 51, 0.35);
+  border-radius: 50%;
+}
+
+.home__slot.is-filled {
+  border: 2px solid var(--ink);
+}
+
+.home__daily {
+  text-align: center;
+}
+
+.home__stage .malang {
+  width: clamp(116px, 40vw, 168px);
+  height: auto;
 }

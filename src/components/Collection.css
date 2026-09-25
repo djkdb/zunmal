@@ -1,7 +1,7 @@
 .collection {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
 }
 
 .collection__progress {
@@ -10,36 +10,56 @@
   gap: 8px;
 }
 
-.collection__progress-label,
 .collection__progress-value {
   font-family: var(--font-display);
+  font-size: var(--fs-s);
+}
+
+.collection__progress-value strong {
+  font-weight: 400;
+  font-size: var(--fs-l);
 }
 
 .progress {
-  height: 14px;
-  border: 2px solid var(--ink);
+  height: 16px;
+  border: var(--line) solid var(--ink);
   border-radius: 999px;
-  background: var(--cream-deep);
+  background: var(--paper);
   overflow: hidden;
 }
 
 .progress__fill {
   height: 100%;
-  background: repeating-linear-gradient(-45deg, var(--pink) 0 8px, var(--pink-deep) 8px 16px);
+  background: var(--berry);
+  border-right: var(--line) solid var(--ink);
   transition: width 0.4s ease;
 }
 
 .collection__heading {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
+/* 진열장 한 칸 = 선반 한 줄 */
 .collection__grid {
+  position: relative;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 6px 18px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 14px 8px;
+}
+
+.collection__grid::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: var(--shelf);
+  border: var(--line) solid var(--ink);
+  border-radius: 5px;
 }
 
 .collection__card {
@@ -47,71 +67,89 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
-  min-height: 128px;
-  padding: 10px 4px 8px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-m);
-  background: var(--paper);
-  box-shadow: var(--shadow-pop-s);
+  padding: 0 2px 6px;
+  border: none;
+  border-radius: var(--radius-slot);
+  background: none;
   cursor: pointer;
   text-align: center;
+  color: var(--ink);
+}
+
+/* 캡슐 창: 말랑이가 들어 있는 투명 캡슐 */
+.collection__window {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), var(--capsule, #f3eadb);
+  transition: transform 0.1s ease;
+}
+
+.collection__card:active .collection__window {
+  transform: scale(0.94);
+}
+
+.collection__card--rare {
+  --capsule: #d4ecff;
+}
+
+.collection__card--epic {
+  --capsule: #e6dcff;
+}
+
+.collection__card--legendary {
+  --capsule: #ffeaa8;
+}
+
+.collection__card--mythic {
+  --capsule: conic-gradient(#ffc2d1, #fff0a8, #c8f0c0, #c9e8ff, #e2d6ff, #ffc2d1);
 }
 
 .collection__card.is-locked {
   cursor: default;
-  background: rgba(255, 253, 248, 0.5);
-  border-style: dashed;
-  box-shadow: none;
   color: var(--ink-soft);
 }
 
-.collection__card--rare {
-  background: #eaf4ff;
+.collection__card.is-locked .collection__window {
+  border-style: dashed;
+  border-color: rgba(43, 34, 51, 0.45);
+  background: rgba(255, 252, 245, 0.6);
 }
 
-.collection__card--epic {
-  background: #f4ebff;
-}
-
-.collection__card--legendary {
-  background: #fff5d9;
-}
-
-.collection__card--mythic {
-  background: linear-gradient(160deg, #ffe3ec, #fff6cc, #dcfff3, #e3f1ff, #efe6ff);
-}
-
-.collection__card.is-partner {
-  box-shadow:
-    var(--shadow-pop-s),
-    0 0 0 3px var(--lemon);
+.collection__card.is-partner .collection__window {
+  box-shadow: 0 0 0 4px var(--lemon), 0 0 0 7px var(--ink);
 }
 
 .collection__partner-tag {
   position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0 8px;
-  border: 2px solid var(--ink);
+  top: -8px;
+  right: 2px;
+  z-index: 1;
+  padding: 0 7px;
+  border: 2.5px solid var(--ink);
   border-radius: 999px;
   background: var(--lemon);
   font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
+  transform: rotate(8deg);
   white-space: nowrap;
 }
 
 .collection__name {
   font-family: var(--font-display);
-  font-size: 0.85rem;
-  line-height: 1.2;
+  font-size: var(--fs-xs);
+  line-height: 1.25;
   word-break: keep-all;
 }
 
 .collection__count {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--ink-soft);
 }
 
@@ -124,13 +162,17 @@
 }
 
 .collection-detail__name {
-  font-size: 1.5rem;
+  font-size: var(--fs-l);
 }
 
 .collection-detail__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.collection__name:empty {
+  min-height: 1.25em;
 }

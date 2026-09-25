@@ -5,6 +5,7 @@ import type { Character } from '../data/characters';
 import type { MiniGameResultPayload } from '../minigames/types';
 import type { MiniGameFinishResult } from '../store/useGameStore';
 import { Malang } from './Malang';
+import { CoinIcon } from './icons';
 import './MiniGameResult.css';
 
 interface MiniGameResultProps {
@@ -29,7 +30,7 @@ export function MiniGameResult({ gameName, partner, payload, result, onRetry }: 
       <div className="card mg-result__card">
         <p className="small muted">{gameName}</p>
         <h1 id="mg-result-title" className="mg-result__title">
-          {isNewBest ? '🎉 최고 기록 갱신!' : '게임 종료!'}
+          {isNewBest ? '최고 기록 갱신!' : '다 했어요!'}
         </h1>
         <Malang character={partner} size={110} animation={isNewBest ? 'bounce' : 'idle'} decorative />
         <p className="mg-result__score">
@@ -52,17 +53,16 @@ export function MiniGameResult({ gameName, partner, payload, result, onRetry }: 
         )}
 
         <div className="mg-result__coins" aria-label={`획득 코인 ${reward.grantedCoins}`}>
-          <span className="mg-result__coin-icon" aria-hidden="true">
-            C
-          </span>
+          <CoinIcon size={34} />
           <strong>+{reward.grantedCoins.toLocaleString()}</strong>
         </div>
         <ul className="mg-result__breakdown small">
           <li>
-            기본 {reward.baseCoins.toLocaleString()} + 파트너 보너스 {reward.partnerBonus.toLocaleString()}
+            점수로 {reward.baseCoins.toLocaleString()}코인
+            {reward.partnerBonus > 0 && <>, {partner.name} 덕분에 {reward.partnerBonus.toLocaleString()}코인 더</>}
           </li>
-          {reward.cappedByGame && <li>한 판 최대치에 도달했어요.</li>}
-          {reward.cappedByDaily && <li>오늘의 코인 한도에 도달했어요. 내일 다시 만나요!</li>}
+          {reward.cappedByGame && <li>한 판에 받을 수 있는 만큼 다 받았어요.</li>}
+          {reward.cappedByDaily && <li>오늘 받을 수 있는 코인을 모두 받았어요. 자정에 다시 채워져요.</li>}
         </ul>
       </div>
 
@@ -71,7 +71,7 @@ export function MiniGameResult({ gameName, partner, payload, result, onRetry }: 
           다시 하기
         </button>
         <Link to="/play" className="btn" onClick={() => sfx.button()}>
-          로비로
+          다른 게임 고르기
         </Link>
       </div>
     </section>
