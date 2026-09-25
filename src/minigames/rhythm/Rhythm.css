@@ -1,0 +1,154 @@
+.rh {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rh__combo {
+  min-height: 2em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+}
+
+.rh__combo strong {
+  font-size: 1.6rem;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.rh__combo.is-hot strong {
+  color: var(--berry-deep);
+}
+
+.rh__mult {
+  background: var(--lemon);
+}
+
+/* 패드 전체가 누르는 영역 */
+.rh__pad {
+  position: relative;
+  height: min(60dvh, 420px);
+  min-height: 300px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(185, 156, 255, 0.2), transparent 62%),
+    var(--paper);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rh__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 4px dashed var(--ink);
+  border-radius: 50%;
+  background: rgba(255, 216, 77, 0.18);
+  pointer-events: none;
+}
+
+.rh__malang {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  margin: -75px 0 0 -75px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+.rh__malang .malang {
+  max-width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+/* 젤리 방울 노트 */
+.rh__note {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--ink);
+  border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, transparent 20%), var(--soda);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.rh__note.is-accent {
+  width: 32px;
+  height: 32px;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, transparent 20%), var(--berry);
+}
+
+.rh__note.is-off {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 35% 30%, #fff 0 18%, transparent 20%), var(--grape);
+}
+
+.rh__judge {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 116px);
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 2px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.rh__judge.is-perfect {
+  background: var(--lemon);
+}
+
+.rh__judge.is-good {
+  background: var(--matcha);
+}
+
+.rh__judge.is-miss {
+  color: var(--ink-soft);
+}
+
+.rh__judge.is-anim {
+  animation: rh-judge-pop 0.25s ease-out;
+}
+
+@keyframes rh-judge-pop {
+  from {
+    transform: translate(-50%, -50%) scale(1.35);
+  }
+}
+
+.rh__help {
+  margin: 0;
+  text-align: center;
+}
