@@ -1,0 +1,116 @@
+# 🍮 말랑 뽑기방
+
+말랑말랑한 젤리 캐릭터 **말랑이**를 모으는 모바일 우선 캐주얼 수집 웹게임.
+
+**▶ 플레이: https://djkdb.github.io/zunmal/**
+
+```
+미니게임 플레이 → 코인 획득 → 뽑기권 구매 → 캡슐 머신 → 말랑이 도감 수집
+```
+
+## 스크린샷
+
+| 캡슐 머신 | 10연 뽑기 결과 | 미니게임 |
+|---|---|---|
+| _(스크린샷 자리)_ | _(스크린샷 자리)_ | _(스크린샷 자리)_ |
+
+## 게임 소개
+
+- **말랑이 15종**: 일반 6 · 레어 3 · 에픽 3 · 전설 2 · 신화 1. 모두 오리지널 디자인이고, 이미지 파일 없이 SVG로 직접 그립니다.
+- **캡슐 머신**: 코인 투입 → 머신 흔들림 → 캡슐 낙하 → 탭해서 열기. 캡슐 색으로 희귀도를 미리 알 수 있고, 등급이 높을수록 연출이 화려해집니다.
+- **효과음**: 소리는 전부 WebAudio로 합성합니다(오디오 파일 없음). 첫 터치나 클릭 전에는 소리가 나지 않고, 음소거 설정은 저장됩니다.
+- **파트너 말랑이**: 미니게임에 함께 데려가는 말랑이입니다. 희귀도에 따라 코인 보너스(최대 +30%)가 붙습니다.
+- **자동 저장**: 진행 상황이 브라우저(localStorage)에 저장되고, 새로고침해도 이어서 할 수 있습니다.
+
+### 확률 공개
+
+| 희귀도 | 확률 | 중복 환급 |
+|---|---|---|
+| ● 일반 | 62% | 10 코인 |
+| ◆ 레어 | 25% | 30 코인 |
+| ✦ 에픽 | 9.5% | 80 코인 |
+| ♛ 전설 | 3% | 300 코인 |
+| ✺ 신화 | 0.5% | 1000 코인 |
+
+- **천장**: 전설 이상이 49회 연속으로 나오지 않으면 50번째 뽑기는 전설 이상이 확정입니다(전설:신화 = 6:1). 천장을 포함한 실질 전설 이상 확률은 약 4.2%입니다.
+- **10연 보장**: 10연 뽑기 결과에 레어 이상이 하나도 없으면 마지막 1개를 레어 이상으로 다시 뽑습니다.
+- **뽑기권**: 1장 100 코인, 11장 1000 코인.
+
+## 플레이 방법
+
+1. 처음 시작하면 파트너 말랑이 1마리를 고릅니다.
+2. **미니게임**에서 점수를 올려 코인을 모읍니다. 한 판 최대 200 코인, 하루 최대 3000 코인이며 한국 시간 자정에 초기화됩니다.
+3. **뽑기방**에서 뽑기권을 사고 캡슐을 뽑습니다.
+4. **도감**에서 모은 말랑이를 보고 파트너를 바꿉니다.
+
+### 미니게임
+
+| 게임 | 시간 | 조작 |
+|---|---|---|
+| 👆 말랑 누르기 | 20초 | 말랑이를 연타해요. 연속으로 누르면 콤보 보너스가 붙고, 빈 곳을 누르면 콤보가 끊겨요. (터치 · 클릭 · Space/Enter) |
+| 🧺 캡슐 받기 | 30초 | 떨어지는 캡슐을 받아요. 황금 캡슐은 보너스, 가시 폭탄은 피해야 해요. (드래그 · ←/→ 또는 A/D · 화면 버튼) |
+
+## 기술 스택
+
+- Vite, React, TypeScript (`strict`, `noUncheckedIndexedAccess`)
+- Zustand + `persist` (버전이 있는 저장 데이터, 마이그레이션, 손상 데이터 복구)
+- React Router (`HashRouter`: GitHub Pages에서 새로고침해도 동작)
+- Vitest: 가챠 확률 10만 회 검증, 경제, 저장, 미니게임 로직 테스트
+- GitHub Actions → GitHub Pages
+- 외부 이미지/사운드 파일 없음 (SVG + Canvas + WebAudio)
+
+## 개발
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # 단위 테스트
+npm run build    # 타입 체크 + 프로덕션 빌드
+npm run preview  # http://localhost:4173/zunmal/
+```
+
+아키텍처, 코딩 컨벤션, 가챠·경제 규칙은 [CLAUDE.md](./CLAUDE.md)에 정리되어 있습니다.
+
+```
+src/
+  data/        캐릭터·희귀도 데이터
+  gacha/       순수 가챠 엔진 (RNG 주입)
+  economy/     밸런스 설정(config.ts)과 보상 계산
+  audio/       WebAudio 효과음
+  store/       Zustand 스토어와 저장 데이터 마이그레이션
+  components/  UI 컴포넌트 (Malang, GachaMachine, PullResult …)
+  minigames/   미니게임 (registry 기반 플러그인 구조)
+  pages/       화면
+```
+
+## 미니게임 추가 방법
+
+게임은 **점수만 보고**합니다. 코인 계산, 지급, 최고 기록 저장은 공통 모듈이 처리합니다.
+
+1. `src/minigames/<game-id>/logic.ts`에 순수 로직을 작성하고 `logic.test.ts`로 테스트합니다.
+2. `src/minigames/<game-id>/index.tsx`에서 `MiniGame` 객체를 default export합니다.
+
+   ```tsx
+   import type { MiniGame, MiniGameProps } from '../types';
+
+   function MyGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+     // ... 플레이가 끝나면
+     // onFinish({ score, stats: { 콤보: 12 } });
+   }
+
+   const myGame: MiniGame = {
+     id: 'my-game',
+     name: '내 게임',
+     description: '한 줄 설명',
+     icon: MyGameIcon,
+     Component: MyGame,
+   };
+   export default myGame;
+   ```
+
+3. `src/minigames/registry.ts`의 `MINI_GAMES` 배열에 한 줄을 추가합니다.
+4. (선택) `src/economy/config.ts`의 `GAME_MULTIPLIERS`에 점수→코인 배율을 추가합니다. 없으면 기본 배율(0.5)을 씁니다.
+
+## 배포
+
+`main` 브랜치에 push하면 GitHub Actions(`.github/workflows/deploy.yml`)가 테스트와 빌드를 거쳐 GitHub Pages에 배포합니다. 처음 한 번은 저장소 **Settings → Pages → Source**를 **GitHub Actions**로 설정해야 합니다.
