@@ -48,6 +48,9 @@ export const GAME_MULTIPLIERS: Readonly<Record<string, number>> = {
   'button-malang': 0.5,
   // 30초, 캡슐 10~30점, 폭탄 감점. 평균 300~400점 → 120~160 코인.
   'capsule-catch': 0.4,
+  // 최대 60초, 높이 10당 1점 + 사탕 5점. 떨어지면 끝이라 보통 10~20초에 250~350점 → 100~140 코인,
+  // 끝까지 버티는 잘하는 플레이는 500점 이상 → 판당 상한 200 도달.
+  'malang-jump': 0.4,
 };
 
 /**
