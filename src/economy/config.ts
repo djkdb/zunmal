@@ -48,6 +48,8 @@ export const GAME_MULTIPLIERS: Readonly<Record<string, number>> = {
   'button-malang': 0.5,
   // 30초, 캡슐 10~30점, 폭탄 감점. 평균 300~400점 → 120~160 코인.
   'capsule-catch': 0.4,
+  // 30초, 톡 10점(황금 30) + 콤보 보너스, 가시 -15. 보통 300~450점 → 105~160 코인, 잘하면 600점+ → 상한 200.
+  'pop-up': 0.35,
 };
 
 /**
