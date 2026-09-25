@@ -1,0 +1,168 @@
+.mt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mt__status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  min-height: 2em;
+  font-family: var(--font-display);
+}
+
+.mt__chip strong {
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+.mt__chip--hot {
+  background: var(--lemon);
+}
+
+.mt__stage {
+  position: relative;
+  /* 정사각 격자: 폭에 맞추되 화면이 낮으면 줄여서 한 화면에 들어오게 */
+  width: min(100%, 400px, max(248px, calc(100dvh - 300px)));
+  margin: 0 auto;
+  padding: 8px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(185, 156, 255, 0.16), transparent 65%),
+    var(--paper);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mt__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mt__card {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  perspective: 600px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  color: inherit;
+}
+
+.mt__card:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-slot);
+}
+
+.mt__inner {
+  position: absolute;
+  inset: 0 0 3px;
+  display: block;
+  transform-style: preserve-3d;
+  transition: transform 0.28s ease;
+}
+
+.mt__card.is-up .mt__inner {
+  transform: rotateY(180deg);
+}
+
+.mt__face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-slot);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+}
+
+/* 뒷면: 소다색 바탕에 점무늬 + 가운데 캡슐. 눌리는 카드라 키캡 그림자 */
+.mt__back {
+  background:
+    radial-gradient(circle, rgba(255, 252, 245, 0.55) 1.6px, transparent 2.2px) 0 0 / 12px 12px,
+    var(--soda);
+  box-shadow: var(--keycap-s);
+}
+
+.mt__card:active:not([aria-disabled='true']) .mt__back {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.mt__back-art {
+  width: 56%;
+  height: auto;
+}
+
+.mt__front {
+  transform: rotateY(180deg);
+  background: var(--paper);
+}
+
+.mt__card.is-matched .mt__front {
+  background: color-mix(in srgb, var(--matcha) 30%, var(--paper));
+}
+
+.mt__front .malang {
+  width: 86%;
+  height: auto;
+  pointer-events: none;
+}
+
+.mt__card[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* 움직임 줄이기: 3D 회전 없이 앞/뒤만 바꿔 보여준다 */
+.mt--reduced .mt__inner {
+  transition: none;
+  transform: none !important;
+}
+
+.mt--reduced .mt__face {
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
+.mt--reduced .mt__front {
+  transform: none;
+  visibility: hidden;
+}
+
+.mt--reduced .mt__card.is-up .mt__front {
+  visibility: visible;
+}
+
+.mt--reduced .mt__card.is-up .mt__back {
+  visibility: hidden;
+}
+
+.mt__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: var(--radius-panel);
+  font-size: 3rem;
+}
+
+.mt__end-bonus {
+  font-size: 1.4rem;
+}
+
+.mt__help {
+  text-align: center;
+}

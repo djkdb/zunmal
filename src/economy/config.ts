@@ -48,6 +48,9 @@ export const GAME_MULTIPLIERS: Readonly<Record<string, number>> = {
   'button-malang': 0.5,
   // 30초, 캡슐 10~30점, 폭탄 감점. 평균 300~400점 → 120~160 코인.
   'capsule-catch': 0.4,
+  // 60초 4×4 짝 맞추기. 짝 20점 + 연속 보너스 + 클리어 시 남은 초×4 + 적은 시도 보너스.
+  // 평균(40초·20회 클리어) 250~300점 → 125~150 코인, 잘하면 400점+ → 상한 200.
+  matching: 0.5,
 };
 
 /**
