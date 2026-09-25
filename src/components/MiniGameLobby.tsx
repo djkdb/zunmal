@@ -39,7 +39,7 @@ export function MiniGameLobby() {
                 setPartner(c.id);
               }}
             >
-              <Malang character={c} size={46} animation="none" decorative />
+              <Malang character={c} size={52} animation="none" decorative />
             </button>
           ))}
         </div>

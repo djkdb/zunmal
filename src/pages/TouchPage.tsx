@@ -160,6 +160,8 @@ export function TouchPage() {
 function TouchPlay({ character }: { character: Character }) {
   const reduced = useReducedMotion();
   const affection = useGameStore((s) => s.affection[character.id] ?? 0);
+  // 파트너를 반짝 모습으로 두었고 반짝을 가지고 있으면 반짝으로 보여준다
+  const shiny = useGameStore((s) => s.partnerShiny && (s.ownedMalangs[character.id]?.shinyCount ?? 0) > 0);
 
   const stageRef = useRef<HTMLButtonElement>(null);
   const jellyRef = useRef<HTMLSpanElement>(null);
@@ -542,7 +544,14 @@ function TouchPlay({ character }: { character: Character }) {
         >
           <span className="touch__floor" aria-hidden="true" />
           <span ref={jellyRef} className="touch__jelly">
-            <Malang character={shown} size={220} animation="none" decorative />
+            <Malang
+              character={shown}
+              size={230}
+              animation="none"
+              decorative
+              aura="auto"
+              shiny={shiny}
+            />
           </span>
           <span className="touch__hearts" aria-hidden="true">
             {hearts.map((h) => (

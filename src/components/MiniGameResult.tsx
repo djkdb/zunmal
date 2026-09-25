@@ -32,7 +32,7 @@ export function MiniGameResult({ gameName, partner, payload, result, onRetry }: 
         <h1 id="mg-result-title" className="mg-result__title">
           {isNewBest ? '최고 기록 갱신!' : '다 했어요!'}
         </h1>
-        <Malang character={partner} size={110} animation={isNewBest ? 'bounce' : 'idle'} decorative />
+        <Malang character={partner} size={122} animation={isNewBest ? 'bounce' : 'idle'} decorative aura="auto" />
         <p className="mg-result__score">
           <span className="small muted">점수</span>
           <strong>{reward.score.toLocaleString()}</strong>

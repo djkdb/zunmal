@@ -181,7 +181,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
                     {character && (
                       <Malang
                         character={character}
-                        size={64}
+                        size={70}
                         animation={matched && !reduced ? 'squish' : 'none'}
                         decorative
                       />

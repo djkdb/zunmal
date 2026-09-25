@@ -26,6 +26,7 @@ export function HomePage() {
   const owned = useGameStore((s) => s.ownedMalangs);
   const dailyEarned = useGameStore((s) => s.dailyEarnedCoins);
   const tickets = useGameStore((s) => s.gachaTickets);
+  const partnerShiny = useGameStore((s) => s.partnerShiny);
   const partner = partnerId ? getCharacter(partnerId) : undefined;
   const ownedCount = CHARACTERS.filter((c) => owned[c.id]).length;
   const dailyLeft = Math.max(0, DAILY_CAP - dailyEarned);
@@ -46,7 +47,14 @@ export function HomePage() {
         <div className="home__stage">
           <p className="home__bubble">{greeting}</p>
           <Link to="/touch" className="home__partner" aria-label={`${partner.name} 만지러 가기`}>
-            <Malang character={partner} size={172} animation="idle" decorative />
+            <Malang
+              character={partner}
+              size={190}
+              animation="idle"
+              decorative
+              aura="auto"
+              shiny={partnerShiny && (owned[partner.id]?.shinyCount ?? 0) > 0}
+            />
           </Link>
           <div className="home__pedestal" aria-hidden="true" />
           <p className="home__name">

@@ -229,7 +229,7 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           // 포인터/키보드는 위 핸들러가 처리하므로 click은 무시(중복 방지)
           onClick={(e) => e.preventDefault()}
         >
-          <Malang character={partner} size={140} animation="none" decorative />
+          <Malang character={partner} size={156} animation="none" decorative />
         </button>
         {flash && (
           <span

@@ -20,7 +20,7 @@ import {
 import './PopUp.css';
 
 const INK = '#2b2233';
-const POP_SIZE = 64;
+const POP_SIZE = 76;
 
 /** 컵 순서(왼쪽 위부터)별 키. 숫자는 숫자 키패드 배치(7 8 9 / 4 5 6 / 1 2 3). */
 const LETTER_KEYS = ['Q', 'W', 'E', 'A', 'S', 'D', 'Z', 'X', 'C'] as const;

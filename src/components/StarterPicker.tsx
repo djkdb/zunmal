@@ -35,7 +35,7 @@ export function StarterPicker() {
               setSelected(c.id);
             }}
           >
-            <Malang character={c} size={84} animation={selected === c.id ? 'bounce' : 'idle'} decorative />
+            <Malang character={c} size={92} animation={selected === c.id ? 'bounce' : 'idle'} decorative />
             <span className="starter__name">{c.name}</span>
           </button>
         ))}

@@ -35,8 +35,7 @@ function SingleResult({ item }: { item: ResolvedPull }) {
       <div className="pull-single__stage">
         {fanfare >= 1 && <div className="pull-rays" aria-hidden="true" />}
         {item.rarity === 'secret' && <div className="pull-starfield" aria-hidden="true" />}
-        <Malang character={item.character} size={170} animation="bounce" decorative />
-        {item.shiny && <div className="pull-shine" aria-hidden="true" />}
+        <Malang character={item.character} size={190} animation="bounce" decorative aura="auto" shiny={item.shiny} />
       </div>
       <div className="pull-single__badges">
         <RarityBadge rarity={item.rarity} />
@@ -66,7 +65,7 @@ function MultiResult({ items }: { items: readonly ResolvedPull[] }) {
             item.isNew || item.isNewShiny ? '새로 획득' : `이미 있어서 ${item.refund}코인 돌려받음`
           }`}
         >
-          <Malang character={item.character} size={56} animation="none" decorative />
+          <Malang character={item.character} size={64} animation="none" decorative shiny={item.shiny} />
           <span className="pull-card__name">{item.character.name}</span>
           <RarityBadge rarity={item.rarity} compact />
           <OwnershipTag item={item} />

@@ -128,7 +128,7 @@ function RarityShelf({ rarity, onOpen }: { rarity: (typeof RARITIES)[number]; on
                 >
                   {isPartner && <span className="collection__partner-tag">파트너</span>}
                   <span className="collection__window">
-                    <Malang character={c} size={66} animation="none" decorative />
+                    <Malang character={c} size={74} animation="none" decorative />
                   </span>
                   {shiny && <span className="collection__shiny-mark" aria-hidden="true" />}
                   <span className="collection__name">{c.name}</span>
@@ -137,7 +137,7 @@ function RarityShelf({ rarity, onOpen }: { rarity: (typeof RARITIES)[number]; on
               ) : (
                 <div className={`collection__card collection__card--${rarity} is-locked`} aria-label="아직 만나지 못한 말랑이">
                   <span className="collection__window">
-                    <Malang character={c} size={66} animation="none" silhouette decorative />
+                    <Malang character={c} size={74} animation="none" silhouette decorative />
                   </span>
                   <span className="collection__name" aria-hidden="true" />
                 </div>
@@ -180,11 +180,11 @@ function SetCard({ set, onOpen }: { set: CollectionSet; onOpen(id: string): void
             <li key={id}>
               {has ? (
                 <button type="button" className="set-card__member" aria-label={c.name} onClick={() => onOpen(id)}>
-                  <Malang character={c} size={44} animation="none" decorative />
+                  <Malang character={c} size={48} animation="none" decorative />
                 </button>
               ) : (
                 <span className="set-card__member is-locked" aria-label="아직 못 만남">
-                  <Malang character={c} size={44} animation="none" silhouette decorative />
+                  <Malang character={c} size={48} animation="none" silhouette decorative />
                 </span>
               )}
             </li>
@@ -235,7 +235,7 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
     <Modal labelledBy="malang-detail-title" onClose={onClose} className={`detail-modal detail-modal--${detail.rarity}`}>
       <div className="collection-detail">
         <div className={`collection-detail__stage${showShiny ? ' is-shiny' : ''}`}>
-          <Malang character={detail} size={150} animation="idle" decorative />
+          <Malang character={detail} size={170} animation="idle" decorative aura="auto" shiny={showShiny} />
         </div>
         <div className="row">
           <RarityBadge rarity={detail.rarity} />
