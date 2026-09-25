@@ -25,6 +25,12 @@ export interface Sfx {
   hit(): void;
   /** 미니게임: 카운트다운 틱 (final=true면 시작음) */
   countdown(final?: boolean): void;
+  /** 리듬용 박자음. accent=true면 강박 */
+  beat(accent?: boolean): void;
+  /** 점프/튀어오름 */
+  jump(): void;
+  /** 카드 뒤집기 */
+  flip(): void;
 }
 
 type Wave = OscillatorType;
@@ -264,6 +270,21 @@ export class SfxEngine implements Sfx {
 
   countdown(final = false) {
     this.tone({ freq: final ? NOTE.A5 : NOTE.A4, duration: final ? 0.3 : 0.12, type: 'square', gain: 0.08 });
+  }
+
+  beat(accent = false) {
+    // 킥 느낌의 저음 + 짧은 클릭
+    this.tone({ freq: accent ? 160 : 120, slideTo: 45, duration: 0.16, type: 'sine', gain: accent ? 0.55 : 0.4 });
+    this.noise(0.03, { freq: accent ? 5000 : 3500, gain: accent ? 0.18 : 0.1, q: 1.5 });
+  }
+
+  jump() {
+    this.tone({ freq: 300, slideTo: 720, duration: 0.14, type: 'square', gain: 0.06 });
+  }
+
+  flip() {
+    this.noise(0.05, { freq: 2600, gain: 0.18, q: 2 });
+    this.tone({ freq: 520, slideTo: 640, duration: 0.05, type: 'triangle', gain: 0.08 });
   }
 }
 
