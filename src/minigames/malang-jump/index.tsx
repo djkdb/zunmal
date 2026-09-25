@@ -30,11 +30,8 @@ const PLATFORM_COLORS: Record<Platform['kind'], string> = {
 };
 const CANDY_COLORS = ['#ff8fab', '#ffd966', '#c3a6ff', '#7fd8be'];
 
-/** 효과음 모듈에 jump()가 없을 때도 동작하도록 (없으면 탭음으로 대신) */
 function playJump(sfx: Sfx) {
-  const s = sfx as Sfx & { jump?: () => void };
-  if (typeof s.jump === 'function') s.jump();
-  else s.tap(3);
+  sfx.jump();
 }
 
 interface Popup {
