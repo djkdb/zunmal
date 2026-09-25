@@ -3,6 +3,7 @@ import capsuleCatch from './capsule-catch';
 import matching from './matching';
 import rhythm from './rhythm';
 import malangJump from './malang-jump';
+import popUp from './pop-up';
 import type { MiniGame } from './types';
 
 /**
@@ -15,6 +16,7 @@ export const MINI_GAMES: readonly MiniGame[] = [
   matching,
   rhythm,
   malangJump,
+  popUp,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
