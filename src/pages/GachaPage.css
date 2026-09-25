@@ -1,0 +1,40 @@
+.gacha-page__machine {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 217, 102, 0.35), transparent 60%),
+    var(--paper);
+}
+
+.gacha-page__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gacha-page__actions .btn {
+  flex-wrap: wrap;
+  padding-inline: 8px;
+}
+
+.gacha-page__cost {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.gacha-page__pity {
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.gacha-page__message {
+  min-height: 1.2em;
+  text-align: center;
+  color: var(--pink-deep);
+}
+
+.gacha-page__message a {
+  color: var(--ink);
+  font-family: var(--font-display);
+}

@@ -1,0 +1,256 @@
+.machine {
+  position: relative;
+  width: min(100%, 270px);
+  margin: 0 auto;
+}
+
+.machine__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.machine__label {
+  font-family: var(--font-display);
+  font-size: 15px;
+  fill: var(--ink);
+}
+
+.machine__knob,
+.machine__capsules,
+.machine__coin {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.machine__coin {
+  opacity: 0;
+}
+
+/* 투입: 코인이 슬롯으로 쏙 */
+.machine--inserting .machine__coin {
+  animation: coin-insert 0.5s ease-in forwards;
+}
+
+@keyframes coin-insert {
+  0% {
+    opacity: 1;
+    transform: translateY(-24px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(14px) scaleX(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(18px) scaleX(0.2);
+  }
+}
+
+/* 흔들림: 손잡이 회전 + 돔 속 캡슐 들썩 + 몸통 떨림 */
+.machine--shaking .machine__knob {
+  animation: knob-turn 1.2s ease-in-out;
+}
+
+.machine--shaking .machine__capsules {
+  animation: capsules-jiggle 0.3s ease-in-out infinite;
+}
+
+.machine--shaking .machine__svg {
+  animation: machine-shake 0.15s linear infinite;
+}
+
+@keyframes knob-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes capsules-jiggle {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  25% {
+    transform: translate(-3px, -6px) rotate(-3deg);
+  }
+  75% {
+    transform: translate(3px, -3px) rotate(3deg);
+  }
+}
+
+@keyframes machine-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px) rotate(-0.6deg);
+  }
+  75% {
+    transform: translateX(2px) rotate(0.6deg);
+  }
+}
+
+/* 결과 캡슐 */
+.machine__capsule {
+  position: absolute;
+  left: 50%;
+  top: 66%;
+  width: 34%;
+  aspect-ratio: 1;
+  margin-left: -17%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.machine__capsule:disabled {
+  cursor: default;
+}
+
+.machine__capsule:focus-visible {
+  outline-offset: 6px;
+}
+
+.machine--dropping .machine__capsule {
+  animation: capsule-drop 0.65s cubic-bezier(0.3, 0, 0.3, 1) both;
+}
+
+.machine--ready .machine__capsule {
+  animation: capsule-wiggle 1s ease-in-out infinite;
+}
+
+.machine__capsule.has-glow {
+  filter: drop-shadow(0 0 10px rgba(255, 214, 90, 0.95)) drop-shadow(0 0 22px rgba(255, 143, 171, 0.7));
+}
+
+.machine__capsule--mythic.has-glow {
+  animation-name: capsule-wiggle, rainbow-glow;
+  animation-duration: 1s, 1.5s;
+  animation-iteration-count: infinite, infinite;
+}
+
+.capsule-top,
+.capsule-bottom,
+.capsule-band {
+  transition:
+    transform 0.4s cubic-bezier(0.2, 1.2, 0.4, 1),
+    opacity 0.4s ease;
+}
+
+.machine--opening .capsule-top {
+  transform: translate(-6px, -26px) rotate(-28deg);
+}
+
+.machine--opening .capsule-bottom {
+  transform: translateY(12px);
+  opacity: 0.4;
+}
+
+.machine--opening .capsule-band {
+  opacity: 0;
+}
+
+@keyframes capsule-drop {
+  0% {
+    transform: translate(28%, 48%) scale(0.45);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(0, -28%) scale(1.05);
+  }
+  78% {
+    transform: translate(0, 0) scale(1.12, 0.88);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes capsule-wiggle {
+  0%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  20% {
+    transform: rotate(-8deg) scale(1.03);
+  }
+  40% {
+    transform: rotate(7deg) scale(1.03);
+  }
+  60% {
+    transform: rotate(0) scale(1);
+  }
+}
+
+@keyframes rainbow-glow {
+  0% {
+    filter: drop-shadow(0 0 14px #ff8fab);
+  }
+  33% {
+    filter: drop-shadow(0 0 14px #ffd966);
+  }
+  66% {
+    filter: drop-shadow(0 0 14px #7fd8be);
+  }
+  100% {
+    filter: drop-shadow(0 0 14px #c3a6ff);
+  }
+}
+
+/* 오픈 플래시: 화면 전체를 덮는 페이드 (레이아웃에 영향 없음) */
+.machine__flash {
+  --flash: rgba(255, 255, 255, 0.95);
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 55%, #fff 0%, var(--flash) 25%, rgba(255, 255, 255, 0) 70%);
+  animation: flash 0.65s ease-out forwards;
+}
+
+.machine__flash--rare {
+  --flash: rgba(127, 191, 255, 0.85);
+}
+
+.machine__flash--epic {
+  --flash: rgba(199, 155, 255, 0.9);
+}
+
+.machine__flash--legendary {
+  --flash: rgba(255, 201, 77, 0.95);
+}
+
+.machine__flash--mythic {
+  background:
+    radial-gradient(circle at 50% 55%, #fff 0%, rgba(255, 255, 255, 0) 45%),
+    conic-gradient(from 0deg at 50% 55%, #ff8fab, #ffd966, #7fd8be, #8ecdf7, #c3a6ff, #ff8fab);
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.machine__hint {
+  min-height: 1.6em;
+  margin-top: 6px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}

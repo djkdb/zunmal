@@ -336,3 +336,110 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------------------------------
+ * 희귀도 배지 (색 + 기호 + 텍스트)
+ * ------------------------------------------------------------------ */
+.rarity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--rarity-common);
+  color: var(--ink);
+}
+
+.rarity-badge--compact {
+  padding: 0 7px;
+  font-size: 0.75rem;
+}
+
+.rarity-badge__stars {
+  font-size: 0.7rem;
+  letter-spacing: -1px;
+}
+
+.rarity-badge--rare {
+  background: var(--rarity-rare);
+}
+
+.rarity-badge--epic {
+  background: var(--rarity-epic);
+}
+
+.rarity-badge--legendary {
+  background: var(--rarity-legendary);
+}
+
+.rarity-badge--mythic {
+  background: linear-gradient(90deg, #ff8fab, #ffd966, #7fd8be, #8ecdf7, #c3a6ff);
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 100;
+  padding: 8px 14px;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: var(--radius-s);
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+.app-main:focus {
+  outline: none;
+}
+
+.skip-link {
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+}
+
+/* ------------------------------------------------------------------
+ * 모달 (<dialog>)
+ * ------------------------------------------------------------------ */
+.modal {
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-l);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
+  overflow: hidden;
+}
+
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+  animation: modal-in 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.modal::backdrop {
+  background: rgba(43, 34, 51, 0.55);
+}
+
+.modal__body {
+  padding: 18px 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@keyframes modal-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,136 @@
+.collection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.collection__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection__progress-label,
+.collection__progress-value {
+  font-family: var(--font-display);
+}
+
+.progress {
+  height: 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream-deep);
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  background: repeating-linear-gradient(-45deg, var(--pink) 0 8px, var(--pink-deep) 8px 16px);
+  transition: width 0.4s ease;
+}
+
+.collection__heading {
+  margin-bottom: 8px;
+}
+
+.collection__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.collection__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 128px;
+  padding: 10px 4px 8px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop-s);
+  cursor: pointer;
+  text-align: center;
+}
+
+.collection__card.is-locked {
+  cursor: default;
+  background: rgba(255, 253, 248, 0.5);
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--ink-soft);
+}
+
+.collection__card--rare {
+  background: #eaf4ff;
+}
+
+.collection__card--epic {
+  background: #f4ebff;
+}
+
+.collection__card--legendary {
+  background: #fff5d9;
+}
+
+.collection__card--mythic {
+  background: linear-gradient(160deg, #ffe3ec, #fff6cc, #dcfff3, #e3f1ff, #efe6ff);
+}
+
+.collection__card.is-partner {
+  box-shadow:
+    var(--shadow-pop-s),
+    0 0 0 3px var(--lemon);
+}
+
+.collection__partner-tag {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--lemon);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.collection__name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.collection__count {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.collection-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.collection-detail__name {
+  font-size: 1.5rem;
+}
+
+.collection-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}

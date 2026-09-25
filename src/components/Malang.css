@@ -1,0 +1,126 @@
+.malang {
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.malang-stroke {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.malang-question {
+  font-family: var(--font-display);
+  font-size: 34px;
+  fill: #fffdf8;
+  stroke: var(--ink);
+  stroke-width: 1.5px;
+  paint-order: stroke;
+}
+
+.malang-body-group {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* 말랑말랑 숨쉬기 */
+.malang--idle .malang-body-group {
+  animation: malang-breathe 2.6s ease-in-out infinite;
+}
+
+.malang--bounce .malang-body-group {
+  animation: malang-bounce 0.9s cubic-bezier(0.3, 0, 0.4, 1) infinite;
+}
+
+.malang--wiggle .malang-body-group {
+  animation: malang-wiggle 0.6s ease-in-out infinite;
+}
+
+/* 한 번 눌리는 반응 (key 교체로 재생) */
+.malang--squish .malang-body-group {
+  animation: malang-squish 0.28s ease-out 1;
+}
+
+.malang-float {
+  animation: malang-float 2.2s ease-in-out infinite;
+}
+
+.malang-twinkle {
+  animation: malang-twinkle 1.6s ease-in-out infinite;
+}
+
+@keyframes malang-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.04, 0.95);
+  }
+}
+
+@keyframes malang-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.06, 0.92);
+  }
+  30% {
+    transform: translateY(-14%) scale(0.95, 1.06);
+  }
+  60% {
+    transform: translateY(0) scale(1.08, 0.9);
+  }
+  80% {
+    transform: translateY(0) scale(0.98, 1.02);
+  }
+}
+
+@keyframes malang-wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes malang-squish {
+  0% {
+    transform: scale(1, 1);
+  }
+  35% {
+    transform: scale(1.18, 0.78);
+  }
+  70% {
+    transform: scale(0.94, 1.08);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes malang-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes malang-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}

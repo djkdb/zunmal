@@ -1,0 +1,180 @@
+.pull-title {
+  text-align: center;
+  font-size: 1.4rem;
+  margin-bottom: 10px;
+}
+
+.pull-modal--legendary {
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 6px var(--rarity-legendary);
+}
+
+.pull-modal--mythic {
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 6px var(--rarity-mythic),
+    0 0 40px 10px rgba(195, 166, 255, 0.8);
+}
+
+/* 1회 결과 */
+.pull-single {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.pull-single__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 220px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  animation: pop-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.pull-single__stage > .malang {
+  position: relative;
+  z-index: 1;
+}
+
+.pull-single__name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+}
+
+.pull-single__desc {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.pull-note {
+  background: var(--lemon);
+}
+
+/* 희귀도별 후광 */
+.pull-rays {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--ray, var(--rarity-rare)) 0 10deg, transparent 10deg 30deg);
+  mask: radial-gradient(circle, #000 30%, transparent 70%);
+  animation: spin 8s linear infinite;
+  opacity: 0.8;
+}
+
+.pull-single--epic .pull-rays {
+  --ray: var(--rarity-epic);
+}
+
+.pull-single--legendary .pull-rays {
+  --ray: var(--rarity-legendary);
+  animation-duration: 5s;
+}
+
+.pull-single--mythic .pull-rays {
+  background: repeating-conic-gradient(#ff8fab 0 10deg, #ffd966 10deg 20deg, #7fd8be 20deg 30deg, #8ecdf7 30deg 40deg, #c3a6ff 40deg 50deg, transparent 50deg 60deg);
+  animation-duration: 4s;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* 획득 태그 */
+.pull-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.pull-tag--new {
+  background: var(--pink);
+}
+
+.pull-tag--dup {
+  background: var(--cream-deep);
+}
+
+/* 10연 결과 */
+.pull-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.pull-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  text-align: center;
+  animation: card-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+.pull-card__name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.pull-card--rare {
+  background: #eaf4ff;
+}
+
+.pull-card--epic {
+  background: #f4ebff;
+  box-shadow: 0 0 0 3px var(--rarity-epic);
+}
+
+.pull-card--legendary {
+  background: #fff5d9;
+  box-shadow:
+    0 0 0 3px var(--rarity-legendary),
+    0 0 16px 2px rgba(255, 182, 39, 0.7);
+}
+
+.pull-card--mythic {
+  background: linear-gradient(160deg, #ffe3ec, #fff6cc, #dcfff3, #e3f1ff, #efe6ff);
+  box-shadow:
+    0 0 0 3px var(--rarity-mythic),
+    0 0 18px 4px rgba(195, 166, 255, 0.8);
+}
+
+@keyframes card-in {
+  from {
+    transform: rotateY(90deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.pull-summary {
+  margin: 12px 0 10px;
+  text-align: center;
+  color: var(--ink-soft);
+}

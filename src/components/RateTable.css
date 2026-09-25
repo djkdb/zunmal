@@ -1,0 +1,43 @@
+.rate-table__summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  min-height: 32px;
+  list-style-position: inside;
+}
+
+.rate-table__table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-table__table th,
+.rate-table__table td {
+  padding: 6px 2px;
+  border-bottom: 1px dashed rgba(43, 34, 51, 0.25);
+  text-align: right;
+}
+
+.rate-table__table th[scope='row'],
+.rate-table__table thead th:first-child {
+  text-align: left;
+  font-weight: 400;
+}
+
+.rate-table__table thead th {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.rate-table__notes {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
