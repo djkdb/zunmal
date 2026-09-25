@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet, useMatch } from 'react-router-dom';
+import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { installAudioUnlock, sfx } from '../audio/sfx';
 import { BottomNav } from '../components/BottomNav';
 import { StarterPicker } from '../components/StarterPicker';
@@ -12,6 +12,12 @@ export function AppShell() {
   const refreshDaily = useGameStore((s) => s.refreshDaily);
   // 게임 플레이 중에는 하단 내비게이션을 숨겨 조작 영역을 확보한다
   const inGame = useMatch('/play/:gameId') !== null;
+
+  // 화면을 옮기면 항상 맨 위에서 시작 (이전 화면의 스크롤 위치가 남지 않도록)
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   // 첫 사용자 입력 이후에만 AudioContext 생성
   useEffect(() => installAudioUnlock(), []);

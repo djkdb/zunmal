@@ -33,6 +33,7 @@ src/
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine, PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
+  missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
   pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage
 ```
 
@@ -55,7 +56,8 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 - 스타일은 `global.css` 토큰 + 컴포넌트별 CSS 파일(`Component.css`)을 컴포넌트에서 import.
 - 접근성: 모든 인터랙션은 `<button>`/`<a>` 등 네이티브 요소로, 44px 이상 터치 타깃, `:focus-visible` 유지,
   희귀도는 색 + 아이콘 + 텍스트로 표현, `prefers-reduced-motion` 존중(`useReducedMotion`).
-- 360px 폭에서 가로 스크롤 금지.
+- 360px 폭에서 가로 스크롤 금지. 360×640 화면에서도 홈의 주요 버튼이 첫 화면에 보여야 한다.
+- 재화를 쓰는 버튼은 state가 아니라 ref로 즉시 잠가 연타 중복 실행을 막는다 (`GachaPage`의 `lockRef`).
 - 사용자 입력 이전에 AudioContext 생성/재생 금지 (`audio/sfx.ts` 가 보장).
 
 ## 디자인 시스템
@@ -102,6 +104,13 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.
 - 세트를 완성하면 한 번 코인 보상(`SET_REWARD_COINS`, 등급 small~ultimate). 일일 상한과 무관.
 
+## 일일 미션 (`missions/missions.ts`, `components/DailyMissions.tsx`)
+
+- 서울 날짜로 시드를 만든 미션 3개(서로 다른 종류, 쉬움/보통/어려움 하나씩). 모든 기기에서 같은 날 같은 미션.
+- 종류: 미니게임 N판, 캡슐 N개 뽑기, 말랑이 N번 쓰다듬기, 미니게임 코인 N개, 최고 기록 깨기.
+- 진행은 store 액션(`finishMiniGame`, `pull`, `petMalang`)이 기록한다. 보상(`MISSION_REWARD_COINS`) + 올클리어 보너스.
+- 받을 보상이 있으면 홈 탭에 빨간 점.
+
 ## 말랑 만지기 (`pages/TouchPage.tsx`, `touch/physics.ts`, `audio/squish.ts`)
 
 - 스프링 기반 말랑 물리(순수 모듈, 테스트 있음) + WebAudio로 합성한 찰박·쭉·뽁 소리.
@@ -111,7 +120,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 ## 경제 시스템 (`economy/`)
 
 - **재화는 코인 하나뿐**이다 (뽑기권은 v3에서 폐지). 코인으로 바로 캡슐을 뽑는다.
-- 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
+- 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상, 일일 미션. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
 - 보상 계산 (`computeReward`):
   ```
   baseCoins    = floor(score × gameMultiplier)
@@ -128,7 +137,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v3: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`).
+- 현재 v4: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`).
   v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 

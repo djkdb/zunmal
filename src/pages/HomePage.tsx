@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
 import { RarityBadge } from '../components/RarityBadge';
-import { BookIcon, CapsuleIcon, JoystickIcon } from '../components/icons';
+import { DailyMissions } from '../components/DailyMissions';
+import { CapsuleIcon, JoystickIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
 import { RARITY_META } from '../data/rarity';
 import { DAILY_CAP, PARTNER_RARITY_BONUS, PULL_COUNT, PULL_PRICE } from '../economy/config';
@@ -64,21 +65,17 @@ export function HomePage() {
       )}
 
       <div className="home__actions">
-        <Link to="/play" className="btn btn--mint btn--big btn--block" onClick={() => sfx.button()}>
+        <Link to="/play" className="btn btn--mint btn--big home__action" onClick={() => sfx.button()}>
           <JoystickIcon size={34} />
           게임하기
         </Link>
-        <div className="home__row">
-          <Link to="/gacha" className="btn btn--primary btn--block" onClick={() => sfx.button()}>
-            <CapsuleIcon size={28} />
-            뽑기
-          </Link>
-          <Link to="/collection" className="btn btn--lemon btn--block" onClick={() => sfx.button()}>
-            <BookIcon size={28} />
-            도감
-          </Link>
-        </div>
+        <Link to="/gacha" className="btn btn--primary btn--big home__action" onClick={() => sfx.button()}>
+          <CapsuleIcon size={32} />
+          뽑기
+        </Link>
       </div>
+
+      <DailyMissions />
 
       <Link to="/collection" className="home__jar" onClick={() => sfx.button()} aria-label={`도감 ${ownedCount}/${CHARACTERS.length}`}>
         <span className="home__slots" aria-hidden="true">

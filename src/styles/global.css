@@ -596,3 +596,26 @@ strong {
     scroll-behavior: auto !important;
   }
 }
+
+.bottom-nav__icon {
+  position: relative;
+}
+
+/* 받을 보상이 있을 때 탭 아이콘 위 빨간 점 */
+.bottom-nav__dot {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  border: 2.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--danger);
+  animation: dot-pop 1.4s ease-in-out infinite;
+}
+
+@keyframes dot-pop {
+  50% {
+    transform: scale(1.25);
+  }
+}

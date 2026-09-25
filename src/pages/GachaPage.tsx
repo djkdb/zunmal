@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
@@ -27,14 +27,19 @@ export function GachaPage() {
   const [message, setMessage] = useState('');
 
   const busy = run !== null;
+  // 같은 프레임 안에서 버튼이 여러 번 눌려도(연타) 뽑기가 한 번만 일어나도록 즉시 잠근다.
+  // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다.
+  const lockRef = useRef(false);
   const untilPity = GACHA_RULES.pityThreshold - pityCount;
   const discount = Math.round((1 - PULL_PRICE.multi / (PULL_PRICE.single * PULL_COUNT.multi)) * 100);
 
   const start = (kind: PullKind) => {
-    if (busy) return;
+    if (busy || lockRef.current) return;
+    lockRef.current = true;
     // 결과는 즉시 store에 확정/저장된다. 연출 도중 새로고침해도 결과는 유지.
     const result = pull(kind);
     if (!result.ok) {
+      lockRef.current = false;
       sfx.fail();
       setMessage('코인이 모자라요.');
       return;
@@ -56,6 +61,7 @@ export function GachaPage() {
     setShowResult(false);
     setPending(null);
     setRun(null);
+    lockRef.current = false;
   };
 
   return (

@@ -62,8 +62,22 @@ describe('sanitizeSave', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 3', () => {
-    expect(SAVE_VERSION).toBe(3);
+  it('현재 버전은 4', () => {
+    expect(SAVE_VERSION).toBe(4);
+  });
+
+  it('v3 → v4: 미션 진행은 오늘 날짜의 빈 진행으로 시작', () => {
+    const s = migrateSave({ coins: 5 }, 3, NOW);
+    expect(s.missions).toEqual({ date: '2026-05-05', progress: {}, claimed: [], bonusClaimed: false });
+  });
+
+  it('손상된 미션 진행은 정화', () => {
+    const s = sanitizeSave(
+      { missions: { date: '2026-05-05', progress: { pet: 7.9, pull: -3, hack: 99 }, claimed: ['pet', 'pet', 'x'], bonusClaimed: 'yes' } },
+      NOW,
+    );
+    expect(s.missions).toEqual({ date: '2026-05-05', progress: { pet: 7 }, claimed: ['pet'], bonusClaimed: false });
+    expect(sanitizeSave({ missions: { date: 'bad' } }, NOW).missions.date).toBe('2026-05-05');
   });
 
   it('v2 → v3: 남은 뽑기권을 장당 100코인으로 바꿔 코인에 더한다', () => {

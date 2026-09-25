@@ -88,3 +88,20 @@
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+.mg-result__gacha {
+  justify-content: center;
+}
+
+.mg-result__gacha-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 10px 1px 4px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}

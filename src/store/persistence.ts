@@ -4,6 +4,7 @@
  */
 import { isCharacterId } from '../data/characters';
 import { isCollectionId } from '../data/collections';
+import { MISSION_KINDS, createMissionState, type MissionKind, type MissionState } from '../missions/missions';
 import { GACHA_RULES } from '../data/rarity';
 import { LEGACY_TICKET_TO_COINS, STARTING_COINS } from '../economy/config';
 import { isValidDateKey, seoulDateKey } from '../economy/daily';
@@ -14,8 +15,9 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
  *  - v1: { ..., ownedMalangs: {id: {count, firstObtainedAt}} }
  *  - v2: 반짝 수집(shinyCount), 컬렉션 보상 수령(claimedSets), 친밀도(affection), 반짝 파트너(partnerShiny)
  *  - v3: 뽑기권 폐지 — 재화는 코인 하나. 남은 뽑기권(gachaTickets)은 코인으로 환산
+ *  - v4: 일일 미션 진행(missions)
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const SAVE_KEY = 'malang-gacha-save';
 
 export interface OwnedMalang {
@@ -52,6 +54,8 @@ export interface SaveData {
   affection: Record<string, number>;
   /** 파트너를 반짝 모습으로 보여줄지 (반짝 보유 시) */
   partnerShiny: boolean;
+  /** 오늘의 미션 진행 (서울 날짜가 바뀌면 초기화) */
+  missions: MissionState;
 }
 
 export function createInitialSave(now: Date = new Date()): SaveData {
@@ -68,6 +72,7 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     claimedSets: [],
     affection: {},
     partnerShiny: false,
+    missions: createMissionState(seoulDateKey(now)),
   };
 }
 
@@ -130,6 +135,21 @@ function sanitizeSetIds(value: unknown): string[] {
   return [...new Set(value.filter((v): v is string => typeof v === 'string' && isCollectionId(v)))];
 }
 
+function sanitizeMissions(value: unknown, fallback: MissionState): MissionState {
+  if (!isRecord(value) || !isValidDateKey(value.date)) return fallback;
+  const progress: MissionState['progress'] = {};
+  if (isRecord(value.progress)) {
+    for (const kind of MISSION_KINDS) {
+      const n = nonNegInt(value.progress[kind], 0);
+      if (n > 0) progress[kind] = n;
+    }
+  }
+  const claimed = Array.isArray(value.claimed)
+    ? [...new Set(value.claimed.filter((k): k is MissionKind => (MISSION_KINDS as readonly unknown[]).includes(k)))]
+    : [];
+  return { date: value.date, progress, claimed, bonusClaimed: value.bonusClaimed === true };
+}
+
 /**
  * 임의의 값을 안전한 SaveData로 변환한다. 어떤 입력에도 throw하지 않는다.
  * 잘못된 필드는 기본값으로, 알 수 없는 캐릭터는 제거한다.
@@ -157,6 +177,7 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     claimedSets: sanitizeSetIds(raw.claimedSets),
     affection: sanitizeAffection(raw.affection),
     partnerShiny: raw.partnerShiny === true,
+    missions: sanitizeMissions(raw.missions, base.missions),
   };
 }
 
@@ -205,6 +226,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   if (fromVersion < 1) data = migrateV0toV1(data, now);
   // v1 → v2: 새 필드는 sanitize가 기본값(반짝 0, 세트 없음, 친밀도 없음)으로 채운다.
   if (fromVersion < 3) data = migrateV2toV3(data);
-  // 향후: if (fromVersion < 4) data = migrateV3toV4(data);
+  // v3 → v4: missions는 sanitize가 오늘 날짜의 빈 진행으로 채운다.
+  // 향후: if (fromVersion < 5) data = migrateV4toV5(data);
   return sanitizeSave(data, now);
 }

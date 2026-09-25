@@ -101,3 +101,13 @@ export const SET_REWARD_COINS: Readonly<Record<CollectionTier, number>> = {
   legend: 2000,
   ultimate: 5000,
 };
+
+/**
+ * 일일 미션 보상 (코인). 미션은 매일(서울 날짜) 3개가 새로 나온다.
+ * 난이도별 보상 + 3개 모두 끝내면 추가 보너스. 미니게임 일일 상한과는 별개로 지급한다.
+ * 하루 최대 약 350~450 코인 ≈ 1회 뽑기 4번 — 매일 들어올 이유를 주되 미니게임보다 크지 않게.
+ */
+export const MISSION_REWARD_COINS = { easy: 50, normal: 80, hard: 120 } as const;
+
+/** 오늘의 미션 3개를 모두 받으면 주는 추가 코인. */
+export const MISSION_ALL_CLEAR_BONUS = 150;

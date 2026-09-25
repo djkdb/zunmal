@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { COLLECTIONS, findUnknownMembers } from '../data/collections';
-import { DAILY_CAP, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
+import { DAILY_CAP, MISSION_ALL_CLEAR_BONUS, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
+import { generateDailyMissions } from '../missions/missions';
 import { createSeededRng } from '../lib/rng';
 import { SAVE_KEY, SAVE_VERSION } from './persistence';
 import { MAX_AFFECTION, createGameStore, createSafeStorage } from './useGameStore';
@@ -202,5 +203,49 @@ describe('컬렉션 데이터', () => {
   it('모든 세트 멤버는 실제 캐릭터이고 세트 id는 고유', () => {
     expect(findUnknownMembers()).toEqual([]);
     expect(new Set(COLLECTIONS.map((c) => c.id)).size).toBe(COLLECTIONS.length);
+  });
+});
+
+describe('일일 미션', () => {
+  const NOW = new Date('2026-09-25T03:00:00Z'); // 서울 2026-09-25
+  const missions = generateDailyMissions('2026-09-25');
+
+  it('게임/뽑기/쓰다듬기가 미션 진행에 기록된다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('soda-drop');
+    store.setState({ coins: PULL_PRICE.single, lastDailyResetDate: '2026-09-25' });
+    store.getState().finishMiniGame('button-malang', 200, NOW);
+    store.getState().pull('single', createSeededRng(1), NOW);
+    store.getState().petMalang('soda-drop', 3, NOW);
+    const p = store.getState().missions;
+    expect(p.date).toBe('2026-09-25');
+    expect(p.progress['play-games']).toBe(1);
+    expect(p.progress['new-best']).toBe(1);
+    expect(p.progress['earn-coins']).toBeGreaterThan(0);
+    expect(p.progress.pull).toBe(1);
+    expect(p.progress.pet).toBe(3);
+  });
+
+  it('완료한 미션 보상과 올클리어 보너스', () => {
+    const store = makeStore();
+    const progress = Object.fromEntries(missions.map((m) => [m.kind, m.target]));
+    store.setState({ coins: 0, missions: { date: '2026-09-25', progress, claimed: [], bonusClaimed: false } });
+    expect(store.getState().claimMissionBonus(NOW)).toBe(0);
+    let total = 0;
+    for (const m of missions) {
+      const r = store.getState().claimMission(m.id, NOW);
+      if (!r.ok) throw new Error('claim failed');
+      total += r.coins;
+    }
+    expect(store.getState().claimMissionBonus(NOW)).toBe(MISSION_ALL_CLEAR_BONUS);
+    expect(store.getState().claimMissionBonus(NOW)).toBe(0);
+    expect(store.getState().coins).toBe(total + MISSION_ALL_CLEAR_BONUS);
+  });
+
+  it('다음 날에는 어제 진행이 사라진다', () => {
+    const store = makeStore();
+    store.setState({ missions: { date: '2026-09-24', progress: { pet: 99 }, claimed: [], bonusClaimed: false } });
+    store.getState().refreshDaily(NOW);
+    expect(store.getState().missions).toEqual({ date: '2026-09-25', progress: {}, claimed: [], bonusClaimed: false });
   });
 });
