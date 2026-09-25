@@ -43,7 +43,7 @@ pages → components → store → gacha / economy → data → lib
 minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 ```
 
-- 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`.
+- 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`, `/touch`, `/touch/:id`.
 - 외부 이미지/사운드 파일 사용 금지. 캐릭터는 SVG, 소리는 WebAudio로 생성한다.
 
 ## 코딩 컨벤션
@@ -60,12 +60,13 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 
 ## 디자인 시스템
 
-UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉은 **동네 문방구 앞 뽑기방**이다.
+UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉은 **젤리 과자 가게 같은 캐주얼 모바일 게임**이다.
 
 - **팔레트** (`global.css` `:root`): 크림 `--cream`, 잉크 `--ink #2b2233`, 딸기우유 `--berry`, 소다 `--soda`, 레몬 `--lemon`, 말차 `--matcha`, 선반 `--shelf`.
-- **글꼴**: Jua(간판, 제목, 숫자) + Gowun Dodum(본문). 페이지 제목은 `.page-title` 스티커 글씨(흰 글자 + 잉크 외곽선).
-- **과감한 장식은 두 곳뿐**: 상단 차양(줄무늬 + 물결 테두리)과 캡슐 머신. 나머지 화면은 조용하게 둔다.
-- **모양이 곧 정보**: 눌리는 것(버튼, 게임 카드)만 키캡 그림자(`--keycap`)를 가진다. 패널은 평평한 외곽선이다.
+- **글꼴**: 카페24 써라운드 한 가지(눈누 jsdelivr CDN). 제목은 `.page-title` 풍선 글씨(흰 글자 + 잉크 외곽선 + 그림자).
+- **재질은 젤리**: 버튼·게임 타일은 광택 하이라이트 + 같은 색 아랫단 + 눌리면 찌그러짐(`.btn`). 배경은 스프링클 무늬.
+- **과감한 장식**: 홈 간판(차양 + 풍선 글씨 로고)과 캡슐 머신. 등급이 높을수록 연출이 화려해진다.
+- **모양이 곧 정보**: 눌리는 것만 두꺼운 아랫단 그림자를 가진다. 패널은 평평한 외곽선이다.
   티켓은 절취선 모양, 확률표는 테이프로 붙인 안내문, 도감은 선반 위 캡슐 창이다.
 - **금지**: 이모지 아이콘(→ `components/icons.tsx`), 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`,
   모든 요소에 같은 둥근 카드와 같은 그림자 반복, 섹션마다 등장 애니메이션.
@@ -73,21 +74,39 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 
 ## 가챠 규칙 (`gacha/engine.ts`, `data/rarity.ts`)
 
-| 희귀도 | 확률 | 캐릭터 수 | 중복 환급 |
-|---|---|---|---|
-| 일반 common | 62% | 6 | 10 |
-| 레어 rare | 25% | 3 | 30 |
-| 에픽 epic | 9.5% | 3 | 80 |
-| 전설 legendary | 3% | 2 | 300 |
-| 신화 mythic | 0.5% | 1 | 1000 |
+| 희귀도 | 확률 | 캐릭터 수 | 중복 환급 | 파트너 보너스 |
+|---|---|---|---|---|
+| 일반 common | 61.95% | 10 | 10 | 0% |
+| 레어 rare | 25% | 7 | 30 | 5% |
+| 에픽 epic | 9.5% | 6 | 80 | 10% |
+| 전설 legendary | 3% | 4 | 300 | 20% |
+| 신화 mythic | 0.5% | 2 | 1000 | 30% |
+| 시크릿 secret | 0.05% | 3 | 5000 | 50% |
 
 - 확률은 basis point 정수 가중치(합 10000)로 저장한다. 같은 희귀도 내 캐릭터는 균등.
-- **천장**: 전설 이상 없이 49회 연속 → 50번째 pull은 전설 이상 확정. 확정 시 전설:신화 = 6:1(원 비율 유지).
-  전설/신화 등장 시 pityCount = 0. 모든 개별 pull에 적용.
+  시크릿 0.05%는 일반에서 떼어 왔다 (나머지 등급은 원래 명세 그대로).
+- **천장**: 전설 이상 없이 49회 연속 → 50번째 pull은 전설 이상 확정. 확정 풀은 전설·신화·시크릿을
+  원래 비율(300:50:5)로 유지하므로 전설:신화 = 6:1. 전설 이상 등장 시 pityCount = 0. 모든 개별 pull에 적용.
 - **10연**: 10 pull 후 레어 이상이 하나도 없으면 10번째를 레어 이상 풀(원 비율 유지)에서 재추첨해 교체.
   교체 결과가 전설 이상이면 pity를 다시 계산한다. 결과는 항상 10개.
+- **반짝(shiny)**: 모든 pull에서 등급과 독립적으로 1% (`GACHA_RULES.shinyRate`). pull 1회 = RNG 3번
+  (희귀도, 캐릭터, 반짝) — 테스트에서 RNG 수열을 짤 때 주의.
 - **중복**: 이미 보유(같은 10연 내 앞선 결과 포함)한 캐릭터는 희귀도별 환급 코인을 지급.
+  단, 반짝 버전을 처음 얻은 경우는 새 수집으로 보고 환급하지 않는다.
 - 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다.
+- **등급 차별화**: 등급마다 캡슐 색, 머신 흔들림, 결과음(`playRarityFanfare`), 결과 모달 테두리가 다르다.
+  시크릿은 화면이 어두워지는 예고 단계(`tease`)와 밤하늘 테마 결과 모달이 따로 있다.
+
+## 컬렉션 (`data/collections.ts`)
+
+- 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.
+- 세트를 완성하면 한 번 뽑기권 보상(`SET_REWARD_TICKETS`, 등급 small~ultimate). 코인은 주지 않는다.
+
+## 말랑 만지기 (`pages/TouchPage.tsx`, `touch/physics.ts`, `audio/squish.ts`)
+
+- 스프링 기반 말랑 물리(순수 모듈, 테스트 있음) + WebAudio로 합성한 찰박·쭉·뽁 소리.
+- 소리는 `sfx.getOutput()`으로 같은 AudioContext와 음소거 설정을 공유한다. 자체 컨텍스트를 만들지 않는다.
+- 만지면 친밀도(`affection`)가 오른다. 친밀도는 코인을 주지 않는다.
 
 ## 경제 시스템 (`economy/`)
 
@@ -108,6 +127,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
+- 현재 v2: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`).
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
 ## 테스트
