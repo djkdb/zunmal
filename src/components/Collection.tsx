@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characters';
 import { COLLECTIONS, collectionProgress, type Collection as CollectionSet } from '../data/collections';
@@ -291,6 +292,9 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
           >
             {isPartner ? '지금 파트너예요' : '파트너로 정하기'}
           </button>
+          <Link to={`/touch/${id}`} className="btn btn--primary" onClick={() => sfx.button()}>
+            만지기
+          </Link>
           <button type="button" className="btn" onClick={onClose}>
             닫기
           </button>

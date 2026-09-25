@@ -202,7 +202,7 @@ strong {
   width: calc(100% - 16px);
   max-width: calc(var(--max-w) - 16px);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 6px;
   background: var(--paper);
   border: var(--line) solid var(--ink);

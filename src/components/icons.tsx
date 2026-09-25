@@ -133,3 +133,15 @@ export function PlayIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** 만지기: 말랑이를 쓰다듬는 손 + 하트 */
+export function PetIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 21 q0 -8 11 -8 q11 0 11 8 q0 5 -11 5 q-11 0 -11 -5 Z" fill="#ffb8c9" />
+      <circle cx="12.5" cy="20" r="1.2" fill={INK} stroke="none" />
+      <circle cx="19.5" cy="20" r="1.2" fill={INK} stroke="none" />
+      <path d="M22 3.5 c-1.6 -1.8 -4.5 -0.6 -4 1.8 c0.4 1.7 4 4 4 4 s3.6 -2.3 4 -4 c0.5 -2.4 -2.4 -3.6 -4 -1.8 Z" fill="#ff6f91" strokeWidth={2} />
+    </Svg>
+  );
+}

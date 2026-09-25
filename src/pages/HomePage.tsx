@@ -45,7 +45,7 @@ export function HomePage() {
       {partner && (
         <div className="home__stage">
           <p className="home__bubble">{greeting}</p>
-          <Link to="/collection" className="home__partner" aria-label={`파트너 ${partner.name}, 도감에서 바꾸기`}>
+          <Link to="/touch" className="home__partner" aria-label={`${partner.name} 만지러 가기`}>
             <Malang character={partner} size={172} animation="idle" decorative />
           </Link>
           <div className="home__pedestal" aria-hidden="true" />

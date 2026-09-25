@@ -1,10 +1,11 @@
 import type { ComponentType } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BookIcon, CapsuleIcon, JoystickIcon, ShopIcon } from './icons';
+import { BookIcon, CapsuleIcon, JoystickIcon, PetIcon, ShopIcon } from './icons';
 
 const NAV_ITEMS: { to: string; label: string; Icon: ComponentType<{ size?: number }>; end: boolean }[] = [
   { to: '/', label: '홈', Icon: ShopIcon, end: true },
   { to: '/play', label: '미니게임', Icon: JoystickIcon, end: false },
+  { to: '/touch', label: '만지기', Icon: PetIcon, end: false },
   { to: '/gacha', label: '뽑기', Icon: CapsuleIcon, end: false },
   { to: '/collection', label: '도감', Icon: BookIcon, end: false },
 ];
