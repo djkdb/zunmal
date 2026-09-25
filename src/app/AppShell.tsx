@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useMatch } from 'react-router-dom';
 import { installAudioUnlock, sfx } from '../audio/sfx';
 import { BottomNav } from '../components/BottomNav';
 import { StarterPicker } from '../components/StarterPicker';
@@ -10,6 +10,8 @@ export function AppShell() {
   const needsStarter = useGameStore((s) => Object.keys(s.ownedMalangs).length === 0);
   const muted = useGameStore((s) => s.settings.muted);
   const refreshDaily = useGameStore((s) => s.refreshDaily);
+  // 게임 플레이 중에는 하단 내비게이션을 숨겨 조작 영역을 확보한다
+  const inGame = useMatch('/play/:gameId') !== null;
 
   // 첫 사용자 입력 이후에만 AudioContext 생성
   useEffect(() => installAudioUnlock(), []);
@@ -35,10 +37,10 @@ export function AppShell() {
         본문으로 건너뛰기
       </button>
       <TopBar />
-      <main className="app-main" id="main" tabIndex={-1}>
+      <main className={`app-main${inGame ? ' app-main--game' : ''}`} id="main" tabIndex={-1}>
         {needsStarter ? <StarterPicker /> : <Outlet />}
       </main>
-      {!needsStarter && <BottomNav />}
+      {!needsStarter && !inGame && <BottomNav />}
     </div>
   );
 }
