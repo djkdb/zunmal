@@ -1,3 +1,4 @@
+import { josa } from '../lib/josa';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { CHARACTERS, getCharacter } from '../data/characters';
@@ -45,7 +46,7 @@ export function MiniGameLobby() {
         </div>
         {partner && (
           <p className="lobby__partner-info">
-            {partner.name}와 함께{' '}
+            {josa(partner.name, '과/와')} 함께{' '}
             {PARTNER_RARITY_BONUS[partner.rarity] > 0 ? (
               <span className="lobby__bonus">코인 +{Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100)}%</span>
             ) : (

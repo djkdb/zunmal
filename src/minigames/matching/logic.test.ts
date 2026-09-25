@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS } from '../../data/characters';
+import { CHARACTERS, getCharacter } from '../../data/characters';
 import { createSeededRng } from '../../lib/rng';
 import {
   MATCHING_CONFIG as C,
@@ -219,5 +219,14 @@ describe('점수', () => {
     expect(clean.cleared && messy.cleared).toBe(true);
     expect(messy.attempts).toBe(clean.attempts + C.pairs - 1);
     expect(clean.score).toBeGreaterThan(messy.score);
+  });
+});
+
+describe('카드 풀', () => {
+  it('시크릿 말랑이는 카드에 나오지 않는다 (도감 스포일러 방지)', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const board = createBoard(createSeededRng(seed));
+      board.forEach((card) => expect(getCharacter(card.characterId)?.rarity).not.toBe('secret'));
+    }
   });
 });

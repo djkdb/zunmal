@@ -1,3 +1,4 @@
+import { josa } from '../lib/josa';
 import {
   useCallback,
   useEffect,
@@ -505,7 +506,7 @@ function TouchPlay({ character }: { character: Character }) {
 
   return (
     <>
-      <div className="touch__meter" role="group" aria-label={`${character.name}와의 애정`}>
+      <div className="touch__meter" role="group" aria-label={`${josa(character.name, '과/와')}의 애정`}>
         <span className="touch__level">
           <HeartShape className="touch__meter-heart" />
           애정 Lv.{level}

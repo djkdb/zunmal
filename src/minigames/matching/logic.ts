@@ -66,10 +66,16 @@ export interface MatchingState {
   clearBonus: number;
 }
 
+/**
+ * 카드에 쓰는 기본 캐릭터 풀. 시크릿은 도감에서 "???"로 숨겨 두는 극악 확률 말랑이라
+ * 미니게임에서 먼저 보여 주지 않도록 뺀다.
+ */
+export const MATCHING_POOL: readonly string[] = CHARACTERS.filter((c) => c.rarity !== 'secret').map((c) => c.id);
+
 /** 캐릭터 id 풀에서 서로 다른 pairs개를 골라 두 장씩 섞은 보드를 만든다. */
 export function createBoard(
   rng: RNG,
-  pool: readonly string[] = CHARACTERS.map((c) => c.id),
+  pool: readonly string[] = MATCHING_POOL,
   config: MatchingConfig = MATCHING_CONFIG,
 ): MatchCard[] {
   const unique = [...new Set(pool)];
