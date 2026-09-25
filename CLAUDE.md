@@ -32,7 +32,7 @@ src/
   audio/          sfx.ts — WebAudio 합성 효과음 (파일 없음)
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, Shop, GachaMachine, PullResult, Collection, MiniGameLobby, MiniGameResult …
-  minigames/      types.ts, registry.ts, <game-id>/{index.tsx, logic.ts, logic.test.ts}
+  minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   pages/          HomePage, GachaPage, CollectionPage, MiniGamePage
 ```
 

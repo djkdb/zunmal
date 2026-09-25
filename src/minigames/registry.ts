@@ -1,4 +1,5 @@
 import buttonMalang from './button-malang';
+import capsuleCatch from './capsule-catch';
 import type { MiniGame } from './types';
 
 /**
@@ -7,6 +8,7 @@ import type { MiniGame } from './types';
  */
 export const MINI_GAMES: readonly MiniGame[] = [
   buttonMalang,
+  capsuleCatch,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
