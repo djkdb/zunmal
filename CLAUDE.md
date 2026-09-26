@@ -184,7 +184,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   granted      = min(earnedCoins, dailyCap − dailyEarned)
   ```
 - 일일 상한은 **Asia/Seoul 달력 날짜**가 바뀌면 초기화 (`daily.ts` 의 `seoulDateKey`).
-- 뽑기 가격(`PULL_PRICE`): 1회 100 코인, 10연 900 코인(10% 할인).
+- 뽑기 가격(`PULL_PRICE`): 1회 100 코인, 10연 1000 코인(할인 없음 — 모으느라 지치지 않게 "한 판 → 한 번 뽑기"가 기본 루프. 1회 뽑기 버튼이 주인공 색).
 - 모든 숫자는 `economy/config.ts` 에 주석과 함께 둔다.
 
 ## 상태 저장 (`store/`)

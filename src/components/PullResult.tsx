@@ -223,7 +223,7 @@ function Actions({
             <button
               key={kind}
               type="button"
-              className={`btn btn--small ${kind === 'multi' ? 'btn--primary' : 'btn--sky'}`}
+              className={`btn btn--small ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
               disabled={!enough}
               onClick={() => {
                 sfx.button();

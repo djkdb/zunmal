@@ -23,9 +23,11 @@ export const STARTING_COINS = 100;
 
 /**
  * 뽑기 가격 (코인).
- * 10연은 10% 할인 — 모아서 한 번에 뽑을 이유를 준다 (예전 "11장 묶음"과 같은 혜택 수준).
+ * 10연은 할인 없이 1회 × 10과 같은 값이다. 할인이 있으면 "모아서 10연"을 하려고 여러 판을 보상 없이 참게 되어
+ * 흥미가 떨어진다 → 코인이 생기는 대로 1회씩 뽑는 짧은 루프(한 판 → 한 번 뽑기)를 기본으로 둔다.
+ * 10연의 이점은 레어 이상 1개 확정과 한꺼번에 뒤집는 연출뿐이다. 천장은 1회 뽑기에도 똑같이 쌓인다.
  */
-export const PULL_PRICE = { single: 100, multi: 900 } as const;
+export const PULL_PRICE = { single: 100, multi: 1000 } as const;
 
 /** 1회 / 10연 뽑기에서 나오는 캡슐 수. */
 export const PULL_COUNT = { single: 1, multi: 10 } as const;

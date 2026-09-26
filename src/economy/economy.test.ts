@@ -12,9 +12,10 @@ import { seoulDateKey, isValidDateKey } from './daily';
 import { applyDailyReset, computeReward, getGameMultiplier, normalizeScore, payForPull } from './economy';
 
 describe('config', () => {
-  it('뽑기 가격: 1회 100, 10연 900 (10% 할인)', () => {
-    expect(PULL_PRICE).toEqual({ single: 100, multi: 900 });
-    expect(PULL_PRICE.multi).toBeLessThan(PULL_PRICE.single * PULL_COUNT.multi);
+  it('뽑기 가격: 1회 100, 10연 1000 (할인 없음)', () => {
+    expect(PULL_PRICE).toEqual({ single: 100, multi: 1000 });
+    // 할인이 없어야 1회씩 바로 뽑아도 손해가 없다
+    expect(PULL_PRICE.multi).toBe(PULL_PRICE.single * PULL_COUNT.multi);
   });
   it('모든 배율/보너스는 음이 아닌 유한수', () => {
     for (const v of [...Object.values(GAME_MULTIPLIERS), ...Object.values(PARTNER_RARITY_BONUS)]) {
@@ -81,11 +82,11 @@ describe('payForPull', () => {
     expect(payForPull(250, 'single')).toEqual({ ok: true, coins: 150 });
   });
   it('10연 뽑기 코인 차감', () => {
-    expect(payForPull(900, 'multi')).toEqual({ ok: true, coins: 0 });
+    expect(payForPull(1000, 'multi')).toEqual({ ok: true, coins: 0 });
   });
   it('코인 부족', () => {
     expect(payForPull(99, 'single')).toEqual({ ok: false, reason: 'insufficient-coins' });
-    expect(payForPull(899, 'multi').ok).toBe(false);
+    expect(payForPull(999, 'multi').ok).toBe(false);
   });
 });
 

@@ -126,7 +126,7 @@ export function GachaPage() {
               <button
                 key={kind}
                 type="button"
-                className={`btn ${kind === 'multi' ? 'btn--primary' : 'btn--sky'}`}
+                className={`btn ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
                 disabled={busy || !enough}
                 onClick={() => {
                   sfx.button();
