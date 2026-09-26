@@ -164,3 +164,15 @@ export function MoreIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** 음표 두 개 (배경음악) */
+export function MusicIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 23 V8 l13 -3 v15" />
+      <path d="M12 12 l13 -3" />
+      <ellipse cx="8.8" cy="23.2" rx="3.6" ry="2.9" fill="#fff9ee" />
+      <ellipse cx="21.8" cy="20.2" rx="3.6" ry="2.9" fill="#fff9ee" />
+    </Svg>
+  );
+}

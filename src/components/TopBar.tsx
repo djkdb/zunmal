@@ -4,14 +4,13 @@ import { sfx } from '../audio/sfx';
 import { useCoinCounter } from '../hooks/useCoinCounter';
 import { setCoinTarget } from '../lib/coinFx';
 import { useGameStore } from '../store/useGameStore';
-import { CoinIcon, SoundOffIcon, SoundOnIcon } from './icons';
+import { CoinIcon } from './icons';
+import { SoundSettings } from './SoundSettings';
 import './TopBar.css';
 
 /** 게임 HUD: 코인(큰 아이콘 + 숫자 + 벌러 가기 버튼)과 소리 켜기/끄기 */
 export function TopBar() {
   const coins = useGameStore((s) => s.coins);
-  const muted = useGameStore((s) => s.settings.muted);
-  const setMuted = useGameStore((s) => s.setMuted);
   // 코인: 굴러 올라가는 숫자 + 날아오는 코인의 목표 (lib/coinFx)
   const pillRef = useRef<HTMLDivElement>(null);
   const coinCounter = useCoinCounter(coins, pillRef);
@@ -36,21 +35,7 @@ export function TopBar() {
           </Link>
         </div>
       </div>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-pressed={muted}
-        aria-label={muted ? '소리 켜기' : '소리 끄기'}
-        onClick={() => {
-          setMuted(!muted);
-          if (muted) {
-            sfx.setMuted(false);
-            sfx.button();
-          }
-        }}
-      >
-        {muted ? <SoundOffIcon size={22} /> : <SoundOnIcon size={22} />}
-      </button>
+      <SoundSettings />
     </header>
   );
 }

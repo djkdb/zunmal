@@ -122,6 +122,13 @@ class FakeNode {
   gain = new FakeParam();
   frequency = new FakeParam();
   Q = new FakeParam();
+  detune = new FakeParam();
+  threshold = new FakeParam();
+  knee = new FakeParam();
+  ratio = new FakeParam();
+  attack = new FakeParam();
+  release = new FakeParam();
+  curve: unknown = null;
   type = '';
   loop = false;
   buffer: unknown = null;
@@ -152,6 +159,9 @@ class FakeAudioContext {
     return new FakeNode();
   }
   createBiquadFilter() {
+    return new FakeNode();
+  }
+  createWaveShaper() {
     return new FakeNode();
   }
   createBufferSource() {

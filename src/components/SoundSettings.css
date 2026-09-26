@@ -1,0 +1,140 @@
+.sound {
+  position: relative;
+  flex: none;
+}
+
+/* 말풍선: 소리 버튼에서 내려온 평평한 외곽선 패널 (눌리는 건 안의 스위치뿐) */
+.sound__panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -4px;
+  z-index: 30;
+  width: min(248px, calc(100vw - 32px));
+  padding: 12px 10px 10px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-slot);
+  background: var(--paper);
+}
+
+/* 버튼을 가리키는 꼬리 */
+.sound__panel::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: 18px;
+  width: 16px;
+  height: 16px;
+  border-top: var(--line) solid var(--ink);
+  border-left: var(--line) solid var(--ink);
+  border-radius: 4px 0 0 0;
+  background: var(--paper);
+  transform: rotate(45deg);
+}
+
+.sound__title {
+  margin: 0 6px 6px;
+  font-family: var(--font-display);
+  font-size: var(--fs-m);
+}
+
+.sound__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-s);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sound__row + .sound__row {
+  border-top: 2px dashed rgba(43, 34, 51, 0.18);
+  border-radius: 0 0 var(--radius-s) var(--radius-s);
+}
+
+.sound__row:focus-visible {
+  outline: 3px solid var(--soda);
+  outline-offset: 1px;
+}
+
+.sound__icon {
+  display: grid;
+  flex: none;
+}
+
+.sound__label {
+  flex: 1;
+}
+
+.sound__state {
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+}
+
+/* 젤리 스위치: 켜지면 메론색으로 차오르고 손잡이가 오른쪽으로 */
+.sound__switch {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 28px;
+  border: var(--line) solid var(--ink);
+  border-radius: 999px;
+  background: #e9dfd0;
+  box-shadow: inset 0 3px 0 rgba(43, 34, 51, 0.12);
+  transition: background-color 0.15s;
+}
+
+.sound__knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 0 var(--ink);
+  transition: transform 0.18s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.sound__row[aria-pressed='true'] .sound__switch {
+  background: var(--matcha);
+}
+
+.sound__row[aria-pressed='true'] .sound__knob {
+  transform: translateX(20px);
+}
+
+.sound__row[aria-pressed='true'] .sound__state {
+  color: var(--ink);
+}
+
+.sound__row:active .sound__knob {
+  transform: scale(1.15, 0.85);
+}
+
+.sound__row[aria-pressed='true']:active .sound__knob {
+  transform: translateX(20px) scale(1.15, 0.85);
+}
+
+.sound__hint {
+  margin: 6px 6px 0;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound__switch,
+  .sound__knob {
+    transition: none;
+  }
+}

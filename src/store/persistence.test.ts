@@ -16,7 +16,7 @@ describe('sanitizeSave', () => {
       ownedMalangs: { 'peach-mochi': { count: 3, shinyCount: 1, firstObtainedAt: 100 } },
       partnerId: 'peach-mochi',
       pityCount: 12,
-      settings: { muted: true },
+      settings: { sfxOn: false, musicOn: true },
       miniGameRecords: { 'button-malang': { bestScore: 300, lastScore: 120, plays: 4 } },
       dailyEarnedCoins: 800,
       lastDailyResetDate: '2026-05-05',
@@ -40,7 +40,7 @@ describe('sanitizeSave', () => {
           'grape-jelly': 'broken',
         },
         partnerId: 'unknown-ip-character',
-        settings: { muted: 'yes' },
+        settings: { sfxOn: 'yes', musicOn: 0 },
         miniGameRecords: { 'button-malang': { bestScore: NaN, plays: 2 }, bad: 3 },
         dailyEarnedCoins: Infinity,
         lastDailyResetDate: 'yesterday',
@@ -51,7 +51,7 @@ describe('sanitizeSave', () => {
     expect(s.pityCount).toBe(49);
     expect(Object.keys(s.ownedMalangs)).toEqual(['peach-mochi']);
     expect(s.partnerId).toBe('peach-mochi');
-    expect(s.settings.muted).toBe(false);
+    expect(s.settings).toEqual({ sfxOn: true, musicOn: true });
     expect(s.miniGameRecords).toEqual({ 'button-malang': { bestScore: 0, lastScore: 0, plays: 2 } });
     expect(s.dailyEarnedCoins).toBe(0);
     expect(s.lastDailyResetDate).toBe('2026-05-05');
@@ -74,8 +74,29 @@ describe('sanitizeSave', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 4', () => {
-    expect(SAVE_VERSION).toBe(4);
+  it('현재 버전은 5', () => {
+    expect(SAVE_VERSION).toBe(5);
+  });
+
+  it('v4 → v5: 음소거였으면 효과음·배경음악 모두 끔', () => {
+    const s = migrateSave({ coins: 5, settings: { muted: true } }, 4, NOW);
+    expect(s.settings).toEqual({ sfxOn: false, musicOn: false });
+    expect('muted' in s.settings).toBe(false);
+  });
+
+  it('v4 → v5: 소리를 켜 두었거나 설정이 없으면 둘 다 켬', () => {
+    expect(migrateSave({ settings: { muted: false } }, 4, NOW).settings).toEqual({ sfxOn: true, musicOn: true });
+    expect(migrateSave({ coins: 1 }, 4, NOW).settings).toEqual({ sfxOn: true, musicOn: true });
+    expect(migrateSave({ settings: 'broken' }, 4, NOW).settings).toEqual({ sfxOn: true, musicOn: true });
+  });
+
+  it('새 플레이어는 효과음·배경음악 모두 켜진 상태로 시작', () => {
+    expect(createInitialSave(NOW).settings).toEqual({ sfxOn: true, musicOn: true });
+  });
+
+  it('v5 설정은 각각 따로 유지', () => {
+    const s = migrateSave({ settings: { sfxOn: true, musicOn: false } }, 5, NOW);
+    expect(s.settings).toEqual({ sfxOn: true, musicOn: false });
   });
 
   it('v3 → v4: 미션 진행은 오늘 날짜의 빈 진행으로 시작', () => {
@@ -146,7 +167,7 @@ describe('migrateSave', () => {
     expect(s.ownedMalangs['starry-night']?.count).toBe(1);
     expect(s.ownedMalangs['ghost-id']).toBeUndefined();
     expect(s.pityCount).toBe(7);
-    expect(s.settings.muted).toBe(true);
+    expect(s.settings).toEqual({ sfxOn: false, musicOn: false });
     expect(s.miniGameRecords['button-malang']?.bestScore).toBe(210);
     expect(s.partnerId).toBe('peach-mochi');
   });

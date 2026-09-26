@@ -252,6 +252,17 @@ function thump(ctx: AudioContext, out: AudioNode, t0: number, freq: number, gain
   env.connect(out);
   osc.start(t0);
   osc.stop(t0 + duration + 0.03);
+  // 폰 스피커는 ~200Hz 아래를 거의 못 낸다 → 3배음 "톡"을 짧게 얹어 작은 스피커에서도 퉁 소리가 느껴지게
+  const knock = ctx.createOscillator();
+  const kEnv = ctx.createGain();
+  knock.type = 'triangle';
+  knock.frequency.setValueAtTime(freq * 3, t0);
+  knock.frequency.exponentialRampToValueAtTime(freq * 1.6, t0 + duration * 0.5);
+  envelope(kEnv.gain, t0, 0.003, gain * 0.3, t0 + duration * 0.5);
+  knock.connect(kEnv);
+  kEnv.connect(out);
+  knock.start(t0);
+  knock.stop(t0 + duration * 0.5 + 0.03);
 }
 
 /** 짧은 젖은 "찰싹" (밴드패스 노이즈) */
