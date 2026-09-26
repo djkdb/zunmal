@@ -387,11 +387,13 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
         {phase === 'ready'
           ? run?.rarity === 'secret'
             ? '이 캡슐… 뭔가 특별해요!'
-            : rank >= rarityRank('legendary')
-              ? '금빛 캡슐! 눌러서 열어 보세요'
-              : rank === rarityRank('epic')
-                ? '보랏빛 캡슐! 눌러서 열어 보세요'
-                : '캡슐을 눌러서 열어 보세요!'
+            : run?.rarity === 'mythic'
+              ? '무지개 캡슐! 눌러서 열어 보세요'
+              : rank >= rarityRank('legendary')
+                ? '금빛 캡슐! 눌러서 열어 보세요'
+                : rank === rarityRank('epic')
+                  ? '보랏빛 캡슐! 눌러서 열어 보세요'
+                  : '캡슐을 눌러서 열어 보세요!'
           : phase === 'tease'
             ? '어… 머신이 이상해요?!'
             : phase === 'idle'
