@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx';
 import { MiniGameLobby } from '../components/MiniGameLobby';
 import { MiniGameResult } from '../components/MiniGameResult';
 import { getCharacter } from '../data/characters';
+import { holdCounter } from '../lib/coinFx';
 import { getMiniGame } from '../minigames/registry';
 import type { MiniGame, MiniGameResultPayload } from '../minigames/types';
 import { useGameStore, type MiniGameFinishResult } from '../store/useGameStore';
@@ -52,6 +53,8 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
       // 같은 판에서 onFinish가 여러 번 호출돼도 한 번만 지급
       if (finishedRound.current === roundRef.current) return;
       finishedRound.current = roundRef.current;
+      // 결과 화면에서 코인이 날아가 닿을 때 숫자가 올라가도록, 지급 직전에 상단 숫자를 붙잡아 둔다
+      holdCounter();
       const result = finishMiniGame(game.id, payload.score);
       setPhase({ kind: 'result', payload, result });
     },
