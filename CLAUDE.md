@@ -30,12 +30,12 @@ src/
                   materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
-                  shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
+                  playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
                   shop/(홈 ShopCard + 가게 화면 조각) …
-  minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
+  minigames/      types.ts, registry.ts, lobby.ts (로비 칩 거르기), shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
   pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방), ShopPage(디저트 가게)
 ```
@@ -418,7 +418,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,
   화면 배치(혼자 배치·자리 옮기기), 반응 부위·쓰다듬기, 꾸미기 데이터(타일 SVG·저장 검사·놓기/치우기·빈자리), 사진 카드(`frameGroup` 모두 담기·비율,
   무늬 자리, 등급 칩·칩 줄, 단체 한 줄 조사).
-- 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰).
+- 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰). 로비 칩 거르기(`minigames/lobby.test.ts`), 예상 코인·오늘 막대·영수증 깎임·상한 문구(`economy/playReward.test.ts`).
 - 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트), 촉감별 소리 맛(`squish`).
 - 놀이방 촉감·말랑이끼리: 슬로우 라이징 회복 시간·젤리 출렁임·쭉쭉이 한계·찐득이 떼기 지연·끈적임 풀림(`touch/materials.test.ts`), 볼 비비기 시간·쉬기·1분 상한·쌓기·쿵·흘끔·같이 졸기(`touch/interactions.test.ts`), 3D 겉모습 값 범위·재질 순서(모찌가 가장 매트, 젤리가 가장 비침, 찐득이가 가장 젖음 — `data/materials.test.ts`).
 
@@ -427,7 +427,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 1. `src/minigames/<game-id>/logic.ts` — 순수 로직 (+ `logic.test.ts`).
 2. `src/minigames/<game-id>/index.tsx` — `MiniGame` 객체를 default export:
    ```ts
-   const game: MiniGame = { id, name, description, icon, Component, durationMs: CONFIG.durationMs, blurb: '톡톡 누르기' };
+   const game: MiniGame = { id, name, description, icon, Component, durationMs: CONFIG.durationMs, blurb: '톡톡 누르기', tags: ['feel', 'record'] };
    export default game;
    ```
    `Component` 는 `MiniGameProps`(`partner`, `partnerShiny?`, `onFinish({score, stats})`, `onExit`, `sfx`)를 받는다.
@@ -437,11 +437,26 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
    DOM 스프라이트를 월드 좌표로 옮긴다(`capsule-catch`, `malang-jump`, `stack` 참고). 궤적 색은 `partnerTrailColor`.
    CSS 클래스 접두사는 게임마다 달라야 한다(모든 게임 CSS가 함께 로드된다).
    로비 카드 한 줄은 `formatPlayLength(durationMs)` + `blurb`("20초 톡톡 누르기", 합쳐 11자 이내 — 테스트). 한 판도 안 한 플레이어에게는
-   `RECOMMENDED_GAME_ID`(말랑 합치기) 하나만 "처음이면 이거!"로 강조, 해 본 게임은 최고 기록 칩. 결과 통계 이름은 띄어 쓴다(`'최대 콤보'`).
+   `RECOMMENDED_GAME_ID`(말랑 합치기) 하나만 "처음이면 이거!"로 강조. 결과 통계 이름은 띄어 쓴다(`'최대 콤보'`).
+   `tags`: 로비 칩 딱지 `pick`(추천)·`feel`(손맛)·`record`(기록 도전)·`focus`(집중) 중 하나 이상. "짧게"는 적지 않는다 —
+   `durationMs ≤ SHORT_PLAY_MS`(30초)에서 계산(`minigames/lobby.ts`). 칩마다 2개 이상·전체보다 적게, 처음 추천 게임은 `pick`(테스트).
 3. `src/minigames/registry.ts` 의 `MINI_GAMES` 배열에 한 줄 추가.
-4. (선택) `economy/config.ts` 의 `GAME_MULTIPLIERS` 에 배율 추가 — 없으면 기본 배율 사용.
+4. `economy/config.ts` 의 `GAME_MULTIPLIERS`(배율)와 `GAME_TYPICAL_SCORES`(보통 점수 — 로비 "약 N코인", 100~150코인이 되게)에 한 줄씩 (registry 테스트가 확인).
 
 결과 화면, 최고 기록 저장, 코인 지급은 `MiniGamePage` 가 공통 처리한다.
+
+- **로비** (`/play`, `components/MiniGameLobby`): 위에서부터 오늘 받은 코인 막대("오늘 받은 코인 1,240 / 3,000", 다 받으면 민트 + 자정 안내)
+  → 파트너 카드 → 가로로 미는 칩 줄(`LOBBY_FILTERS`: 전체·추천·짧게·손맛·기록 도전·집중, 고른 칩은 `sessionStorage['malang-lobby-filter']`)
+  → 두 칸 타일(모두 같은 높이, 색은 registry 순서라 걸러도 그대로): 아이콘·이름·길이+blurb·내 기록 두 칸(최고 | 최근, 안 해 봤으면 "첫 도전")
+  ·레몬 알약 "약 N코인"(`expectedCoins`: 해 본 게임은 최고와 최근의 가운데, 처음이면 보통 점수 → `computeReward`에 지금 파트너·오늘 남은 한도,
+  10 단위 반올림. 오늘 다 받았으면 "오늘은 다 받았어요"). 최근 점수는 기존 `miniGameRecords.lastScore`(저장 구조 변경 없음).
+- **결과** (`components/MiniGameResult`): 게임 이름(제목) → 파트너 + 큰 점수(새 최고면 레몬 "최고 기록!"/"첫 기록!" 딱지 + 색종이, 아니면 "최고 N")
+  → 기록 칩 → 영수증(점수 보상, 파트너 얼굴 + 등급 배지 + "보너스 +N%", 한 판 상한·오늘 상한으로 깎인 코인, 받은 코인)
+  → 상한이 걸리면 한 줄(`rewardNote`: "오늘 상한에 닿아 N코인만 받았어요." 등) → 오늘 받은 코인 막대.
+  숫자는 모두 store `finishMiniGame`이 돌려준 `computeReward` 값 하나에서 나온다(`rewardTrims`: 보상 + 보너스 − 깎임 = 받은 코인, 테스트).
+  발표: 점수 → 받은 코인이 차례로 굴러 올라가고(오늘 막대도 함께) → 코인이 위 알약으로 날아간다(`holdCounter`를 발표 끝까지 늘림).
+  카드를 톡 누르면 바로 끝, 움직임 줄이기면 처음부터 끝난 값. 버튼: "다시 하기"(주) → "캡슐 뽑기"(뽑을 수 있으면 "뽑기 가능!" 딱지) + "다른 게임",
+  못 뽑으면 "N코인 더 모으면 캡슐을 뽑을 수 있어요.".
 
 ## Git workflow
 
