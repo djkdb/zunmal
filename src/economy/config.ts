@@ -155,3 +155,76 @@ export const COUPONS: readonly CouponDef[] = [
   // 오픈 기념 선물: 10연 뽑기 한 번 값
   { id: 'open-2026', code: 'zun', coins: 1000, title: '오픈 기념' },
 ];
+
+// ── 말랑 디저트 가게 (방치형 수입, economy/shop.ts) ───────────────────
+/**
+ * 가게 직원 한 마리의 시간당 코인 (희귀도별). 앱을 닫아 둬도 실제 시간만큼 쌓인다(서버가 없어 기기 시계 기준).
+ *
+ * 목표 (economy/shop.test.ts 가 대표 직원 구성으로 확인한다):
+ *  - 하루에 2~3번 들어와 받는 플레이어는 가게가 하루에 약 16시간 일한 것으로 본다(`SHOP_EXPECTED_HOURS_PER_DAY`:
+ *    밤에 자는 동안은 8시간에서 가득 차 멈춘다).
+ *  - 새 플레이어(일반 시작 말랑이 하나) ≈ 10/시간 × 16 = 하루 150~250 → 미니게임 한두 판 값. 조금이라도 매일 들어올 이유.
+ *  - 중반(8마리 이상 모아 3칸, 에픽·레어·일반 + 친밀도 조금) ≈ 35~45/시간 → 하루 500~800 → 10연 한 번에 1.5~2일.
+ *  - 초반(4마리, 2칸) ≈ 하루 350~400, 후반(24마리 이상, 5칸 전설·에픽 위주 + 보너스) ≈ 하루 1,300~1,600.
+ *  - 등급 차이는 일부러 완만하다(시크릿도 일반의 2.4배): 좋은 말랑이가 있으면 기쁘지만 칸 수(모은 말랑이 수)가 더 크다.
+ * 가게 수입은 미니게임 일일 상한(DAILY_CAP)과 무관하다.
+ */
+export const SHOP_RATE_PER_HOUR: Readonly<Record<Rarity, number>> = {
+  common: 10,
+  rare: 12,
+  epic: 14,
+  legendary: 17,
+  mythic: 20,
+  secret: 24,
+};
+
+/**
+ * 직원 칸이 열리는 "모은 말랑이 종류 수". 1마리면 1칸, 4마리 2칸, 8마리 3칸, 15마리 4칸, 24마리 5칸(최대).
+ * 수집할수록 가게가 커진다 — 가챠를 돌릴 이유와 가게가 이어진다.
+ */
+export const SHOP_SLOT_UNLOCKS: readonly number[] = [1, 4, 8, 15, 24];
+
+/** 가게가 가득 차는 시간. 이 시간어치를 넘으면 더 쌓이지 않는다("가게가 가득 찼어요"). */
+export const SHOP_CAP_HOURS = 8;
+
+/** 하루에 2~3번 받는 플레이어가 실제로 쌓는 시간(균형 계산·테스트용 가정). */
+export const SHOP_EXPECTED_HOURS_PER_DAY = 16;
+
+/** 친밀도 보너스: 애정 단계(data/affection.ts levelOf)가 1 오를 때마다 +5%, 최대 +25% (6단계 = 애정 250). */
+export const SHOP_AFFECTION_BONUS = { perLevel: 0.05, max: 0.25 } as const;
+
+/** 반짝 말랑이(반짝을 하나라도 가졌으면)는 +25%. */
+export const SHOP_SHINY_BONUS = 0.25;
+
+/** 세트 호흡: 같은 컬렉션 세트(data/collections.ts)에 속한 직원이 둘 이상이면 한 마리 늘 때마다 그 직원들 +10%. */
+export const SHOP_SET_BONUS_PER_MEMBER = 0.1;
+
+/**
+ * 촉감별 특기 (말랑이마다 한 줄, data/materialIds.ts). 작게, 읽기 쉽게.
+ *  - 슬로우 라이징: 느긋하게 오래 버텨서 가게가 가득 차는 시간 +1시간 (가게 전체, 최대 +2시간)
+ *  - 탱탱 젤리: 통통 튀며 빨리 일해서 자기 수입 +10%
+ *  - 쭉쭉이: 팔을 쭉 뻗어 다른 직원 수입 +5%씩
+ *  - 찐득이: 딱 붙어 정이 들어서 친밀도 보너스가 두 배 (단계당 +10%, 최대 +50%)
+ */
+export const SHOP_MATERIAL_PERKS = {
+  slowRiseExtraHours: 1,
+  slowRiseMaxExtraHours: 2,
+  jellyBonus: 0.1,
+  stretchyHelpBonus: 0.05,
+  stickyAffectionMultiplier: 2,
+} as const;
+
+/**
+ * 저장된 "쌓아 둔 코인"(shop.banked)의 안전 상한 — 손상된 저장 정화용.
+ * 5칸 모두 시크릿 + 모든 보너스 최대여도 가득 찬 가게는 약 2,000코인이라 넉넉하게 잡는다.
+ */
+export const SHOP_BANK_MAX = 10_000;
+
+// ── 말랑 선물 (하루 한 번, economy/gift.ts) ───────────────────────────
+/**
+ * 서울 날짜로 하루 한 번, 친밀도가 가장 높은 말랑이가 선물 상자를 가져온다.
+ * 코인 = 기본 30 + 애정 단계 × 10, 최대 120 (애정 단계 9 = 애정 400부터 최대).
+ * 새 플레이어(1단계)는 40 — 쓰다듬을수록 선물이 커져 "말랑이를 아끼는" 보람이 코인으로도 보인다.
+ * 첫 선물은 시작한 다음 날부터(첫날은 처음 안내에 집중).
+ */
+export const GIFT_COINS = { base: 30, perLevel: 10, max: 120 } as const;

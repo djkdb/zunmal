@@ -141,6 +141,40 @@ describe('sanitizeSave: 놀이방 (v7)', () => {
     expect(bad.playroom.props).toEqual([]);
   });
 
+  it('가게(v9): 직원은 연 보유 말랑이만, 중복 없이, 열린 칸까지', () => {
+    const o = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+    const ids = ['peach-mochi', 'soda-drop', 'matcha-bean', 'milk-cloud', 'grape-jelly'];
+    const owned = Object.fromEntries(ids.map((id) => [id, o]));
+    const s = sanitizeSave(
+      {
+        ownedMalangs: owned,
+        unboxed: ids.slice(0, 4),
+        shop: { staff: ['grape-jelly', 'soda-drop', 'soda-drop', 'hacked', 7, 'peach-mochi', 'matcha-bean'], lastTickAt: 1000, banked: 12.7 },
+      },
+      NOW,
+    );
+    // 5마리 → 2칸. grape-jelly 는 아직 캡슐 속
+    expect(s.shop).toEqual({ staff: ['soda-drop', 'peach-mochi'], lastTickAt: 1000, banked: 12 });
+  });
+
+  it('가게(v9): 미래 정산 시각은 지금으로, 이상한 값은 고친다', () => {
+    const future = sanitizeSave({ shop: { staff: [], lastTickAt: NOW.getTime() + 86_400_000, banked: 5 } }, NOW);
+    expect(future.shop.lastTickAt).toBe(NOW.getTime());
+    const bad = sanitizeSave({ shop: { staff: 'x', lastTickAt: Number.NaN, banked: -3 }, giftDay: 'someday' }, NOW);
+    expect(bad.shop).toEqual({ staff: [], lastTickAt: NOW.getTime(), banked: 0 });
+    expect(bad.giftDay).toBeNull();
+    const huge = sanitizeSave({ shop: { staff: [], lastTickAt: -5, banked: 1e12 } }, NOW);
+    expect(huge.shop.banked).toBe(10_000);
+    expect(huge.shop.lastTickAt).toBe(NOW.getTime());
+    expect(sanitizeSave({ giftDay: '2026-05-04' }, NOW).giftDay).toBe('2026-05-04');
+  });
+
+  it('새 저장: 빈 가게, 첫 선물은 다음 날부터', () => {
+    const s = createInitialSave(NOW);
+    expect(s.shop).toEqual({ staff: [], lastTickAt: NOW.getTime(), banked: 0 });
+    expect(s.giftDay).toBe('2026-05-05');
+  });
+
   it('새 저장은 연 것도 매트도 비어 있다', () => {
     const s = createInitialSave(NOW);
     expect(s.unboxed).toEqual([]);
@@ -149,8 +183,29 @@ describe('sanitizeSave: 놀이방 (v7)', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 8', () => {
-    expect(SAVE_VERSION).toBe(8);
+  it('현재 버전은 9', () => {
+    expect(SAVE_VERSION).toBe(9);
+  });
+
+  it('v8 → v9: 가게 첫 직원은 파트너(연 말랑이면), 정산 시각은 지금, 선물은 오늘 바로', () => {
+    const o = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+    const owned = { 'peach-mochi': o, 'soda-drop': o };
+    const s = migrateSave({ coins: 5, ownedMalangs: owned, unboxed: ['peach-mochi', 'soda-drop'], partnerId: 'soda-drop' }, 8, NOW);
+    expect(s.shop).toEqual({ staff: ['soda-drop'], lastTickAt: NOW.getTime(), banked: 0 });
+    expect(s.giftDay).toBeNull();
+    expect(s.coins).toBe(5);
+    // 파트너가 아직 캡슐 속이면 처음 연 말랑이
+    const sealed = migrateSave({ ownedMalangs: owned, unboxed: ['peach-mochi'], partnerId: 'soda-drop' }, 8, NOW);
+    expect(sealed.shop.staff).toEqual(['peach-mochi']);
+    // 연 말랑이가 없으면 빈 가게
+    const none = migrateSave({ ownedMalangs: owned, unboxed: [], partnerId: 'soda-drop' }, 8, NOW);
+    expect(none.shop.staff).toEqual([]);
+  });
+
+  it('아주 옛 저장(v6)도 v9까지: 파트너가 가게에서 일한다', () => {
+    const owned = { 'peach-mochi': { count: 1, shinyCount: 0, firstObtainedAt: 1 } };
+    const s = migrateSave({ ownedMalangs: owned, partnerId: 'peach-mochi' }, 6, NOW);
+    expect(s.shop.staff).toEqual(['peach-mochi']);
   });
 
   it('v7 → v8: 매트에는 한 마리만 (나와 있던 파트너, 없으면 처음 꺼낸 말랑이)', () => {

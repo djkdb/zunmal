@@ -382,3 +382,81 @@ describe('놀이방 (unboxed / playroom)', () => {
     expect(store.getState().coins).toBe(createInitialSave().coins);
   });
 });
+
+describe('디저트 가게 / 말랑 선물', () => {
+  const H = 3_600_000;
+  const T0 = new Date('2026-09-26T03:00:00Z');
+  const at = (hours: number) => new Date(T0.getTime() + hours * H);
+  const o = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+
+  it('시작 말랑이가 첫 직원이 되고, 시간만큼 쌓인 코인을 받는다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    expect(store.getState().shop.staff).toEqual(['peach-mochi']);
+    const before = store.getState().coins;
+    expect(store.getState().claimShop(at(2))).toBe(20);
+    expect(store.getState().coins).toBe(before + 20);
+    // 바로 다시 누르면 없음 (코인이 두 번 나오지 않는다)
+    expect(store.getState().claimShop(at(2))).toBe(0);
+    // 가득 차면 멈춘다: 슬로우 라이징 모찌 = 9시간 = 90
+    expect(store.getState().claimShop(at(100))).toBe(90);
+  });
+
+  it('가게 수입은 미니게임 일일 상한과 무관하다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    store.setState({ dailyEarnedCoins: DAILY_CAP });
+    expect(store.getState().claimShop(at(3))).toBe(30);
+    expect(store.getState().dailyEarnedCoins).toBe(DAILY_CAP);
+  });
+
+  it('직원을 바꿔도 지금까지 번 코인은 남는다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    store.setState({
+      ownedMalangs: { 'peach-mochi': o, 'soda-drop': o, 'matcha-bean': o, 'milk-cloud': o },
+      unboxed: ['peach-mochi', 'soda-drop', 'matcha-bean'],
+    });
+    expect(store.getState().setShopStaff(0, 'soda-drop', at(3))).toBe(true);
+    expect(store.getState().shop).toEqual({ staff: ['soda-drop'], banked: 30, lastTickAt: at(3).getTime() });
+    // 캡슐을 안 연 말랑이는 일할 수 없다
+    expect(store.getState().setShopStaff(1, 'milk-cloud', at(3))).toBe(false);
+    // 4마리 → 2칸
+    expect(store.getState().setShopStaff(1, 'matcha-bean', at(3))).toBe(true);
+    expect(store.getState().setShopStaff(2, 'peach-mochi', at(3))).toBe(false);
+    expect(store.getState().shop.staff).toEqual(['soda-drop', 'matcha-bean']);
+    // 소다 11 + 도움 5% = 11.5, 말차 10 → 1시간 21.5
+    expect(store.getState().claimShop(at(4))).toBe(30 + 21);
+  });
+
+  it('캡슐을 처음 열면 빈 칸이 있을 때 바로 일하러 간다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    store.setState({ ownedMalangs: { 'peach-mochi': o, 'soda-drop': o, 'matcha-bean': o, 'milk-cloud': o } });
+    store.getState().unboxMalang('soda-drop', 5, at(1));
+    expect(store.getState().shop).toEqual({ staff: ['peach-mochi', 'soda-drop'], banked: 10, lastTickAt: at(1).getTime() });
+    // 칸이 꽉 차면 그대로
+    store.getState().unboxMalang('matcha-bean', 5, at(2));
+    expect(store.getState().shop.staff).toEqual(['peach-mochi', 'soda-drop']);
+  });
+
+  it('시계를 되돌리면 주지 않고, 기준만 옮긴다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    expect(store.getState().claimShop(at(-5))).toBe(0);
+    expect(store.getState().shop.lastTickAt).toBe(at(-5).getTime());
+  });
+
+  it('말랑 선물: 첫날은 없고, 다음 날 하루 한 번', () => {
+    const store = makeStore();
+    store.setState({ ...createInitialSave(T0) });
+    store.getState().chooseStarter('peach-mochi', T0);
+    expect(store.getState().claimGift(T0)).toEqual({ ok: false });
+    store.setState({ affection: { 'peach-mochi': 120 } });
+    const coins = store.getState().coins;
+    const next = new Date(T0.getTime() + 24 * H);
+    expect(store.getState().claimGift(next)).toEqual({ ok: true, coins: 60, giverId: 'peach-mochi' });
+    expect(store.getState().coins).toBe(coins + 60);
+    expect(store.getState().claimGift(next)).toEqual({ ok: false });
+  });
+});

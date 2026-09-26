@@ -9,13 +9,8 @@
  */
 import type { ShapeSpec } from '../components/malang/shapes';
 
-/** 애정 이만큼마다 한 단계. 애정은 코인을 주지 않는 순수한 교감 수치다. */
-export const AFFECTION_PER_LEVEL = 50;
-
-export function levelOf(affection: number): number {
-  const a = Number.isFinite(affection) ? Math.max(0, affection) : 0;
-  return Math.floor(a / AFFECTION_PER_LEVEL) + 1;
-}
+/** 애정 단계는 data/affection.ts (가게·선물도 함께 쓴다). 애정은 교감 수치 — 만진다고 코인이 나오지 않는다. */
+export { AFFECTION_PER_LEVEL, levelOf } from '../data/affection';
 
 // ── 단계별로 열리는 반응 ─────────────────────────────────────
 

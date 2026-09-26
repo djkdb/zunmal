@@ -5,6 +5,15 @@ import { STARTER_CHARACTER_IDS, getCharacter } from '../data/characters';
 import { collectionProgress, getCollection } from '../data/collections';
 import { MISSION_ALL_CLEAR_BONUS, SET_REWARD_COINS } from '../economy/config';
 import { checkCoupon, type CouponResult } from '../economy/coupons';
+import { giftAvailable, giftCoins, giftGiver } from '../economy/gift';
+import {
+  assignStaff,
+  claimShop as claimShopCoins,
+  computeShopRates,
+  settleShop,
+  unlockedSlots,
+  type ShopRates,
+} from '../economy/shop';
 import { seoulDateKey } from '../economy/daily';
 import {
   applyDailyReset,
@@ -63,7 +72,7 @@ export interface GameActions {
    * 놀이방: 봉인된 캡슐을 열었다 → 연 말랑이로 기록하고 매트에 올린다 (자리가 있으면).
    * cap 은 이 기기의 매트 상한 (PLAYROOM_MAX_OUT 이하). 처음 연 것이면 true.
    */
-  unboxMalang(characterId: string, cap?: number): boolean;
+  unboxMalang(characterId: string, cap?: number, now?: Date): boolean;
   /** 놀이방: 연 말랑이를 매트에 꺼낸다. 이미 나와 있거나 매트가 꽉 찼거나 안 연 말랑이면 false */
   takeOutMalang(characterId: string, cap?: number): boolean;
   /** 놀이방: 매트의 말랑이를 선반에 넣는다 */
@@ -79,6 +88,15 @@ export interface GameActions {
   placeProp(id: PropId, x: number, y: number): boolean;
   /** 놀이방 꾸미기: 소품 치우기 */
   removeProp(id: PropId): void;
+  /**
+   * 디저트 가게: 칸 slot 에 말랑이를 넣는다(null 이면 비움). 캡슐을 연 보유 말랑이만, 열린 칸까지.
+   * 바꾸기 전에 지금까지 번 코인을 정산해 두므로(banked) 바꿔도 코인을 잃지 않는다. 바뀌었으면 true.
+   */
+  setShopStaff(slot: number, characterId: string | null, now?: Date): boolean;
+  /** 디저트 가게 받기: 쌓인 코인을 모두 받는다 (일일 상한과 무관). 받은 코인(없으면 0) */
+  claimShop(now?: Date): number;
+  /** 말랑 선물 열기 (서울 날짜로 하루 한 번). 선물을 가져온 말랑이와 코인 */
+  claimGift(now?: Date): { ok: true; coins: number; giverId: string } | { ok: false };
   /** 오늘의 미션 보상 받기 */
   claimMission(id: MissionKind, now?: Date): { ok: true; coins: number } | { ok: false; reason: string };
   /** 미션 3개를 모두 받은 뒤 추가 보너스 받기. 받은 코인(없으면 0)을 돌려준다. */
@@ -171,7 +189,23 @@ function pickSave(state: GameState): SaveData {
     redeemedCoupons: state.redeemedCoupons,
     unboxed: state.unboxed,
     playroom: state.playroom,
+    shop: state.shop,
+    giftDay: state.giftDay,
   };
+}
+
+/** 지금 저장 상태의 가게 수입표 (화면과 store 액션이 같은 계산을 쓴다) */
+export function shopRatesOf(state: Pick<SaveData, 'shop' | 'ownedMalangs' | 'affection'>): ShopRates {
+  return computeShopRates(state.shop.staff, { owned: state.ownedMalangs, affection: state.affection });
+}
+
+/** 캡슐을 처음 연 말랑이: 가게에 빈 칸이 있으면 바로 일하러 간다 (지금까지 번 코인은 먼저 정산) */
+function withNewStaff(state: SaveData, characterId: string, now: Date): SaveData['shop'] {
+  const shop = state.shop;
+  if (shop.staff.includes(characterId)) return shop;
+  if (shop.staff.length >= unlockedSlots(Object.keys(state.ownedMalangs).length)) return shop;
+  const settled = settleShop(shop, shopRatesOf(state), now.getTime());
+  return { staff: [...shop.staff, characterId], banked: settled.banked, lastTickAt: now.getTime() };
 }
 
 function clampCap(cap: number | undefined): number {
@@ -195,6 +229,8 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
             // 시작 말랑이는 직접 골랐으니 캡슐 없이 바로 매트에
             unboxed: [characterId],
             playroom: { ...get().playroom, out: [characterId] },
+            // 시작 말랑이가 디저트 가게 첫 직원 (지금부터 쌓인다)
+            shop: { staff: [characterId], lastTickAt: now.getTime(), banked: 0 },
           });
           return true;
         },
@@ -294,7 +330,7 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           });
         },
 
-        unboxMalang(characterId, cap) {
+        unboxMalang(characterId, cap, now = new Date()) {
           const state = get();
           if (!state.ownedMalangs[characterId]) return false;
           const first = !state.unboxed.includes(characterId);
@@ -304,6 +340,7 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           set({
             unboxed: first ? [...state.unboxed, characterId] : state.unboxed,
             playroom: canPlace ? { ...state.playroom, out: [...out, characterId] } : state.playroom,
+            shop: first ? withNewStaff(state, characterId, now) : state.shop,
           });
           return first;
         },
@@ -350,6 +387,40 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           const playroom = get().playroom;
           if (!playroom.props.some((p) => p.id === id)) return;
           set({ playroom: { ...playroom, props: withoutProp(playroom.props, id) } });
+        },
+
+        setShopStaff(slot, characterId, now = new Date()) {
+          const state = get();
+          if (characterId !== null && (!state.ownedMalangs[characterId] || !state.unboxed.includes(characterId))) return false;
+          const slots = unlockedSlots(Object.keys(state.ownedMalangs).length);
+          const staff = assignStaff(state.shop.staff, slot, characterId, slots);
+          if (staff.length === state.shop.staff.length && staff.every((id, i) => state.shop.staff[i] === id)) return false;
+          // 지금까지 번 코인을 예전 직원 기준으로 먼저 정산
+          const settled = settleShop(state.shop, shopRatesOf(state), now.getTime());
+          // 새 직원은 지금부터 (1코인 미만 자투리는 버린다)
+          set({ shop: { staff, banked: settled.banked, lastTickAt: now.getTime() } });
+          return true;
+        },
+
+        claimShop(now = new Date()) {
+          const state = get();
+          const res = claimShopCoins(state.shop, shopRatesOf(state), now.getTime());
+          if (res.coins <= 0) {
+            if (res.save.lastTickAt !== state.shop.lastTickAt) set({ shop: res.save });
+            return 0;
+          }
+          set({ coins: state.coins + res.coins, shop: res.save });
+          return res.coins;
+        },
+
+        claimGift(now = new Date()) {
+          const state = get();
+          const giverId = giftGiver({ unboxed: state.unboxed, affection: state.affection, partnerId: state.partnerId });
+          const today = seoulDateKey(now);
+          if (!giverId || !giftAvailable(state.giftDay, today, giverId)) return { ok: false };
+          const coins = giftCoins(state.affection[giverId] ?? 0);
+          set({ coins: state.coins + coins, giftDay: today });
+          return { ok: true, coins, giverId };
         },
 
         claimMission(id, now = new Date()) {

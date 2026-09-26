@@ -6,7 +6,8 @@ import { isCharacterId } from '../data/characters';
 import { isCollectionId } from '../data/collections';
 import { MISSION_KINDS, createMissionState, type MissionKind, type MissionState } from '../missions/missions';
 import { GACHA_RULES } from '../data/rarity';
-import { LEGACY_TICKET_TO_COINS, STARTING_COINS } from '../economy/config';
+import { LEGACY_TICKET_TO_COINS, SHOP_BANK_MAX, STARTING_COINS } from '../economy/config';
+import { unlockedSlots, type ShopSave } from '../economy/shop';
 import { isCouponId } from '../economy/coupons';
 import { isValidDateKey, seoulDateKey } from '../economy/daily';
 import { DEFAULT_MAT, sanitizeMatId, sanitizeProps, type MatPatternId, type PlacedProp } from '../data/playroomDecor';
@@ -22,8 +23,9 @@ import { DEFAULT_MAT, sanitizeMatId, sanitizeProps, type MatPatternId, type Plac
  *  - v6: 받은 쿠폰(redeemedCoupons)
  *  - v7: 놀이방 — 캡슐을 연 말랑이(unboxed), 매트 위에 꺼내 둔 말랑이(playroom.out)
  *  - v8: 놀이방 꾸미기 — 매트 무늬(playroom.mat), 매트 위 소품(playroom.props). 기본은 한 마리만(out 은 하나로)
+ *  - v9: 말랑 디저트 가게(shop: 직원·마지막 정산 시각·쌓아 둔 코인) + 하루 한 번 말랑 선물(giftDay)
  */
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 /** 매트 위에 동시에 꺼내 둘 수 있는 최대 수 (저장 상한. 기기별 실제 상한은 touch/perfGovernor.ts 가 정한다) */
 export const PLAYROOM_MAX_OUT = 5;
 export const SAVE_KEY = 'malang-gacha-save';
@@ -82,6 +84,10 @@ export interface SaveData {
   unboxed: string[];
   /** 놀이방(만지기) 매트 상태 */
   playroom: PlayroomSave;
+  /** 말랑 디저트 가게 (economy/shop.ts) */
+  shop: ShopSave;
+  /** 말랑 선물을 마지막으로 받은 서울 날짜 (없으면 null) */
+  giftDay: string | null;
 }
 
 export function createInitialSave(now: Date = new Date()): SaveData {
@@ -102,6 +108,9 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     redeemedCoupons: [],
     unboxed: [],
     playroom: { out: [], mat: DEFAULT_MAT, props: [] },
+    shop: { staff: [], lastTickAt: now.getTime(), banked: 0 },
+    // 첫 선물은 시작한 다음 날부터 (첫날은 처음 안내에 집중)
+    giftDay: seoulDateKey(now),
   };
 }
 
@@ -194,6 +203,23 @@ function sanitizePlayroom(value: unknown, unboxed: readonly string[]): PlayroomS
 }
 
 /**
+ * 가게: 직원은 연 보유 말랑이만, 중복 없이, 열린 칸 수까지. 정산 시각은 유한한 0 이상 —
+ * 불러온 시각보다 미래면(시계를 돌려 놓았던 저장) 지금으로 자른다. 쌓아 둔 코인은 0..SHOP_BANK_MAX 정수.
+ */
+function sanitizeShop(value: unknown, unboxed: readonly string[], ownedCount: number, now: number): ShopSave {
+  const rec = isRecord(value) ? value : {};
+  const allowed = new Set(unboxed);
+  const raw = Array.isArray(rec.staff) ? rec.staff : [];
+  const staff = [...new Set(raw.filter((v): v is string => typeof v === 'string' && allowed.has(v)))].slice(
+    0,
+    unlockedSlots(ownedCount),
+  );
+  const t = rec.lastTickAt;
+  const lastTickAt = typeof t === 'number' && Number.isFinite(t) && t >= 0 ? Math.min(Math.floor(t), now) : now;
+  return { staff, lastTickAt, banked: nonNegInt(rec.banked, 0, SHOP_BANK_MAX) };
+}
+
+/**
  * 임의의 값을 안전한 SaveData로 변환한다. 어떤 입력에도 throw하지 않는다.
  * 잘못된 필드는 기본값으로, 알 수 없는 캐릭터는 제거한다.
  */
@@ -229,6 +255,8 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     redeemedCoupons: Array.isArray(raw.redeemedCoupons) ? [...new Set(raw.redeemedCoupons.filter(isCouponId))] : [],
     unboxed,
     playroom: sanitizePlayroom(raw.playroom, unboxed),
+    shop: sanitizeShop(raw.shop, unboxed, Object.keys(ownedMalangs).length, now.getTime()),
+    giftDay: isValidDateKey(raw.giftDay) ? raw.giftDay : null,
   };
 }
 
@@ -296,6 +324,16 @@ function migrateV7toV8(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * v8 → v9: 디저트 가게. 파트너가 캡슐을 연 말랑이면 파트너, 아니면 처음 연 말랑이가 첫 직원.
+ * 정산 시각은 지금 — 예전 시간을 소급해 주지 않는다. 선물은 오늘 바로 받을 수 있다(giftDay 없음).
+ */
+function migrateV8toV9(raw: Record<string, unknown>, now: Date): Record<string, unknown> {
+  const unboxed = Array.isArray(raw.unboxed) ? raw.unboxed.filter((v): v is string => typeof v === 'string') : [];
+  const partner = typeof raw.partnerId === 'string' && unboxed.includes(raw.partnerId) ? raw.partnerId : unboxed[0];
+  return { ...raw, shop: { staff: partner ? [partner] : [], lastTickAt: now.getTime(), banked: 0 }, giftDay: null };
+}
+
+/**
  * 저장된 버전에서 현재 버전으로 마이그레이션한 뒤 sanitize한다.
  * 알 수 없는(미래) 버전도 가능한 필드만 살려 복구한다.
  */
@@ -310,6 +348,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   // v5 → v6: redeemedCoupons는 sanitize가 빈 목록으로 채운다.
   if (fromVersion < 7) data = migrateV6toV7(data);
   if (fromVersion < 8) data = migrateV7toV8(data);
-  // 향후: if (fromVersion < 9) data = migrateV8toV9(data);
+  if (fromVersion < 9) data = migrateV8toV9(data, now);
+  // 향후: if (fromVersion < 10) data = migrateV9toV10(data);
   return sanitizeSave(data, now);
 }
