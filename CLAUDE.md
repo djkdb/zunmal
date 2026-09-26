@@ -22,10 +22,10 @@ npm run preview    # 빌드 결과 미리보기
 
 ```
 src/
-  app/            App(라우터), AppShell(레이아웃)
+  app/            App(라우터), AppShell(레이아웃), routeChunks.ts (화면별 지연 청크 + 미리 받기)
   styles/         global.css — 디자인 토큰, 공용 클래스
   lib/            rng.ts (주입형/시드 RNG), share.ts (자랑하기 글·보내기 순서), josa.ts, couponLink.ts …
-  hooks/          useReducedMotion 등 공용 훅
+  hooks/          useReducedMotion, useDialogFocus(<dialog> 아닌 창의 초점 규칙) 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
                   materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf + 단계별 반응 표 REACTION_UNLOCKS), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
@@ -33,7 +33,7 @@ src/
                   playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입),
                   shopPreview.ts (직원 바꾸기 미리 보기, 가게 청크 전용), gift.ts (하루 한 번 말랑 선물),
                   affection.ts (친밀도 진행: 단계·하트·다음 단계에 받는 반응/가게 보너스/선물)
-  audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
+  audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악, 첫 입력 뒤 지연 로드), tracks.ts (경로 → 곡), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
                   shop/(홈 ShopCard + 가게 화면 조각), home/(홈 허브: GoalCard, HubStatus, TodayStrip, useHub),
@@ -55,6 +55,11 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 - 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`, `/shop`, `/touch`, `/touch/:id`.
 - 외부 이미지/사운드 파일 사용 금지. 캐릭터는 SVG, 소리는 WebAudio로 생성한다. (3D 연출·3D 머신도 코드로 만든 도형·셰이더·캔버스 텍스처뿐)
 - three.js는 신화 연출·3D 머신·놀이방 3D가 쓰는 한 청크로만 받는다(동적 import). 첫 화면 번들에 정적 import 금지.
+- **첫 화면 번들 = 홈만.** 뽑기·도감·미니게임·가게·놀이방은 `app/routeChunks.ts`의 지연 청크(`ROUTE_CHUNKS`, 공용 `PageLoading`)다.
+  AppShell이 한가할 때 뽑기·도감을, 링크에 pointerdown·hover·focus가 닿으면 그 화면을 미리 받는다(`prefetchRoute`, 데이터 절약 모드면 한가할 때 받기는 건너뜀).
+  청크를 못 받으면 `ErrorBoundary`가 "화면을 받지 못했어요" + 다시 불러오기. 새 화면도 여기에 한 줄 추가한다.
+  글꼴 조각은 data: URL로 박지 않고(`assetsInlineLimit`), @fontsource의 woff 대체 파일은 `vite.config.ts`의 `woff2Only`가 지운다
+  (둘 다 없으면 첫 화면 CSS가 gzip 약 70kB 불어난다). `music.ts`도 첫 입력 뒤 음악이 켜져 있을 때 `useRouteMusic`이 받는다.
 
 ## 코딩 컨벤션
 
@@ -65,6 +70,11 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 - 스타일은 `global.css` 토큰 + 컴포넌트별 CSS 파일(`Component.css`)을 컴포넌트에서 import.
 - 접근성: 모든 인터랙션은 `<button>`/`<a>` 등 네이티브 요소로, 44px 이상 터치 타깃, `:focus-visible` 유지,
   희귀도는 색 + 아이콘 + 텍스트로 표현, `prefers-reduced-motion` 존중(`useReducedMotion`).
+- 창: 가능하면 `components/Modal`(네이티브 `<dialog>`: 초점 가둠·Esc·닫으면 연 버튼으로). 화면 위에 직접 그린 `role="dialog"`(놀이방 시트·사진)는
+  `hooks/useDialogFocus`로 같은 규칙을 지킨다. 창이 열려 있으면 `html:has(dialog[open])`이 뒤 화면 스크롤을 잠근다. 모달 높이는 safe-area를 뺀 `100dvh`.
+- 알림 영역(`role="status"`/`aria-live`)은 사건 한 번에 한 줄만 — 몇 초마다 오르는 숫자(가게 코인, 게임 점수)에는 붙이지 않는다.
+  그 자리에서 받기 버튼이 사라지면 초점을 문서 처음으로 떨어뜨리지 않는다(도감 세트 보상: 받은 줄 또는 지금 탭으로).
+- 진동은 `lib/haptics`(`haptic`)나 try/catch로 감싼 `navigator.vibrate?.()`만 (iOS엔 없고 일부 앱 안 브라우저는 예외를 던진다).
 - 360px 폭에서 가로 스크롤 금지. 360×640 화면에서도 홈의 주요 버튼이 첫 화면에 보여야 한다.
 - 재화를 쓰는 버튼은 state가 아니라 ref로 즉시 잠가 연타 중복 실행을 막는다 (`GachaPage`의 `lockRef`).
 - 사용자 입력 이전에 AudioContext 생성/재생 금지 (`audio/sfx.ts` 가 보장).
@@ -84,7 +94,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 | 주 행동(딸기우유) | `--primary` (+ `--primary-deep` 눌림·링, `--primary-tint` 옅은 바탕, `--primary-text` 흰 바탕 위 글자) | #FF9FB8 |
 | 레몬 / 소다 / 민트 / 포도 / 복숭아 | `--lemon` `--sky` `--mint` `--grape` `--peach` (+ `--lemon-tint`, `--sky-tint`) | #FFD66B #8FC3FF #9FE0B8 #C9B6FF #FFC2A0 |
 | 면 / 칸 / 가는 선 | `--surface` / `--surface-2` / `--border` | #FFF / #F3F8FE / #E3EDF8 |
-| 금빛(천장·코인) / 위험 | `--gold` / `--danger` | #F2C14E / #F0506E |
+| 금빛(천장·코인) / 위험 | `--gold` / `--danger`(채움·선만) | #F2C14E / #F0506E |
+| 좋아짐 / 나빠짐 / 레몬 글자 | `--good-ink`+`--good-tint` / `--bad-ink`+`--bad-tint` / `--lemon-ink` (글자는 늘 화살표·체크·말과 함께) | #1C6B3E #DFF6E8 / #B3203F #FFE3E8 / #7A5200 (모두 AA) |
 | 모서리 | `--radius-card` 22 · `--radius-btn` 18 · `--radius-s` 12 · `--radius-pill` 999 | |
 | 그림자 | `--shadow-card`(카드) · `--shadow-btn`(버튼) · `--shadow-btn-press`(눌림) · `--shadow-float`(모달·말풍선) · `--shadow-up`(하단 탭) | 파란 기운 rgba(26,64,128,…) |
 | 희귀도 | `--rarity-<r>`(대표색·빛) · `--rarity-<r>-tint`(배지 바탕) · `--rarity-<r>-ink`(배지 글자) | 일반 회색, 레어 파랑, 에픽 보라, 전설 금, 신화 분홍·무지개, 시크릿 밤하늘 |
@@ -105,6 +116,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 주아 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
 - **홈 파트너**: 누르면 놀이방(`/touch`) — 링크 이름 "말랑이 만지러 가기". 아직 아무도 쓰다듬지 않았으면(`affection`이 모두 0, 저장 구조 변경 없음)
   "꾹 눌러 봐요" 말풍선 + 톡 누르는 손가락(`TapIcon`)이 붙는다(절대 위치 — 360×640 첫 화면 규칙 유지, 움직임 줄이기면 정지).
+  파트너 말풍선은 **한 번에 하나**: 선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > "꾹 눌러 봐요" > 인사. 인사는 처음 온 날 "만나서 반가워요!"("오늘도" 아님).
   코인이 `PULL_PRICE.single`보다 적으면 주인공(딸기우유) 버튼이 "미니게임으로 코인 벌기"(`/play`)가 되고 캡슐 뽑기는 보조 버튼.
 - **홈 허브** (아래 **홈 허브** 절): 파트너 아래 "다음 목표" 카드 하나가 지금 할 한 가지를 알려 준다.
 - **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
@@ -147,9 +159,10 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   "지금 만지러 가기"(가장 좋은 새 말랑이 `summarizePulls().bestNewIndex` → `/touch/:id`, 놀이방이 그 캡슐을 매트에 떨어뜨린다).
   - 딱지는 어디서나 같은 모양: NEW(처음 만남 + 첫 반짝) · 중복 [코인]+N(좁은 10연 카드만 "중복" 글자 생략) · 반짝!. 설명 띠에도 같은 딱지.
   - 다 열면 요약 줄(`dl`, 칸으로 나눔): 새 말랑이 N(= NEW 딱지 수) · 반짝 N · 환급 +N · 도감 N/32(도감 링크) · 전설 이상까지 N회(뽑은 뒤 천장).
-    1회는 도감과 천장만. 아래 버튼 줄은 **다시 뽑기**(방금과 같은 방식, `againRef`로 한 번만) + 자랑하기(있을 때) + 닫기.
-    코인이 모자라면 다시 뽑기는 비활성(`aria-describedby`로 이유) + "N코인 더 모으면 다시 뽑을 수 있어요" + "미니게임에서 코인 모으기"(`/play`,
-    `economy.coinsNeededForPull`).
+    1회는 도감과 천장만. 그 아래 행동은 한 곳(`ResultActions`, 위계 하나): [한 줄 안내] + **주인공 버튼**(새 말랑이가 있으면 "지금 만지러 가기",
+    없고 코인이 모자라면 "미니게임에서 코인 모으기") + 줄(**다시 뽑기**(방금과 같은 방식, `againRef`로 한 번만, 주인공이 없으면 이것이 딸기우유) · 자랑하기(있을 때) · 닫기).
+    코인이 모자라면 다시 뽑기는 비활성(`aria-describedby`로 이유) + 줄 아래 "N코인 더 모으면 다시 뽑을 수 있어요"(`economy.coinsNeededForPull`),
+    주인공이 만지러 가기면 그 줄에 "미니게임에서 코인 모으기" 글자 링크.
 - **뽑기 버튼**: 1회 = 캡슐 하나 아이콘(딸기우유 주인공), 10연 = 캡슐 더미 아이콘(`CapsuleStackIcon`) + 위 모서리 레몬 딱지 "레어 이상 1개 보장"
   (`GACHA_RULES.multiGuaranteeMinRarity`). 누르면 버튼 눌림 + 아이콘이 톡 튀고(움직임 줄이기면 없음) `haptic('tap')`.
   1회도 못 뽑으면 버튼 아래 "1회 뽑기까지 N코인 더 필요해요" + "미니게임에서 코인 모으기".
@@ -223,8 +236,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 세트를 완성하면 한 번 코인 보상(`SET_REWARD_COINS`, 등급 small~ultimate). 일일 상한과 무관.
 - 도감 상세는 반짝을 가졌으면 반짝 모습부터 연다(파트너로 원래 모습을 고른 경우만 원래 모습).
 - **도감 화면**은 모으고 싶게 만드는 곳이다. 값은 모두 `summarizeCollection`(`data/collectionProgress.ts`) 하나에서 온다. 순서:
-  제목 → **요약**(`CollectionSummary`: 딸기우유 비율 고리 + 주아 큰 "17 / 32" + 남은 수 + 반짝 N종 알약, 아래 등급 줄 2칸×3줄 =
-  배지(색 + 모양 + 글자) + N/M + 등급색 막대, 다 모으면 민트 + 체크, 누르면 그 등급 진열장으로 스크롤) → 탭(말랑 도감 / 컬렉션,
+  제목 → **요약**(`CollectionSummary`: 딸기우유 비율 고리 + 주아 큰 "17 / 32" + 남은 수 + 반짝 N종 알약, 아래 등급 칸 3칸×2줄 =
+  배지(색 + 모양 + 글자) / N/M + 등급색 막대, 다 모으면 민트 + 체크, 누르면 그 등급 진열장으로 스크롤 — 360×640에서 다음 목표 카드가 첫 화면에 걸리게 낮게) → 탭(말랑 도감 / 컬렉션,
   받을 세트 보상이 있으면 컬렉션 탭에 빨간 점) → 도감 탭: **다음 목표**(`CollectionGoal`) + 등급별 진열장 / 컬렉션 탭: 세트 목록.
 - **다음 목표** 카드: 받을 세트 보상이 있으면 "○○ 세트를 다 모았어요" + 보상 받기(그 자리에서, `useSetClaim`: ref 잠금 + 코인 날리기),
   아니면 `nearestSet` — "○○ 세트까지 N마리 남았어요" + 막대 + 없는 말랑이 캡슐(최대 4, 나머지 "+N") 과 등급 배지 +
@@ -238,8 +251,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   (시크릿은 밤하늘 캡슐 + 금 이음새). 이름 자리는 "???". 실루엣 색은 `Malang`의 `.malang-silhouette`(`--malang-silhouette`) 변수로 입힌다.
 - **진열장 칸**: NEW 딱지(딸기우유 알약 — 뽑기 결과·선반과 같은 모양)는 `isNewInCollection` = 아직 캡슐 속(봉인)이거나 처음 얻은 지
   `COLLECTION_NEW_MS`(24시간) 안. 파트너 딱지가 있으면 NEW 는 쉰다. 반짝 표시, 친밀도 2단계부터 창 오른쪽 아래 작은 하트 + 단계.
-- **상세 창**: 가진 수·반짝·코인 보너스 칸 + **친밀도 칸**(`AffectionMeter`) + 반짝 모습 보기 + 파트너·만지기·닫기
-  (공유 버튼은 뽑기 결과 쪽 작업에서 행동 줄에 붙는다).
+- **상세 창**: 가진 수·반짝·코인 보너스 칸 + **친밀도 칸**(`AffectionMeter`) + 반짝 모습 보기 + 창 아래에 붙은 행동 2×2(파트너로 정하기·만지기 / 자랑하기·닫기).
+- 세트 보상을 그 자리에서 받으면(`useSetClaim(onClaimed)`) 도감의 상태 줄이 "○○ 세트 보상 N코인을 받았어요"를 읽는다.
 - 첫 말랑이 고르기 화면은 도감 설명 대신 `STARTER_BLURBS`(`data/characters.ts`, 등급 이야기 없는 따뜻한 존댓말 한 줄)를 보여 준다.
 
 ## 일일 미션 (`missions/missions.ts`, `components/DailyMissions.tsx`)
@@ -270,8 +283,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
     내림 빨강·아래 화살표, 그대로 회색 두 줄, 지금 일하는 말랑이는 "일하는 중") + 세트가 생기거나 깨지는 한 줄. 가게 전체가 가장 많이 오르는 순.
     숫자는 `economy/shopPreview.ts`의 `previewStaffChange`(assignStaff → computeShopRates → `shownPerHour`) — 화면 합계와 같은 함수라 고른 뒤 값이 똑같다.
     화살표는 글자(→) 대신 SVG(`ToIcon`, `TrendIcon`).
-  가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)·창(`SheetDialog`, Modal 사본)은 가게 청크에만 둔다 —
-  지연 청크가 `components/Modal`을 가져오면 번들러가 첫 화면 공용 모듈을 여러 조각으로 쪼개 첫 화면이 무거워진다.
+  가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)은 가게 청크에만 둔다. 고르기 창은 공용 `components/Modal`
+  (모든 화면이 지연 청크가 되어 Modal은 작은 공용 청크로 나뉘고 첫 화면과 무관하다).
 - **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 30 + 애정 단계 × 10, 최대 120(`GIFT_COINS`).
   홈 파트너 말풍선 자리(선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > 인사), 선물이 떠 있으면 "꾹 눌러 봐요"는 쉰다. 새 플레이어는 다음 날부터.
   가게 코인을 받으면 미션 하루 기록에 `shop-claim`을 센다(홈 "오늘" 줄).
@@ -287,7 +300,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   도감 요약을 한 번에 만든다. 화면은 `components/home/useHub.ts`(저장 + 15초마다)로 받는다.
 - **다음 목표** (`goals/nextGoal.ts`, `GOAL_ORDER` 순, 테스트): 선물 → 첫걸음 → 미션 보상(올클리어 보너스) → 세트 보상 → 가게 → 봉인 캡슐(`/touch/:id`)
   → 천장 가까움(`pityCloseWithin`) → 조금 남은 미션("1판만 더 하면 +50코인", `missionNearRatio`) → 거의 다 모은 세트(`setNearMissing`)
-  → 뽑기 → 코인 모으기(모자란 양, 오늘 게임 코인이 남았을 때만) → 파트너 애정(늘 있는 마지막). 문턱값은 `economy/config.ts` `GOAL_THRESHOLDS`.
+  → 뽑기 → 코인 모으기(모자란 양, 오늘 게임 코인이 남았을 때만) → 파트너 애정(늘 있는 마지막 — `affectionProgress` 그대로:
+  막대 = 단계 안 비율, 글자 "Lv.N", 설명 = 다음 단계에 생기는 첫 가지 "Lv.3이 되면 새 반응 볼 콕" 또는 "친밀도 N만 더 쌓으면 Lv.N+1이 돼요"). 문턱값은 `economy/config.ts` `GOAL_THRESHOLDS`.
   목표 = 종류·아이콘·제목·설명·진행(0..1 + 글자)·버튼 이름·행동(`route` 또는 `claim-gift|mission|mission-bonus|set|shop`).
   말풍선이 이미 말랑 선물을 보여 주면 카드는 `nextGoal(hub, ['gift'])`로 다음 것을 고른다.
 - **목표 카드**(`GoalCard`): 캡슐 한 알 모양(왼쪽 종류 색 반쪽 + 아이콘, 흰 몸, 오른쪽 딸기우유 행동 알약). 카드 전체가 링크 또는 버튼 하나.
@@ -454,7 +468,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **배경음악** (`music.ts`): 25ms 타이머 + 오디오 시계 기준 120ms 미리 예약(`StepClock`). 곡은 `TRACKS`(home 92 / collection 76 /
   touch 68 / gacha 100 / minigame 120 BPM)이고 시드 고정 8마디 악절 4종(`generatePhrase`, 순수·테스트)이 돌아가며 나온다.
   음색은 마림바(1:3.92:9.24)·오르골·FM 종(1:1.4)·칼림바·패드·베이스(≥110Hz + 배음)·셰이커·클릭. 화면 전환은 다음 마디 경계에서 1초 교차 페이드.
-  경로 → 곡은 `trackForPath`, AppShell의 `useRouteMusic()`이 적용. 리듬 게임(`QUIET_GAME_IDS`)은 박자가 부딪혀 음악을 끈다.
+  경로 → 곡은 `trackForPath`(`audio/tracks.ts`, music.ts가 다시 내보냄), AppShell의 `useRouteMusic()`이 적용(곡 엔진은 첫 입력 뒤 지연 로드). 리듬 게임(`QUIET_GAME_IDS`)은 박자가 부딪혀 음악을 끈다.
 - **덕킹**: 팡파레·신화 연출 소리(`result*`, `epic*`, `secretBoom`, `secretTease`)가 스스로 `sfx.duck(초, dB)`를 불러 음악을 -5~-20dB 낮춘다.
   화면 코드는 신경 쓰지 않아도 된다.
 - **설정**: 효과음/배경음악 따로(`settings.sfxOn`, `settings.musicOn`, HUD 소리 버튼 → `SoundSettings` 말풍선).
@@ -503,6 +517,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 자랑하기: 글(조사·또·반짝 이모지 ≤2·도감 숫자 자르기), 보내기 순서(Web Share → AbortError 조용히 → 클립보드 → 직접), 공유 주소는 쿠폰 링크가 아님(`lib/share.test.ts`),
   자랑할 결과 고르기(`pullReveal.shareHighlightIndex`).
 - 저장: 손상/구버전 데이터 migrate.
+- 화면 청크: 경로 → 미리 받을 청크(`app/routeChunks.test.ts`, 홈·모르는 경로·`constructor` 같은 이름은 받지 않음).
 - 홈 허브: 도감 요약·가장 가까운 세트(`data/collectionProgress.test.ts`), 첫걸음 단계 계산(`goals/firstRun.test.ts`), 목표 우선순위·문턱값·문구
   (`goals/nextGoal.test.ts`), 오늘 줄·탭 알림(`goals/today.test.ts`).
 - 도감: 세트 탭 순서·정확한 기대 뽑기 수·둥글림·NEW 판정(`data/collectionProgress.test.ts`). 친밀도 진행: levelOf·가게·선물 공식과 같은 값,
