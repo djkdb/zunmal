@@ -21,22 +21,56 @@ export function levelOf(affection: number): number {
 
 export type ReactionId = 'pat' | 'blush' | 'tickle' | 'melt' | 'dizzy' | 'jump';
 
+/** 반응을 부르는 손짓 (방법 보기 그림·손가락 시범의 종류) */
+export type ReactionGesture =
+  | 'press' // 꾹 누르기
+  | 'pull' // 쭉 당기기
+  | 'poke' // 콕 한 번
+  | 'carry' // 들어서 옮기고 던지기
+  | 'rub' // 좌우로 문지르기
+  | 'tap' // 옆을 톡 한 번
+  | 'taps' // 톡톡톡톡 빠르게
+  | 'hold' // 오래 누르기
+  | 'flick' // 세게 튕기기
+  | 'pats'; // 세 번 쓰다듬기
+
+/** 그림에서 강조할 곳 */
+export type ReactionArea = 'head' | 'cheek' | 'belly' | 'body';
+
 export interface ReactionUnlock {
   id: ReactionId;
   level: number;
   /** 게이지·축하 문구에 쓰는 이름 */
   label: string;
-  /** 어떻게 하면 되는지 (짧게) */
-  how: string;
+  /** 어떻게 하면 되는지 (한 줄, 존댓말) — 방법 보기·열림 알림·게이지 아래 줄이 모두 이 글을 쓴다 */
+  howTo: string;
+  gesture: ReactionGesture;
+  area: ReactionArea;
 }
 
 export const REACTION_UNLOCKS: readonly ReactionUnlock[] = [
-  { id: 'pat', level: 2, label: '머리 쓰다듬기', how: '머리를 톡톡 쓰다듬어 보세요' },
-  { id: 'blush', level: 3, label: '볼 콕', how: '볼을 콕 찌르면 빨개져요' },
-  { id: 'tickle', level: 4, label: '간지럼', how: '배를 콕콕콕 여러 번 찔러 보세요' },
-  { id: 'melt', level: 5, label: '녹아내리기', how: '오래 꾹 누르고 있어 보세요' },
-  { id: 'dizzy', level: 6, label: '빙글빙글', how: '세게 튕기듯 놓아 보세요' },
-  { id: 'jump', level: 7, label: '애교 점프', how: '머리를 세 번 쓰다듬어 보세요' },
+  { id: 'pat', level: 2, label: '머리 쓰다듬기', howTo: '머리 위를 좌우로 살살 문질러요', gesture: 'rub', area: 'head' },
+  { id: 'blush', level: 3, label: '볼 콕', howTo: '얼굴 옆 볼을 톡 찔러요', gesture: 'tap', area: 'cheek' },
+  { id: 'tickle', level: 4, label: '간지럼', howTo: '배를 톡톡톡톡 빠르게 찔러요', gesture: 'taps', area: 'belly' },
+  { id: 'melt', level: 5, label: '녹아내리기', howTo: '손가락을 떼지 말고 2초 넘게 꾹 눌러요', gesture: 'hold', area: 'body' },
+  { id: 'dizzy', level: 6, label: '빙글빙글', howTo: '쭉 당겼다가 휙 튕기듯 놓아요', gesture: 'flick', area: 'body' },
+  { id: 'jump', level: 7, label: '애교 점프', howTo: '머리를 연달아 세 번 쓰다듬어요', gesture: 'pats', area: 'head' },
+];
+
+/** 처음부터 되는 기본 손짓 (방법 보기 맨 위) */
+export interface BasicGesture {
+  id: 'squish' | 'stretch' | 'poke' | 'carry';
+  label: string;
+  howTo: string;
+  gesture: ReactionGesture;
+  area: ReactionArea;
+}
+
+export const BASIC_GESTURES: readonly BasicGesture[] = [
+  { id: 'squish', label: '꾹 누르기', howTo: '누르고 있으면 점점 납작해져요', gesture: 'press', area: 'body' },
+  { id: 'stretch', label: '쭉 당기기', howTo: '누른 채로 살짝 끌면 쭉 늘어나요', gesture: 'pull', area: 'body' },
+  { id: 'poke', label: '콕 찌르기', howTo: '톡 찌르면 뽁 하고 출렁여요', gesture: 'poke', area: 'body' },
+  { id: 'carry', label: '옮기기와 던지기', howTo: '멀리 끌면 따라와요. 휙 놓으면 날아가요', gesture: 'carry', area: 'body' },
 ];
 
 export function isUnlocked(id: ReactionId, level: number): boolean {
@@ -58,14 +92,25 @@ export function unlocksAt(level: number): ReactionUnlock[] {
 
 export type TouchZone = 'head' | 'cheek' | 'belly';
 
+/** 머리 = 몸 윗부분 이만큼 (폰에서 손가락이 커도 잘 맞게 넉넉히) */
+export const HEAD_BAND = 0.35;
+/** 볼 = 머리 아래 양옆 이만큼씩 */
+export const CHEEK_BAND = 0.25;
+
 /**
- * 말랑이 그림 좌표(SVG, 몸 가운데 x=60) 의 한 점이 어디인가.
- * 머리 = 눈보다 위, 볼 = 눈 높이~입 아래의 양옆, 배 = 나머지(가운데·아래).
+ * 말랑이 그림 좌표(SVG)의 한 점이 어디인가. 몸통 상자 기준 비율로 나눈다:
+ * 머리 = 위 35%, 볼 = 그 아래 왼쪽·오른쪽 25% 띠, 배 = 나머지(가운데·아래).
  */
-export function touchZone(p: { x: number; y: number }, shape: Pick<ShapeSpec, 'faceY' | 'eyeGap'>): TouchZone {
-  const dx = Math.abs(p.x - 60);
-  if (p.y < shape.faceY - 8) return 'head';
-  if (dx > shape.eyeGap + 1 && p.y <= shape.faceY + 18) return 'cheek';
+export function touchZone(
+  p: { x: number; y: number },
+  shape: Pick<ShapeSpec, 'top' | 'bottom' | 'left' | 'right'>,
+): TouchZone {
+  const h = Math.max(1, shape.bottom - shape.top);
+  const w = Math.max(1, shape.right - shape.left);
+  const ry = (p.y - shape.top) / h;
+  const rx = (p.x - shape.left) / w;
+  if (!(ry >= HEAD_BAND)) return 'head';
+  if (rx < CHEEK_BAND || rx > 1 - CHEEK_BAND) return 'cheek';
   return 'belly';
 }
 
@@ -96,6 +141,40 @@ export function registerPat(pats: readonly number[], now: number, level: number)
   recent.push(now);
   if (recent.length >= JUMP_PATS && isUnlocked('jump', level)) return { pats: [], jump: true };
   return { pats: recent, jump: false };
+}
+
+// ── 머리 문지르기 → 쓰다듬기 ──────────────────────────────
+
+/** 이 시간 안에 좌우 방향이 이만큼 바뀌면 한 번 쓰다듬은 것 */
+export const RUB_WINDOW_MS = 1000;
+export const RUB_TURNS = 2;
+/** 이보다 작은 움직임은 방향으로 치지 않는다 (손 떨림, 그림 좌표 단위) */
+export const RUB_MIN_STEP = 1.5;
+/** 방향이 안 바뀌어도 한쪽으로 이만큼(그림 좌표) 쓸면 한 번 */
+export const RUB_STROKE = 60;
+
+export interface RubState {
+  dir: number;
+  turns: number[];
+  path: number;
+}
+
+export function createRub(): RubState {
+  return { dir: 0, turns: [], path: 0 };
+}
+
+/**
+ * 머리 위에서 손가락이 dx(그림 좌표)만큼 움직였다. 좌우로 두 번 오가거나(1초 안) 길게 한 번 쓸면 pat = true.
+ * 쓰다듬으면 다시 센다.
+ */
+export function rubStep(state: RubState, dx: number, now: number): { state: RubState; pat: boolean } {
+  if (!Number.isFinite(dx) || Math.abs(dx) < RUB_MIN_STEP) return { state, pat: false };
+  const dir = Math.sign(dx);
+  const turns = state.turns.filter((t) => now - t < RUB_WINDOW_MS);
+  if (state.dir !== 0 && dir !== state.dir) turns.push(now);
+  const path = state.path + Math.abs(dx);
+  if (turns.length >= RUB_TURNS || path >= RUB_STROKE) return { state: createRub(), pat: true };
+  return { state: { dir, turns, path }, pat: false };
 }
 
 // ── 오래 누르기 → 녹아내리기 ─────────────────────────────────

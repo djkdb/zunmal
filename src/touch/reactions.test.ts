@@ -10,6 +10,10 @@ import {
   MELT_FULL_MS,
   MELT_START_MS,
   REACTION_UNLOCKS,
+  BASIC_GESTURES,
+  RUB_STROKE,
+  createRub,
+  rubStep,
   TICKLE_POKES,
   YAWN_AFTER_MS,
   approach,
@@ -60,13 +64,25 @@ describe('affection levels and unlocks', () => {
 });
 
 describe('touch zones', () => {
-  it('splits head, cheeks and belly for every shape', () => {
+  it('head is the top ~35%, cheeks are the side bands, belly is the rest (every shape)', () => {
     for (const shape of Object.values(SHAPES)) {
-      expect(touchZone({ x: 60, y: shape.top + 4 }, shape)).toBe('head');
-      expect(touchZone({ x: 60 - shape.eyeGap - 9, y: shape.faceY + 8 }, shape)).toBe('cheek');
-      expect(touchZone({ x: 60 + shape.eyeGap + 9, y: shape.faceY + 8 }, shape)).toBe('cheek');
-      expect(touchZone({ x: 60, y: shape.faceY + 10 }, shape)).toBe('belly');
-      expect(touchZone({ x: 60, y: shape.bottom - 4 }, shape)).toBe('belly');
+      const h = shape.bottom - shape.top;
+      const w = shape.right - shape.left;
+      const midX = (shape.left + shape.right) / 2;
+      expect(touchZone({ x: midX, y: shape.top + 4 }, shape)).toBe('head');
+      // 머리 띠 가장자리까지 머리 (눈보다 아래여도 넉넉히)
+      expect(touchZone({ x: shape.left + 2, y: shape.top + h * 0.33 }, shape)).toBe('head');
+      expect(touchZone({ x: shape.left + w * 0.1, y: shape.top + h * 0.5 }, shape)).toBe('cheek');
+      expect(touchZone({ x: shape.right - w * 0.1, y: shape.top + h * 0.5 }, shape)).toBe('cheek');
+      expect(touchZone({ x: midX, y: shape.top + h * 0.5 }, shape)).toBe('belly');
+      expect(touchZone({ x: midX, y: shape.bottom - 4 }, shape)).toBe('belly');
+    }
+  });
+
+  it('every reaction and basic gesture has a how-to line', () => {
+    for (const r of [...REACTION_UNLOCKS, ...BASIC_GESTURES]) {
+      expect(r.howTo.length).toBeGreaterThan(5);
+      expect(r.howTo.length).toBeLessThan(40);
     }
   });
 
@@ -100,6 +116,55 @@ describe('touch zones', () => {
     }
     // 잠겨 있으면 점프 없음
     expect(registerPat([0, 100], 200, 6).jump).toBe(false);
+  });
+});
+
+describe('rubbing the head', () => {
+  it('two left-right turns within a second count as a pat', () => {
+    let st = createRub();
+    let pat = false;
+    const moves: [number, number][] = [
+      [5, 0],
+      [5, 80],
+      [-5, 200],
+      [-5, 300],
+      [5, 450],
+    ];
+    for (const [dx, t] of moves) {
+      const r = rubStep(st, dx, t);
+      st = r.state;
+      pat = pat || r.pat;
+    }
+    expect(pat).toBe(true);
+  });
+
+  it('slow back-and-forth or tiny jitters do not count', () => {
+    let st = createRub();
+    let pat = false;
+    for (const [dx, t] of [
+      [5, 0],
+      [-5, 900],
+      [5, 2100],
+      [0.5, 2200],
+      [-0.5, 2250],
+    ] as [number, number][]) {
+      const r = rubStep(st, dx, t);
+      st = r.state;
+      pat = pat || r.pat;
+    }
+    expect(pat).toBe(false);
+  });
+
+  it('one long stroke also counts, then it starts over', () => {
+    let st = createRub();
+    let pats = 0;
+    for (let i = 0; i < 13; i++) {
+      const r = rubStep(st, 5, i * 30);
+      st = r.state;
+      if (r.pat) pats++;
+    }
+    expect(pats).toBe(1);
+    expect(st.path).toBeLessThan(RUB_STROKE);
   });
 });
 

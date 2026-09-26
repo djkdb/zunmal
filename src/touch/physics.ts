@@ -225,6 +225,20 @@ export function tickle(state: TouchState, direction: number): TouchState {
   };
 }
 
+/**
+ * 몸 전체가 부딪혔다 (놀이방: 매트에 착지, 다른 말랑이·벽과 툭). strength 0..1.
+ * dirX 는 부딪혀 밀려나는 옆 방향 (−1..1, 0 이면 위에서 떨어진 착지): 세로로 철퍽 눌리고 그 반대쪽으로 기운다.
+ */
+export function impact(state: TouchState, dirX: number, strength: number): TouchState {
+  const s = clamp(Number.isFinite(strength) ? strength : 0, 0, 1);
+  const d = clamp(Number.isFinite(dirX) ? dirX : 0, -1, 1);
+  return {
+    ...state,
+    squash: kick(state.squash, (2.4 + 4.2 * s) * (1 - 0.6 * Math.abs(d))),
+    lean: kick(state.lean, d * (1.2 + 2.2 * s)),
+  };
+}
+
 /** 녹아내렸을 때 눌림 (가장 납작한 쉬는 자세) */
 export const MELT_SQUASH = 0.46;
 
