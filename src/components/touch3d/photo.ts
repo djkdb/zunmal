@@ -16,7 +16,7 @@ import {
   type Rect,
 } from '../../touch/photoCard';
 import { VIEWBOX } from '../malang/helpers';
-import { rasterizeMalang } from './rasterMalang';
+import { rasterizeMalang, svgMarkup } from './rasterMalang';
 
 /** 캔버스 글꼴 (CSS 토큰을 못 읽을 때). 제목 글꼴은 한 가지 굵기뿐이라 굵게 하지 않는다 */
 const DISPLAY_FALLBACK = "'Jua', 'NanumSquareRound', 'Pretendard Variable', sans-serif";
@@ -175,13 +175,12 @@ export async function rasterizePlainSvg(svg: SVGSVGElement, w: number, h: number
   const px = vb.width * PROP_PAD;
   const py = vb.height * PROP_PAD;
   const clone = svg.cloneNode(true) as SVGSVGElement;
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   clone.setAttribute('viewBox', `${vb.x - px} ${vb.y - py} ${vb.width + 2 * px} ${vb.height + 2 * py}`);
   const cw = Math.max(1, Math.round(w * (1 + 2 * PROP_PAD) * scale));
   const ch = Math.max(1, Math.round(h * (1 + 2 * PROP_PAD) * scale));
   clone.setAttribute('width', String(cw));
   clone.setAttribute('height', String(ch));
-  const xml = new XMLSerializer().serializeToString(clone);
+  const xml = svgMarkup(clone);
   const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`);
   const c = document.createElement('canvas');
   c.width = cw;

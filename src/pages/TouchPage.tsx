@@ -1770,10 +1770,17 @@ function Playroom() {
       if (snap && st) items.push({ depth: -1e5, layer: async () => ({ image: snap, rect: toRect(st.canvas.getBoundingClientRect()) }) });
       items.sort((a, b) => a.depth - b.depth);
       const layers: PhotoLayer[] = [];
+      // 한 겹이 실패해도(브라우저가 그림을 못 읽음) 나머지로 사진을 만든다
+      let failedLayers = 0;
       for (const it of items) {
-        const layer = await it.layer();
-        if (layer) layers.push(layer);
+        try {
+          const layer = await it.layer();
+          if (layer) layers.push(layer);
+        } catch {
+          failedLayers++;
+        }
       }
+      if (failedLayers > 0 && layers.length === 0 && !fxCopy) throw new Error('no layers');
       if (fxCopy && fxCanvas) layers.push({ image: fxCopy, rect: toRect(fxCanvas.getBoundingClientRect()) });
 
       // 사진 칸: 매트 위 모든 말랑이를 감싸는 상자를 칸 비율로 넓힌다 (아무도 잘리지 않게)
@@ -1816,8 +1823,11 @@ function Playroom() {
         if (prev) URL.revokeObjectURL(prev.url);
         return { url: URL.createObjectURL(blob), blob, fileName, canShare: mod.canShareFile(blob, fileName) };
       });
-    } catch {
-      say('사진을 만들지 못했어요. 다시 찍어 주세요.', 2600);
+    } catch (e) {
+      // 끝의 짧은 원인 표시는 폰에서만 나는 실패를 알려 받기 위한 것
+      const code = e instanceof Error ? (e.name === 'Error' ? e.message : e.name).slice(0, 24) : 'unknown';
+      console.error('photo failed', e);
+      say(`사진을 만들지 못했어요. 다시 찍어 주세요. (${code})`, 3600);
     } finally {
       photoLockRef.current = false;
       setPhotoBusy(false);

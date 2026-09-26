@@ -54,6 +54,24 @@ const STYLE_PROPS = [
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/**
+ * SVG 요소 → 이미지로 읽을 수 있는 XML 문자열.
+ * Safari(WebKit)는 setAttribute('xmlns')를 한 요소를 직렬화하면 xmlns 를 두 번 써서 XML 이 깨지고
+ * 이미지가 안 읽힌다(놀이방 3D 텍스처·사진 실패). 그래서 xmlns 는 직접 넣지 않고, 직렬화 뒤 맨 앞 태그에
+ * 정확히 한 번만 있게 고친다. xlink: 를 쓰면 그 이름공간도 선언한다.
+ */
+export function svgMarkup(el: SVGSVGElement): string {
+  el.removeAttribute('xmlns');
+  const raw = new XMLSerializer().serializeToString(el);
+  const end = raw.indexOf('>');
+  if (end < 0) return raw;
+  const selfClosing = raw[end - 1] === '/';
+  let head = raw.slice(0, selfClosing ? end - 1 : end).replace(/\sxmlns="[^"]*"/g, '').replace(/\sxmlns:xlink="[^"]*"/g, '');
+  head += ` xmlns="${SVG_NS}"`;
+  if (raw.includes('xlink:')) head += ' xmlns:xlink="http://www.w3.org/1999/xlink"';
+  return head + raw.slice(selfClosing ? end - 1 : end);
+}
+
 function inlineStyles(src: Element, dst: Element) {
   const cs = window.getComputedStyle(src);
   let style = dst.getAttribute('style') ?? '';
@@ -170,7 +188,6 @@ export async function rasterizeMalang(
   inlineStyles(source, clone);
   clone.querySelectorAll('title').forEach((t) => t.remove());
   prune(clone, part, bodyPath, opts.bottom);
-  clone.setAttribute('xmlns', SVG_NS);
   const height = opts.height ?? size;
   clone.setAttribute('width', String(size));
   clone.setAttribute('height', String(height));
@@ -179,7 +196,7 @@ export async function rasterizeMalang(
   clone.removeAttribute('class');
   clone.style.overflow = 'hidden';
 
-  const markup = new XMLSerializer().serializeToString(clone);
+  const markup = svgMarkup(clone);
   const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }));
   try {
     const img = await loadImage(url);
