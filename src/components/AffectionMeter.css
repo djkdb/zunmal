@@ -1,0 +1,135 @@
+/* ── 친밀도: 하트 줄 + 다음 단계에 받는 것 ─────────────────────────
+ * 하트 다섯 개가 한 단계를 나눠 채운다(하나 = 애정 10). 색만으로 읽지 않게 "Lv.4" 와 "다음 레벨까지 32" 를 늘 함께 쓴다. */
+.heart-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 0;
+}
+
+.heart-row__heart {
+  display: block;
+  overflow: visible;
+}
+
+.heart-row__empty {
+  fill: var(--surface-2);
+}
+
+.heart-row__full {
+  fill: var(--primary);
+}
+
+.heart-row__line {
+  fill: none;
+  stroke: var(--primary-deep);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+/* 도감 상세 칸: 옅은 딸기우유 바탕 (카드 안의 칸) */
+.affection-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px 14px;
+  border-radius: var(--radius-s);
+  background: var(--primary-tint);
+  text-align: left;
+}
+
+.affection-meter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.affection-meter__level {
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-s);
+}
+
+.affection-meter__level strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-m);
+  letter-spacing: var(--tracking-title);
+}
+
+.affection-meter__left {
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.affection-meter__gauge .heart-row {
+  gap: 6px;
+}
+
+.affection-meter__gauge .heart-row__empty {
+  fill: var(--surface);
+}
+
+.affection-meter__next {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.affection-meter__when {
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  line-height: 1.4;
+  word-break: keep-all;
+}
+
+/* 받는 것 알약: 흰 알약 + 아이콘 */
+.perk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(26, 64, 128, 0.1);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* 시크릿 상세(밤하늘 모달) */
+.detail-modal--secret .affection-meter {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.detail-modal--secret .affection-meter__left,
+.detail-modal--secret .affection-meter__when {
+  color: #e6dcff;
+}
+
+.detail-modal--secret .heart-row__empty,
+.detail-modal--secret .affection-meter__gauge .heart-row__empty {
+  fill: rgba(255, 255, 255, 0.16);
+}
+
+.detail-modal--secret .heart-row__line {
+  stroke: #ffc2d6;
+}
