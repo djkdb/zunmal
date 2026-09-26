@@ -349,6 +349,8 @@ export function trackForPath(pathname: string): TrackId | null {
   }
   if (path.startsWith('/gacha')) return 'gacha';
   if (path.startsWith('/collection')) return 'collection';
+  // 디저트 가게: 도감과 같은 느긋한 곡
+  if (path.startsWith('/shop')) return 'collection';
   if (path.startsWith('/touch')) return 'touch';
   return 'home';
 }

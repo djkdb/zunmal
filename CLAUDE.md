@@ -27,15 +27,17 @@ src/
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
-                  playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
+                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
-  economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
+  economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
+                  shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
-  components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
+  components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
+                  shop/(홈 ShopCard + 가게 화면 조각) …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
-  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방)
+  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방), ShopPage(디저트 가게)
 ```
 
 의존 방향 (위가 아래를 import 가능, 역방향 금지):
@@ -45,7 +47,7 @@ pages → components → store → gacha / economy → data → lib
 minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 ```
 
-- 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`, `/touch`, `/touch/:id`.
+- 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`, `/shop`, `/touch`, `/touch/:id`.
 - 외부 이미지/사운드 파일 사용 금지. 캐릭터는 SVG, 소리는 WebAudio로 생성한다. (3D 연출·3D 머신도 코드로 만든 도형·셰이더·캔버스 텍스처뿐)
 - three.js는 신화 연출·3D 머신·놀이방 3D가 쓰는 한 청크로만 받는다(동적 import). 첫 화면 번들에 정적 import 금지.
 
@@ -209,6 +211,25 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 진행은 store 액션(`finishMiniGame`, `pull`, `petMalang`)이 기록한다. 보상(`MISSION_REWARD_COINS`) + 올클리어 보너스.
 - 받을 보상이 있으면 홈 탭에 빨간 점.
 
+## 말랑 디저트 가게 · 말랑 선물 (`economy/shop.ts`, `economy/gift.ts`, `components/shop/`, `pages/ShopPage.tsx`)
+
+- 미니게임 반복이 귀찮다는 요청으로 만든 **방치형 수입**. 캡슐을 연(`unboxed`) 말랑이가 가게 직원으로 일하며 실제 시간만큼 코인을 모은다(앱을 닫아 둬도).
+- 칸: 모은 말랑이 종류 수로 1/4/8/15/24마리 → 1~5칸(`SHOP_SLOT_UNLOCKS`). 시작 말랑이가 첫 직원, 캡슐을 처음 열면 빈 칸에 자동으로 들어간다.
+  직원은 언제든 바꾼다(`setShopStaff`) — 바꾸기 전에 번 코인을 `banked`에 정산해 잃지 않는다.
+- 시간당 = 희귀도 기본(`SHOP_RATE_PER_HOUR` 10/12/14/17/20/24) × (1 + 친밀도 단계당 5%·최대 25% + 반짝 25% + 촉감 특기 + 세트).
+  특기(`SHOP_MATERIAL_PERKS`, 가게 화면에 한 줄): 슬로우 라이징 = 가득 참 +1시간(최대 +2), 탱탱 젤리 = 자기 +10%, 쭉쭉이 = 다른 직원 +5%씩,
+  찐득이 = 친밀도 보너스 두 배. 세트: 같은 컬렉션 직원이 n마리면 그들에게 +(n−1)×10%(여러 세트면 가장 큰 것 하나, "디저트 가게 세트 +20%" 칩).
+- 가득 참 8시간(`SHOP_CAP_HOURS`)어치에서 멈춘다. 시계: 경과 = clamp(now − lastTickAt, 0, 가득 참), 거꾸로 가면 주지 않고 기준을 지금으로. 한 번에 가득 찬 양까지만.
+  받기는 ref 잠금 + 코인 날리기(`useShopClaim`). 미니게임 일일 상한과 무관. 목표 경제(하루 16시간 가정)는 config 주석 + `shop.test.ts`.
+- 홈: 주요 버튼(과 앱 안 브라우저 카드) 바로 아래 `ShopCard` — CSS 차양 + 창 속 직원 얼굴, 4초마다 오르는 코인, 가득 참 막대, 받기. 카드 = `/shop` 링크.
+- `/shop`(지연 청크, 음악은 collection 곡): 제목이 곧 간판인 코드 그림 가게(`ShopFront`: 줄무늬 차양, 선반, 직원이 카운터 뒤에서 행주질·쟁반·폴짝,
+  유리 진열장 디저트 — 움직임 줄이기면 정지), 계산대(모인 코인·막대·받기·세트 칩), 직원 칸(시간당·보너스 칩·특기, 빈 자리, 잠긴 칸 "말랑이 N마리 모으면 열려요"),
+  고르기 창 `StaffPicker`(이 자리에 두면 시간당 많은 순, 가게 전체 시간당 + "N시간이면 가득 차요").
+  가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)·창(`SheetDialog`, Modal 사본)은 가게 청크에만 둔다 —
+  지연 청크가 `components/Modal`을 가져오면 번들러가 첫 화면 공용 모듈을 여러 조각으로 쪼개 첫 화면이 무거워진다.
+- **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 30 + 애정 단계 × 10, 최대 120(`GIFT_COINS`).
+  홈 파트너 말풍선 자리(선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > 목표 > 인사), 선물이 떠 있으면 "꾹 눌러 봐요"는 쉰다. 새 플레이어는 다음 날부터.
+
 ## 놀이방 — 말랑 만지기 (`pages/TouchPage.tsx`, `components/playroom/`, `touch/`, `audio/squish.ts`)
 
 - `/touch`, `/touch/:id`는 **화면 전체가 하늘 바탕 위 폭신한 놀이 매트**(스카이 소다: 흰 파이핑 + 흰 바느질 + 고른 무늬)인 독립 창이다.
@@ -357,7 +378,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 ## 경제 시스템 (`economy/`)
 
 - **재화는 코인 하나뿐**이다 (뽑기권은 v3에서 폐지). 코인으로 바로 캡슐을 뽑는다.
-- 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상, 일일 미션. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
+- 코인 출처: 미니게임(일일 상한 적용), 중복 환급, 컬렉션 세트 보상, 일일 미션, 디저트 가게(방치 수입), 말랑 선물(하루 한 번). 뒤의 둘은 일일 상한과 무관. 미니게임은 점수만 보고하고 코인을 직접 변경하지 않는다.
 - 보상 계산 (`computeReward`):
   ```
   baseCoins    = floor(score × gameMultiplier)
@@ -374,13 +395,15 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v8: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
+- 현재 v9: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
   소리 설정 `settings: { sfxOn, musicOn }`(v4의 `muted: true`는 둘 다 끔으로 옮긴다. 새 플레이어는 둘 다 켬 — 음악은 첫 입력 뒤에 시작),
   받은 쿠폰(`redeemedCoupons`, v6), 놀이방(v7): `unboxed: string[]`(캡슐을 연 말랑이) + `playroom: { out: string[] }`(매트 위, 최대 `PLAYROOM_MAX_OUT` 5).
   v6→v7은 이미 가진 말랑이를 모두 연 것으로 치고 매트에는 파트너 하나. 새 플레이어의 시작 말랑이는 열린 채 매트에.
   `pull`로 새로 얻은 말랑이는 `unboxed`에 넣지 않는다(놀이방에서 캡슐로 연다). sanitize: `unboxed` ⊆ 보유, `out` ⊆ unboxed ∩ 보유, 중복 없음, 5개까지.
   꾸미기(v8): `playroom.mat`(무늬 id, 모르면 기본 `sky-dots`) + `playroom.props: {id, x, y}[]`(x·y는 매트 바닥 기준 0..1로 자름, 모르는 id·중복 제거,
   최대 3개). v7→v8은 기본 무늬·소품 없음 + 매트에는 한 마리만 남긴다(나와 있던 파트너, 없으면 처음 꺼낸 말랑이). 들어올 때마다 `soloMalang`이 한 마리로 줄인다.
+  가게(v9): `shop: { staff, lastTickAt, banked }` + `giftDay`(선물 받은 서울 날짜 또는 null). v8→v9는 파트너(연 말랑이면, 아니면 처음 연 말랑이)가 첫 직원,
+  `lastTickAt` = 지금(소급 없음), 선물은 오늘 바로. sanitize: staff ⊆ unboxed ∩ 보유·중복 없음·열린 칸까지, 미래 `lastTickAt`은 지금으로, `banked` 0..`SHOP_BANK_MAX` 정수.
   v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
@@ -388,7 +411,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 
 - `npm test` — Vitest, node 환경, `src/**/*.test.ts`.
 - 가챠: 10만 회 확률 검증을 서로 다른 시드 여러 개로 수행(±5σ 허용), 천장/비율/10연 보장/환급.
-- 경제: 보상식, 판당·일일 상한, 서울 자정 경계.
+- 경제: 보상식, 판당·일일 상한, 서울 자정 경계. 디저트 가게(칸·보너스·세트·특기, 쌓이기·가득 참·시계 되감기·자투리, 대표 직원 구성별 하루 수입 범위),
+  말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`).
 - 저장: 손상/구버전 데이터 migrate.
 - 3D 머신 더미: 가라앉으면 겹침 없음·돔 안·바닥 위·멈춤, 돔 아래쪽만 참, 시드 결정성, 휘젓기 후 다시 가라앉음(`machine3d/pile.test.ts`).
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,

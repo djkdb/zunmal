@@ -48,22 +48,14 @@ export function nextSlotAt(ownedCount: number): number | null {
   return SHOP_SLOT_UNLOCKS.find((need) => ownedCount < need) ?? null;
 }
 
-/** 촉감별 특기 한 줄 (가게 화면에 그대로 보인다) */
-export const MATERIAL_PERK_TEXT: Readonly<Record<MaterialId, string>> = {
-  slowRise: `느긋하게 버텨서 가게가 ${SHOP_MATERIAL_PERKS.slowRiseExtraHours}시간 더 늦게 차요`,
-  jelly: `통통 튀며 일해서 수입 +${pct(SHOP_MATERIAL_PERKS.jellyBonus)}%`,
-  stretchy: `팔을 쭉 뻗어 다른 직원 수입 +${pct(SHOP_MATERIAL_PERKS.stretchyHelpBonus)}%`,
-  sticky: `딱 붙어 정이 들어서 친밀도 보너스가 ${SHOP_MATERIAL_PERKS.stickyAffectionMultiplier}배`,
-};
-
 export type ShopBonusKind = 'affection' | 'shiny' | 'jelly' | 'help' | 'set';
 
 export interface ShopBonus {
   kind: ShopBonusKind;
   /** 더하는 비율 (0.1 = +10%) */
   amount: number;
-  /** 칩 글자 ("친밀도 +10%", "디저트 가게 세트 +20%") */
-  label: string;
+  /** 세트 보너스면 세트 이름 (칩 글자는 components/shop/perks.ts bonusLabel) */
+  setName?: string;
 }
 
 export interface StaffRate {
@@ -104,10 +96,6 @@ export interface ShopContext {
   affection: Readonly<Record<string, number | undefined>>;
 }
 
-function pct(v: number): number {
-  return Math.round(v * 100);
-}
-
 /** 친밀도 보너스 (찐득이는 두 배) */
 export function affectionBonus(affection: number, material: MaterialId): number {
   const mult = material === 'sticky' ? SHOP_MATERIAL_PERKS.stickyAffectionMultiplier : 1;
@@ -138,22 +126,20 @@ export function computeShopRates(staffIds: readonly string[], ctx: ShopContext):
     const material = materials[i] ?? 'jelly';
     const bonuses: ShopBonus[] = [];
     const aff = affectionBonus(ctx.affection[c.id] ?? 0, material);
-    if (aff > 0) bonuses.push({ kind: 'affection', amount: aff, label: `친밀도 +${pct(aff)}%` });
+    if (aff > 0) bonuses.push({ kind: 'affection', amount: aff });
     if ((ctx.owned[c.id]?.shinyCount ?? 0) > 0) {
-      bonuses.push({ kind: 'shiny', amount: SHOP_SHINY_BONUS, label: `반짝 +${pct(SHOP_SHINY_BONUS)}%` });
+      bonuses.push({ kind: 'shiny', amount: SHOP_SHINY_BONUS });
     }
     if (material === 'jelly') {
-      const v = SHOP_MATERIAL_PERKS.jellyBonus;
-      bonuses.push({ kind: 'jelly', amount: v, label: `탱탱 +${pct(v)}%` });
+      bonuses.push({ kind: 'jelly', amount: SHOP_MATERIAL_PERKS.jellyBonus });
     }
     // 쭉쭉이 도움은 자기 자신을 뺀 쭉쭉이 수만큼
     const helpers = stretchyCount - (material === 'stretchy' ? 1 : 0);
     if (helpers > 0) {
-      const v = helpers * SHOP_MATERIAL_PERKS.stretchyHelpBonus;
-      bonuses.push({ kind: 'help', amount: v, label: `쭉쭉 도움 +${pct(v)}%` });
+      bonuses.push({ kind: 'help', amount: helpers * SHOP_MATERIAL_PERKS.stretchyHelpBonus });
     }
     const set = sets.find((s) => getCollectionMembers(s.id).includes(c.id));
-    if (set) bonuses.push({ kind: 'set', amount: set.bonus, label: `${set.name} 세트 +${pct(set.bonus)}%` });
+    if (set) bonuses.push({ kind: 'set', amount: set.bonus, setName: set.name });
 
     const base = SHOP_RATE_PER_HOUR[c.rarity];
     const multiplier = 1 + bonuses.reduce((sum, b) => sum + b.amount, 0);
@@ -171,11 +157,6 @@ export function computeShopRates(staffIds: readonly string[], ctx: ShopContext):
 
 function getCollectionMembers(id: string): readonly string[] {
   return COLLECTIONS.find((c) => c.id === id)?.memberIds ?? [];
-}
-
-/** 한 직원의 시간당 코인 (고르기 창에서 "이 말랑이를 이 칸에 넣으면"을 보여 줄 때) */
-export function staffRateIn(staffIds: readonly string[], id: string, ctx: ShopContext): StaffRate | undefined {
-  return computeShopRates(staffIds.includes(id) ? staffIds : [...staffIds, id], ctx).staff.find((s) => s.id === id);
 }
 
 // ── 쌓이기·정산 ──────────────────────────────────────────────

@@ -190,3 +190,15 @@ export function MusicIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** 선물 상자: 딸기우유 상자 + 레몬 리본 */
+export function GiftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 14 h20 v12.5 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 Z" fill="#ffc4d3" />
+      <rect x="4" y="9.5" width="24" height="5" rx="1.5" fill="#ffe3ec" />
+      <path d="M16 9.5 v18.5" stroke="#d99a1e" strokeWidth={3} />
+      <path d="M16 9.5 c-2 -4.5 -7.5 -5 -7 -1.5 c0.3 2 4.5 1.5 7 1.5 c2.5 0 6.7 0.5 7 -1.5 c0.5 -3.5 -5 -3 -7 1.5 Z" fill="#ffd66b" />
+    </Svg>
+  );
+}

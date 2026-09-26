@@ -5,6 +5,14 @@
 export const MATERIAL_IDS = ['slowRise', 'jelly', 'stretchy', 'sticky'] as const;
 export type MaterialId = (typeof MATERIAL_IDS)[number];
 
+/** 촉감 이름 (놀이방 정보 패널·방법 보기·디저트 가게 특기 줄) */
+export const MATERIAL_LABELS: Readonly<Record<MaterialId, string>> = {
+  slowRise: '슬로우 라이징',
+  jelly: '탱탱 젤리',
+  stretchy: '쭉쭉이',
+  sticky: '찐득이',
+};
+
 /** 말랑이마다 촉감 (이름·설명에서 골랐다). 목록에 없으면 `DEFAULT_MATERIAL` */
 export const MATERIAL_BY_ID: Readonly<Record<string, MaterialId>> = {
   // 일반

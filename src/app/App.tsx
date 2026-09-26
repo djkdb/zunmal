@@ -7,8 +7,9 @@ import { CollectionPage } from '../pages/CollectionPage';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useSaveGuard } from './useSaveGuard';
 
-// 미니게임 12종과 놀이방(물리·3D 준비 코드)은 들어갈 때만 받는다 — 첫 화면(인스타 링크) 로딩을 가볍게
+// 미니게임 12종, 디저트 가게 화면, 놀이방(물리·3D 준비 코드)은 들어갈 때만 받는다 — 첫 화면(인스타 링크) 로딩을 가볍게
 const MiniGamePage = lazy(() => import('../pages/MiniGamePage').then((m) => ({ default: m.MiniGamePage })));
+const ShopPage = lazy(() => import('../pages/ShopPage').then((m) => ({ default: m.ShopPage })));
 const TouchPage = lazy(() => import('../pages/TouchPage').then((m) => ({ default: m.TouchPage })));
 
 function PageLoading() {
@@ -30,6 +31,7 @@ export function App() {
             <Route path="collection" element={<CollectionPage />} />
             <Route path="play" element={<Suspense fallback={<PageLoading />}><MiniGamePage /></Suspense>} />
             <Route path="play/:gameId" element={<Suspense fallback={<PageLoading />}><MiniGamePage /></Suspense>} />
+            <Route path="shop" element={<Suspense fallback={<PageLoading />}><ShopPage /></Suspense>} />
             <Route path="touch" element={<Suspense fallback={<PageLoading />}><TouchPage /></Suspense>} />
             <Route path="touch/:id" element={<Suspense fallback={<PageLoading />}><TouchPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />

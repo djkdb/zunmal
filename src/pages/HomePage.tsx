@@ -6,7 +6,11 @@ import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
 import { CouponBox } from '../components/CouponBox';
 import { InstallCard } from '../components/InstallCard';
-import { CloseIcon, TapIcon } from '../components/icons';
+import { CloseIcon, GiftIcon, TapIcon } from '../components/icons';
+import { ShopCard } from '../components/shop/ShopCard';
+import { seoulDateKey } from '../economy/daily';
+import { giftAvailable, giftCoins, giftGiver } from '../economy/gift';
+import { josa } from '../lib/josa';
 import { clearPendingCoupon, usePendingCoupon } from '../app/couponLink';
 import { checkCoupon } from '../economy/coupons';
 import { flyCoins } from '../lib/coinFx';
@@ -111,6 +115,70 @@ function GiftBubble({ code, onDone }: { code: string; onDone(text: string): void
   );
 }
 
+/** 오늘 말랑 선물을 가져올 말랑이 (받을 수 있을 때만) */
+function useDailyGift(): string | null {
+  const unboxed = useGameStore((s) => s.unboxed);
+  const affection = useGameStore((s) => s.affection);
+  const partnerId = useGameStore((s) => s.partnerId);
+  const giftDay = useGameStore((s) => s.giftDay);
+  const giver = giftGiver({ unboxed, affection, partnerId });
+  return giftAvailable(giftDay, seoulDateKey(), giver) ? giver : null;
+}
+
+/**
+ * 하루 한 번 말랑 선물: 파트너 말풍선 자리에 "○○가 선물을 가져왔어요" + 열기.
+ * 누르면 상자가 폭 열리고 코인이 위 코인 알약으로 날아간다. ref 로 바로 잠가 두 번 받지 않는다.
+ */
+function DailyGiftBubble({ giverId, onDone }: { giverId: string; onDone(text: string): void }) {
+  const claimGift = useGameStore((s) => s.claimGift);
+  const giver = getCharacter(giverId);
+  const coins = giftCoins(useGameStore((s) => s.affection[giverId] ?? 0));
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const lockRef = useRef(false);
+  const [opening, setOpening] = useState(false);
+  if (!giver) return null;
+  const open = () => {
+    if (lockRef.current) return;
+    lockRef.current = true;
+    setOpening(true);
+    sfx.capsuleOpen();
+    haptic('success');
+    // 상자가 열리는 순간(0.36초 뒤)에 받는다 — 움직임 줄이기면 바로
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    window.setTimeout(
+      () => {
+        const res = claimGift();
+        if (!res.ok) {
+          onDone('선물은 내일 또 가져올게요');
+          return;
+        }
+        sfx.coin();
+        sfx.success();
+        if (buttonRef.current) flyCoins(buttonRef.current, res.coins);
+        onDone(`선물 ${res.coins}코인을 받았어요!`);
+      },
+      reduced ? 0 : 360,
+    );
+  };
+  return (
+    <div className={`home__bubble home__daily-gift${opening ? ' is-opening' : ''}`} role="status">
+      <span className="home__daily-gift-box" aria-hidden="true">
+        <GiftIcon size={30} />
+      </span>
+      <span className="home__gift-text">{josa(giver.name, '이/가')} 선물을 가져왔어요</span>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="btn btn--primary btn--small home__gift-btn"
+        onClick={open}
+        aria-label={`선물 열기, ${coins}코인`}
+      >
+        열기
+      </button>
+    </div>
+  );
+}
+
 export function HomePage() {
   const partnerId = useGameStore((s) => s.partnerId);
   const owned = useGameStore((s) => s.ownedMalangs);
@@ -138,6 +206,12 @@ export function HomePage() {
     if (giftUsed) clearPendingCoupon();
   }, [giftUsed]);
   const [giftDone, setGiftDone] = useState<string | null>(null);
+  const dailyGiver = useDailyGift();
+  const showCoupon = !!pendingCoupon && giftReady;
+  // 말풍선 자리: 선물 쿠폰 > 말랑 선물 > (받은 뒤 한 줄) > 목표 > 인사
+  const showDailyGift = !showCoupon && !giftDone && dailyGiver !== null;
+  // 선물 말풍선이 떠 있으면 "꾹 눌러 봐요"는 잠깐 쉰다 (한 번에 하나만 말을 건다)
+  const touchHint = neverPetted && !showCoupon && !showDailyGift;
   useEffect(() => {
     if (!giftDone) return;
     const t = window.setTimeout(() => setGiftDone(null), 3200);
@@ -182,8 +256,10 @@ export function HomePage() {
 
       {partner && (
         <div className="home__stage">
-          {pendingCoupon && giftReady ? (
+          {showCoupon && pendingCoupon ? (
             <GiftBubble code={pendingCoupon} onDone={setGiftDone} />
+          ) : showDailyGift && dailyGiver ? (
+            <DailyGiftBubble giverId={dailyGiver} onDone={setGiftDone} />
           ) : giftDone ? (
             <p className="home__bubble" role="status">
               {giftDone}
@@ -195,7 +271,7 @@ export function HomePage() {
           )}
           <Link
             to="/touch"
-            className={`home__partner${neverPetted ? ' has-hint' : ''}`}
+            className={`home__partner${touchHint ? ' has-hint' : ''}`}
             aria-label={`말랑이 만지러 가기, ${partner.name}`}
             onClick={() => sfx.button()}
           >
@@ -207,7 +283,7 @@ export function HomePage() {
               aura="auto"
               shiny={partnerShiny && (owned[partner.id]?.shinyCount ?? 0) > 0}
             />
-            {neverPetted && (
+            {touchHint && (
               <>
                 <span className="home__touch-bubble" aria-hidden="true">
                   꾹 눌러 봐요
@@ -256,6 +332,8 @@ export function HomePage() {
       </div>
 
       <InstallCard slot="in-app" />
+
+      <ShopCard />
 
       <DailyMissions />
 

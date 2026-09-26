@@ -15,7 +15,7 @@ import type { Character } from './characters';
 import { RARITIES, type Rarity } from './rarity';
 
 export { MATERIAL_IDS, type MaterialId } from './materialIds';
-import { DEFAULT_MATERIAL, MATERIAL_BY_ID, type MaterialId } from './materialIds';
+import { DEFAULT_MATERIAL, MATERIAL_BY_ID, MATERIAL_LABELS, type MaterialId } from './materialIds';
 
 /** 몸 안쪽 출렁임(physics.ts·softbody.ts)에 쓰는 값. 1 = 예전 기본 말랑 */
 export interface MaterialFeel {
@@ -107,7 +107,7 @@ export interface MaterialSpec {
 export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
   slowRise: {
     id: 'slowRise',
-    label: '슬로우 라이징',
+    label: MATERIAL_LABELS.slowRise,
     feelLine: '누른 자국이 천천히 차올라요',
     feel: { springK: 0.9, zetaFree: 5, riseTauMs: 720, stretch: 0.9, snap: 0, sag: 0, stickMs: 0, impact: 0.7 },
     world: { bounce: 0.12, wallBounce: 0.3, friction: 0.45, grip: 1, stiffness: 0.75, mass: 1, stick: 0 },
@@ -132,7 +132,7 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
   },
   jelly: {
     id: 'jelly',
-    label: '탱탱 젤리',
+    label: MATERIAL_LABELS.jelly,
     feelLine: '통통 튀고 탱글탱글 흔들려요',
     feel: { springK: 1.35, zetaFree: 0.75, riseTauMs: 0, stretch: 1.1, snap: 1.25, sag: 0, stickMs: 0, impact: 1.35 },
     world: { bounce: 0.56, wallBounce: 0.78, friction: 0.24, grip: 0.8, stiffness: 1.25, mass: 1, stick: 0 },
@@ -157,7 +157,7 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
   },
   stretchy: {
     id: 'stretchy',
-    label: '쭉쭉이',
+    label: MATERIAL_LABELS.stretchy,
     feelLine: '멀리 쭈욱 늘어났다 퐁 돌아와요',
     feel: { springK: 0.85, zetaFree: 0.8, riseTauMs: 0, stretch: 2.5, snap: 1.7, sag: 0, stickMs: 0, impact: 1.1 },
     world: { bounce: 0.3, wallBounce: 0.5, friction: 0.35, grip: 0.9, stiffness: 0.85, mass: 1, stick: 0 },
@@ -182,7 +182,7 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
   },
   sticky: {
     id: 'sticky',
-    label: '찐득이',
+    label: MATERIAL_LABELS.sticky,
     feelLine: '손가락에 붙었다가 쩍 떨어져요',
     feel: { springK: 0.6, zetaFree: 2.6, riseTauMs: 0, stretch: 1.4, snap: 0.5, sag: 0.07, stickMs: 380, impact: 0.8 },
     world: { bounce: 0.06, wallBounce: 0.2, friction: 0.75, grip: 1.3, stiffness: 0.6, mass: 1.1, stick: 1 },

@@ -155,6 +155,7 @@ describe('trackForPath', () => {
     ['/play/button-malang', 'minigame'],
     ['/gacha', 'gacha'],
     ['/collection', 'collection'],
+    ['/shop', 'collection'],
     ['/touch', 'touch'],
     ['/touch/peach-mochi', 'touch'],
     ['/unknown', 'home'],

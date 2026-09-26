@@ -82,7 +82,7 @@ describe('디저트 가게: 시간당 코인', () => {
     expect(plain?.perHour).toBeCloseTo(10 * 1.1);
     const shiny = computeShopRates(['soda-drop'], ctx({ shiny: ['soda-drop'] })).staff[0];
     expect(shiny?.perHour).toBeCloseTo(10 * 1.35);
-    expect(shiny?.bonuses.map((b) => b.label)).toEqual(['반짝 +25%', '탱탱 +10%']);
+    expect(shiny?.bonuses.map((b) => b.kind)).toEqual(['shiny', 'jelly']);
   });
 
   it('쭉쭉이는 다른 직원을 +5%씩 돕는다 (자기 자신은 제외)', () => {
@@ -96,7 +96,10 @@ describe('디저트 가게: 시간당 코인', () => {
   it('같은 세트 직원: 한 마리 늘 때마다 +10% ("디저트 가게 세트 +20%")', () => {
     const r = computeShopRates(['peach-mochi', 'custard-bun', 'choco-chip'], ctx());
     expect(r.sets[0]).toMatchObject({ id: 'dessert-shop', count: 3 });
-    for (const s of r.staff) expect(s.bonuses.some((b) => b.label === '디저트 가게 세트 +20%')).toBe(true);
+    for (const s of r.staff) {
+      expect(s.bonuses.find((b) => b.kind === 'set')).toMatchObject({ setName: '디저트 가게' });
+      expect(s.bonuses.find((b) => b.kind === 'set')?.amount).toBeCloseTo(0.2);
+    }
     // 슬로우 라이징 셋이어도 가득 참 연장은 최대 +2시간
     expect(r.capHours).toBe(SHOP_CAP_HOURS + SHOP_MATERIAL_PERKS.slowRiseMaxExtraHours);
   });
