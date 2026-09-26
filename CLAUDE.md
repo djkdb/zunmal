@@ -27,23 +27,25 @@ src/
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
-                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
+                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
                   shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
-                  shop/(홈 ShopCard + 가게 화면 조각) …
+                  shop/(홈 ShopCard + 가게 화면 조각), home/(홈 허브: GoalCard, HubStatus, TodayStrip, useHub) …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
+  goals/          홈 허브 판단 (순수): hubState.ts (저장+시각 → 지금 상태), nextGoal.ts (다음 목표 후보·우선순위),
+                  firstRun.ts (첫걸음 6단계), today.ts (오늘 줄), alerts.ts (홈 탭 빨간 점)
   pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방), ShopPage(디저트 가게)
 ```
 
 의존 방향 (위가 아래를 import 가능, 역방향 금지):
 
 ```
-pages → components → store → gacha / economy → data → lib
+pages → components → goals → store → gacha / economy / missions → data → lib   (goals 는 store 의 타입만 import)
 minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 ```
 
@@ -101,6 +103,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **홈 파트너**: 누르면 놀이방(`/touch`) — 링크 이름 "말랑이 만지러 가기". 아직 아무도 쓰다듬지 않았으면(`affection`이 모두 0, 저장 구조 변경 없음)
   "꾹 눌러 봐요" 말풍선 + 톡 누르는 손가락(`TapIcon`)이 붙는다(절대 위치 — 360×640 첫 화면 규칙 유지, 움직임 줄이기면 정지).
   코인이 `PULL_PRICE.single`보다 적으면 주인공(딸기우유) 버튼이 "미니게임으로 코인 벌기"(`/play`)가 되고 캡슐 뽑기는 보조 버튼.
+- **홈 허브** (아래 **홈 허브** 절): 파트너 아래 "다음 목표" 카드 하나가 지금 할 한 가지를 알려 준다.
 - **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
   기본은 같은 구성의 3D(아래 가챠 규칙의 **3D 캡슐 머신**), SVG는 대체용.
   등급이 높을수록 연출(빛·흔들림·신화 이상 전체 화면)이 화려해지는 건 그대로다.
@@ -209,7 +212,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 서울 날짜로 시드를 만든 미션 3개(서로 다른 종류, 쉬움/보통/어려움 하나씩). 모든 기기에서 같은 날 같은 미션.
 - 종류: 미니게임 N판, 캡슐 N개 뽑기, 말랑이 N번 쓰다듬기, 미니게임 코인 N개, 최고 기록 깨기.
 - 진행은 store 액션(`finishMiniGame`, `pull`, `petMalang`)이 기록한다. 보상(`MISSION_REWARD_COINS`) + 올클리어 보너스.
-- 받을 보상이 있으면 홈 탭에 빨간 점.
+  하루 기록(`progress`)은 미션이 아닌 사건도 센다(`DAILY_EVENT_KINDS`: + `shop-claim`) — 홈 "오늘" 줄이 읽는다. 날짜가 바뀌면 함께 비운다.
+- 받을 보상이 있으면 홈 탭에 빨간 점(선물·가게 가득 참·봉인 캡슐도 — `goals/alerts.ts`).
 
 ## 말랑 디저트 가게 · 말랑 선물 (`economy/shop.ts`, `economy/gift.ts`, `components/shop/`, `pages/ShopPage.tsx`)
 
@@ -221,14 +225,43 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   찐득이 = 친밀도 보너스 두 배. 세트: 같은 컬렉션 직원이 n마리면 그들에게 +(n−1)×10%(여러 세트면 가장 큰 것 하나, "디저트 가게 세트 +20%" 칩).
 - 가득 참 8시간(`SHOP_CAP_HOURS`)어치에서 멈춘다. 시계: 경과 = clamp(now − lastTickAt, 0, 가득 참), 거꾸로 가면 주지 않고 기준을 지금으로. 한 번에 가득 찬 양까지만.
   받기는 ref 잠금 + 코인 날리기(`useShopClaim`). 미니게임 일일 상한과 무관. 목표 경제(하루 16시간 가정)는 config 주석 + `shop.test.ts`.
-- 홈: 주요 버튼(과 앱 안 브라우저 카드) 바로 아래 `ShopCard` — CSS 차양 + 창 속 직원 얼굴, 4초마다 오르는 코인, 가득 참 막대, 받기. 카드 = `/shop` 링크.
+- 홈: 오늘의 미션 카드 아래 `ShopCard` — CSS 차양 + 창 속 직원 얼굴, 4초마다 오르는 코인, 가득 참 막대, 받기. 카드 = `/shop` 링크.
 - `/shop`(지연 청크, 음악은 collection 곡): 제목이 곧 간판인 코드 그림 가게(`ShopFront`: 줄무늬 차양, 선반, 직원이 카운터 뒤에서 행주질·쟁반·폴짝,
   유리 진열장 디저트 — 움직임 줄이기면 정지), 계산대(모인 코인·막대·받기·세트 칩), 직원 칸(시간당·보너스 칩·특기, 빈 자리, 잠긴 칸 "말랑이 N마리 모으면 열려요"),
   고르기 창 `StaffPicker`(이 자리에 두면 시간당 많은 순, 가게 전체 시간당 + "N시간이면 가득 차요").
   가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)·창(`SheetDialog`, Modal 사본)은 가게 청크에만 둔다 —
   지연 청크가 `components/Modal`을 가져오면 번들러가 첫 화면 공용 모듈을 여러 조각으로 쪼개 첫 화면이 무거워진다.
 - **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 30 + 애정 단계 × 10, 최대 120(`GIFT_COINS`).
-  홈 파트너 말풍선 자리(선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > 목표 > 인사), 선물이 떠 있으면 "꾹 눌러 봐요"는 쉰다. 새 플레이어는 다음 날부터.
+  홈 파트너 말풍선 자리(선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > 인사), 선물이 떠 있으면 "꾹 눌러 봐요"는 쉰다. 새 플레이어는 다음 날부터.
+  가게 코인을 받으면 미션 하루 기록에 `shop-claim`을 센다(홈 "오늘" 줄).
+
+## 홈 허브 (`pages/HomePage.tsx`, `components/home/`, `goals/`)
+
+홈은 "지금 할 한 가지"를 알려 주는 허브다. 순서(위 → 아래): 간판 → 파트너(말풍선·"꾹 눌러 봐요" 그대로) → **다음 목표 카드** → 주요 버튼 두 개
+(미니게임 / 캡슐 뽑기, 코인에 따라 주인공 색이 바뀜) → [앱 안 브라우저 카드] → 상태 줄 → 오늘 줄 → 오늘의 미션 → 가게 카드 → 쿠폰 → 설치 카드.
+360×640(320 폭 포함)에서 목표 카드와 주요 버튼까지 첫 화면에 들어온다 — 무거운 튜토리얼 덮개는 두지 않는다.
+
+- **상태는 모두 저장에서 계산**(새 저장 필드 없음): `readHub(save, nowMs)`(`goals/hubState.ts`)가 오늘(서울)·남은 일일 코인·천장까지·봉인 캡슐(선반 순서)·
+  첫날 여부(가장 먼저 얻은 말랑이의 날짜)·오늘 미션·선물·가게(`ready` = 가득 참 또는 `GOAL_THRESHOLDS.shopReadyCoins` 이상 또는 받으면 바로 뽑을 수 있음)·
+  도감 요약을 한 번에 만든다. 화면은 `components/home/useHub.ts`(저장 + 15초마다)로 받는다.
+- **다음 목표** (`goals/nextGoal.ts`, `GOAL_ORDER` 순, 테스트): 선물 → 첫걸음 → 미션 보상(올클리어 보너스) → 세트 보상 → 가게 → 봉인 캡슐(`/touch/:id`)
+  → 천장 가까움(`pityCloseWithin`) → 조금 남은 미션("1판만 더 하면 +50코인", `missionNearRatio`) → 거의 다 모은 세트(`setNearMissing`)
+  → 뽑기 → 코인 모으기(모자란 양, 오늘 게임 코인이 남았을 때만) → 파트너 애정(늘 있는 마지막). 문턱값은 `economy/config.ts` `GOAL_THRESHOLDS`.
+  목표 = 종류·아이콘·제목·설명·진행(0..1 + 글자)·버튼 이름·행동(`route` 또는 `claim-gift|mission|mission-bonus|set|shop`).
+  말풍선이 이미 말랑 선물을 보여 주면 카드는 `nextGoal(hub, ['gift'])`로 다음 것을 고른다.
+- **목표 카드**(`GoalCard`): 캡슐 한 알 모양(왼쪽 종류 색 반쪽 + 아이콘, 흰 몸, 오른쪽 딸기우유 행동 알약). 카드 전체가 링크 또는 버튼 하나.
+  받기 목표는 그 자리에서 받고(ref 잠금, 코인이 알약에서 날아감, 화면 읽기 알림) 다음 목표로 바뀌며 살짝 폴짝(움직임 줄이기면 없음).
+- **첫걸음** (`goals/firstRun.ts`, 모두 저장 값): 첫 말랑이(보유 있음) → 첫 뽑기(`totalPulls ≥ 1`) → 새 캡슐 열기(`unboxed` 2개 이상, 또는 뽑았는데 봉인 없음)
+  → 쓰다듬기(`affection` > 0) → 미니게임 한 판(판 수 합 ≥ 1) → 한 번 더 뽑기(`totalPulls ≥ 2`). 순서와 상관없이 세고, 지금 단계는 순서상 첫 미완료.
+  목표 카드 막대가 여섯 칸 + "첫걸음 N/6"으로 바뀌고, 다 하면 사라진다. 봉인 캡슐 이름은 말하지 않는다(등급만 — 선반과 같음).
+- **상태 줄**(`HubStatus`): 뽑기까지 코인(또는 뽑을 수 있는 횟수), 전설 이상까지 N회, 도감 N/32 + %. 칸마다 링크.
+- **오늘 줄**(`TodayStrip`, `goals/today.ts`): 선물 → 미션 → 가게 → 미니게임 → 뽑기 다섯 칸을 선으로 잇는다. 한 칸 = 민트 + 체크, 할 수 있음 = 레몬 고리,
+  시작한 날 선물 = "내일". 한 일은 미션 하루 기록(`missions.progress`의 `play-games`·`pull`·`shop-claim`)과 `giftDay`·`bonusClaimed`로 판단한다(출석부 아님).
+  선물·미션·가게 칸은 홈 안의 해당 카드로 스크롤·초점, 미니게임·뽑기는 그 화면으로.
+- **홈 탭 빨간 점**(`goals/alerts.ts`): 선물 도착, 받을 미션·세트 보상, 가게 가득 참, 열지 않은 캡슐. 탭 이름 뒤에 이유를 읽어 준다.
+- **도감 요약** (`data/collectionProgress.ts`, 테스트): `summarizeCollection({ owned, claimedSets })` → 전체 수·비율·화면용 %(`displayPercent`)·반짝 종류 수·
+  등급별 수·세트별 진행(`SetProgress`: 없는 id·가장 높은 없는 등급·대략 기대 뽑기 수·보상 받을 수 있음)·가장 가까운 미완성 세트(`nearestIncompleteSet`:
+  시작한 세트 중 남은 수 → 덜 비싼 순 → 많이 모은 순, 시작한 세트가 없으면 가장 덜 비싼 세트)·받을 세트. 도감 화면의 진행 표시도 이 모듈 위에 만든다.
 
 ## 놀이방 — 말랑 만지기 (`pages/TouchPage.tsx`, `components/playroom/`, `touch/`, `audio/squish.ts`)
 
@@ -414,6 +447,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계. 디저트 가게(칸·보너스·세트·특기, 쌓이기·가득 참·시계 되감기·자투리, 대표 직원 구성별 하루 수입 범위),
   말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`).
 - 저장: 손상/구버전 데이터 migrate.
+- 홈 허브: 도감 요약·가장 가까운 세트(`data/collectionProgress.test.ts`), 첫걸음 단계 계산(`goals/firstRun.test.ts`), 목표 우선순위·문턱값·문구
+  (`goals/nextGoal.test.ts`), 오늘 줄·탭 알림(`goals/today.test.ts`). 테스트 저장은 `goals/testSave.ts`(시작 말랑이를 고른 직후).
 - 3D 머신 더미: 가라앉으면 겹침 없음·돔 안·바닥 위·멈춤, 돔 아래쪽만 참, 시드 결정성, 휘젓기 후 다시 가라앉음(`machine3d/pile.test.ts`).
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,
   화면 배치(혼자 배치·자리 옮기기), 반응 부위·쓰다듬기, 꾸미기 데이터(타일 SVG·저장 검사·놓기/치우기·빈자리), 사진 카드(`frameGroup` 모두 담기·비율,
