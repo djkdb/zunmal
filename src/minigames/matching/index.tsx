@@ -6,6 +6,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -28,7 +29,7 @@ function playFlip(sfx: Sfx) {
 
 type EndKind = 'clear' | 'timeout';
 
-function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
+function MatchingGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const initial = useMemo(() => createMatchingState(createBoard(defaultRng)), []);
@@ -39,6 +40,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
   const [announce, setAnnounce] = useState('');
   const startAtRef = useRef(0);
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const reported = useRef(false);
   const secsLeftAtClear = useRef(0);
 
@@ -78,6 +80,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
   useEffect(() => {
     if (ended === null) return;
     if (ended === 'timeout') sfx.fail();
+    buddyRef.current?.setBase(ended === 'clear' ? 'wow' : 'sad');
     const id = window.setTimeout(
       () => {
         if (reported.current) return;
@@ -100,6 +103,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
     let next = out.state;
     if (out.event === 'match') {
       sfx.pickup();
+      buddyRef.current?.react(next.combo >= 3 ? 'wow' : 'happy', 900);
       setAnnounce(`${getCharacter(next.cards[index]?.characterId ?? '')?.name ?? ''} 짝을 찾았어요.`);
       if (next.cleared) {
         const remaining = Math.max(0, CONFIG.durationMs - elapsed);
@@ -111,6 +115,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
       }
     } else if (out.event === 'mismatch') {
       playFlip(sfx);
+      buddyRef.current?.react('oops', 800);
       setAnnounce('짝이 아니에요.');
     } else {
       playFlip(sfx);
@@ -142,6 +147,7 @@ function MatchingGame({ onFinish, onExit, sfx }: MiniGameProps) {
     <div className={`mt${reduced ? ' mt--reduced' : ''}`}>
       <GameHud timeLeft={timeLeft} totalTime={CONFIG.durationMs / 1000} score={state.score} onExit={onExit} />
       <div className="mt__status">
+        <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={44} className="mt__buddy" />
         <span className="chip mt__chip">
           찾은 짝 <strong>{`${state.pairsFound}/${CONFIG.pairs}`}</strong>
         </span>

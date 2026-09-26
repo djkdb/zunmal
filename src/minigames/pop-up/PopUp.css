@@ -42,6 +42,14 @@
   background: var(--shelf);
 }
 
+/* 파트너가 쟁반 왼쪽 위 모서리에서 응원한다 */
+.pu__buddy {
+  position: absolute;
+  top: -44px;
+  left: 6px;
+  z-index: 1;
+}
+
 .pu__grid {
   position: relative;
   display: grid;

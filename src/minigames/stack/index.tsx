@@ -4,6 +4,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { darken, isDark, lighten } from '../../lib/color';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import { STACK_CONFIG as CONFIG, WORLD, createStackState, drop, step, type Block, type StackState } from './logic';
@@ -50,6 +51,13 @@ function colorForFloor(index: number, partner: Character): string {
 
 /** 탑 인덱스 i 블록의 윗변 y (카메라 적용 전) */
 const floorTop = (i: number) => GROUND_Y - (i + 1) * H;
+
+/**
+ * 파트너 말랑이는 움직이는 블록 위에 올라타 함께 좌우로 오간다 (월드 단위).
+ * 몸통 폭 약 40, 몸통 아랫변(viewBox y=108)이 블록 윗변보다 살짝 아래로 파묻힌다.
+ */
+const SPRITE_WORLD = 64;
+const SPRITE_FOOT = 52;
 
 function cameraTarget(state: StackState): number {
   return Math.max(0, CAMERA_LINE - floorTop(state.tower.length));
@@ -194,11 +202,16 @@ function drawScene(ctx: CanvasRenderingContext2D, state: StackState, partner: Ch
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function StackGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dropBtnRef = useRef<HTMLButtonElement>(null);
+  const spriteRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
+  /** CSS px / 월드 단위 */
+  const scaleRef = useRef(1);
+  const [spritePx, setSpritePx] = useState(56);
   const stateRef = useRef<StackState>(createStackState());
   const fxRef = useRef<Fx>({ camera: 0, pieces: [], popups: [], wobble: 0 });
   const startedRef = useRef(false);
@@ -222,12 +235,31 @@ function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     });
   }, []);
 
+  /** 말랑이를 움직이는 블록 위로 (끝나면 탑 꼭대기 블록 위로). 리렌더 없이 transform만 바꾼다. */
+  const placeSprite = (s: StackState, fx: Fx) => {
+    const el = spriteRef.current;
+    if (!el) return;
+    const k = scaleRef.current;
+    const size = SPRITE_WORLD * k;
+    const top = s.tower[s.tower.length - 1];
+    const ride = s.finished ? top : s.slider;
+    if (!ride) return;
+    const floor = s.finished ? s.tower.length - 1 : s.tower.length;
+    const footY = floorTop(floor) + 3 + fx.camera;
+    const cx = ride.x + ride.w / 2;
+    el.style.transform = `translate(${(cx * k - size / 2).toFixed(1)}px, ${((footY - SPRITE_FOOT) * k).toFixed(1)}px)`;
+  };
+
   // 캔버스 해상도: 논리 월드를 devicePixelRatio에 맞춰 선명하게
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.clientWidth <= 0) return;
+      scaleRef.current = canvas.clientWidth / WORLD.width;
+      setSpritePx(Math.round(SPRITE_WORLD * scaleRef.current));
+      placeSprite(stateRef.current, fxRef.current);
       const scale = (canvas.clientWidth / WORLD.width) * dpr;
       if (scale <= 0) return;
       canvas.width = Math.round(WORLD.width * scale);
@@ -259,11 +291,14 @@ function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     if (result.kind === 'miss') {
       fx.pieces.push({ ...result.lost, y, vy: 0, rot: 0, vr: spin(result.lost.x < WORLD.width / 2 ? -1 : 1), color, age: 0 });
       sfx.fail();
+      buddyRef.current?.setBase('sad');
+      buddyRef.current?.react('oops', 600);
       setEnded('miss');
     } else {
       sfx.tap(Math.min(12, Math.floor(state.floors / 3)));
       fx.wobble = reduced ? 0 : 1;
       const cx = result.placed.x + result.placed.w / 2;
+      buddyRef.current?.react(result.kind === 'perfect' ? 'wow' : 'happy', result.kind === 'perfect' ? 700 : 400);
       if (result.kind === 'perfect') {
         sfx.pickup();
         fx.popups.push({ x: cx, y: y - 6, text: result.grew ? '딱 맞음! 넓어졌어요' : '딱 맞음!', color: '#e84d74', age: 0 });
@@ -309,6 +344,7 @@ function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       stateRef.current = s;
       if (s.finished && !prev.finished && s.endReason === 'time') {
         sfx.success();
+        buddyRef.current?.setBase('happy');
         setEnded('time');
       }
 
@@ -321,6 +357,7 @@ function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         .filter((p) => p.age < 1200);
       fx.popups = fx.popups.map((p) => ({ ...p, age: p.age + dt })).filter((p) => p.age < 800);
       drawScene(ctx, s, partner, fx);
+      placeSprite(s, fx);
 
       hudAcc += dt;
       if (!s.finished && hudAcc > 100) {
@@ -374,6 +411,9 @@ function StackGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         )}
       </p>
       <div className="st__stage">
+        <div ref={spriteRef} className="st__partner" style={{ width: spritePx, height: spritePx }}>
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={spritePx} animation="none" />
+        </div>
         <canvas
           ref={canvasRef}
           className="st__canvas"

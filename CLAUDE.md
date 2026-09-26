@@ -221,8 +221,12 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
    const game: MiniGame = { id, name, description, icon, Component };
    export default game;
    ```
-   `Component` 는 `MiniGameProps`(`partner`, `onFinish({score, stats})`, `onExit`, `sfx`)를 받는다.
+   `Component` 는 `MiniGameProps`(`partner`, `partnerShiny?`, `onFinish({score, stats})`, `onExit`, `sfx`)를 받는다.
    **코인을 계산/지급하지 않는다.** 점수만 `onFinish` 로 보고.
+   **파트너 말랑이가 게임 안에 꼭 보여야 한다** (주인공이거나 옆에서 응원): `minigames/shared/PartnerBuddy`
+   (`<Malang>` 하나 + 표정 반응 `react('happy'|'wow'|'oops'|'sad')`/`setBase`, 전설 이상은 오라). 캔버스 게임은
+   DOM 스프라이트를 월드 좌표로 옮긴다(`capsule-catch`, `malang-jump`, `stack` 참고). 궤적 색은 `partnerTrailColor`.
+   CSS 클래스 접두사는 게임마다 달라야 한다(모든 게임 CSS가 함께 로드된다).
 3. `src/minigames/registry.ts` 의 `MINI_GAMES` 배열에 한 줄 추가.
 4. (선택) `economy/config.ts` 의 `GAME_MULTIPLIERS` 에 배율 추가 — 없으면 기본 배율 사용.
 

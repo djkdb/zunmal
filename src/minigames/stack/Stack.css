@@ -49,6 +49,16 @@
   cursor: pointer;
 }
 
+/* 파트너 말랑이: 움직이는 블록에 올라탄다. 캔버스 위에 그리지만 입력은 캔버스가 받는다 */
+.st__partner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform;
+}
+
 .st__drop {
   align-self: center;
   width: min(100%, 260px);

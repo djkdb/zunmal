@@ -1,0 +1,202 @@
+/* ── 함께할 말랑이 카드: 평평한 외곽선 패널, 말랑이는 희귀도 색 받침 위에 ── */
+.partner-card {
+  --plate: var(--rarity-common);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px 8px 8px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  text-align: left;
+}
+
+.partner-card--rare {
+  --plate: var(--rarity-rare);
+}
+.partner-card--epic {
+  --plate: var(--rarity-epic);
+}
+.partner-card--legendary {
+  --plate: var(--rarity-legendary);
+}
+.partner-card--mythic {
+  --plate: #ffc2d4;
+}
+.partner-card--secret {
+  --plate: #6a4fb3;
+}
+
+.partner-card__stage {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 78%, rgba(43, 34, 51, 0.14) 0 30%, transparent 31%),
+    radial-gradient(circle at 35% 28%, #fff 0 16%, transparent 50%), color-mix(in srgb, var(--plate) 55%, #fff);
+  overflow: visible;
+}
+
+.partner-card--secret .partner-card__stage {
+  background: radial-gradient(circle at 25% 30%, #fff 0 1.2px, transparent 2px),
+    radial-gradient(circle at 70% 22%, #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 80% 70%, #fff 0 1px, transparent 1.6px), linear-gradient(160deg, #2d1b5e, #6a4fb3);
+}
+
+.partner-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.partner-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.25;
+  word-break: keep-all;
+}
+
+.partner-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+}
+
+.partner-bonus {
+  padding: 0 8px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--matcha);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.partner-bonus.is-none {
+  background: transparent;
+  border-style: dashed;
+  border-color: rgba(43, 34, 51, 0.4);
+  color: var(--ink-soft);
+}
+
+.partner-card__change {
+  padding-inline: 14px;
+}
+
+/* ── 고르기 창 ── */
+.partner-sheet .modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.partner-sheet__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-l);
+  font-weight: 400;
+  text-align: center;
+}
+
+.partner-sheet__hint {
+  margin: -6px 0 0;
+  text-align: center;
+}
+
+.partner-sheet__shiny {
+  align-self: center;
+}
+
+.partner-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: min(56dvh, 420px);
+  margin: 0 -6px;
+  padding: 4px 6px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.partner-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 4px 8px;
+  border: 2.5px solid rgba(43, 34, 51, 0.25);
+  border-radius: var(--radius-slot);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.partner-option.is-selected {
+  border: var(--line) solid var(--ink);
+  background: color-mix(in srgb, var(--lemon) 45%, var(--paper));
+  box-shadow: var(--keycap-s);
+}
+
+.partner-option:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.partner-option:active:not(.is-selected) {
+  transform: scale(0.96);
+}
+
+.partner-option__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.partner-option__shiny {
+  position: absolute;
+  top: -2px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+}
+
+.partner-option__name {
+  max-width: 100%;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.partner-option__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2px 4px;
+}
+
+.partner-option__pct {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.partner-sheet__done {
+  flex: none;
+}

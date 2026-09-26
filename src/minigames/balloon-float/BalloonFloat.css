@@ -70,6 +70,12 @@
   will-change: transform, top;
 }
 
+.bf__malang .buddy {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
 .bf__malang .malang {
   display: block;
   width: 100%;

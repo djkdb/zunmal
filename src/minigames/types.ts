@@ -12,6 +12,11 @@ export interface MiniGameResultPayload {
 export interface MiniGameProps {
   /** 함께 플레이하는 파트너 말랑이 (연출용). 코인 보너스는 게임 밖에서 계산된다. */
   partner: Character;
+  /**
+   * 파트너를 반짝 모습으로 보여 줄지 (보유한 반짝 + 사용자가 켠 경우에만 true).
+   * 연출 전용이라 쓰지 않는 게임은 무시해도 된다.
+   */
+  partnerShiny?: boolean;
   /** 게임 종료 시 한 번 호출. 게임은 코인을 직접 지급하지 않는다. */
   onFinish(result: MiniGameResultPayload): void;
   /** 중도 포기 (점수 없음) */

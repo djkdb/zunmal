@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Malang } from '../../components/Malang';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -22,7 +22,7 @@ interface Floater {
   text: string;
 }
 
-function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function ButtonMalangGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const [state, setState] = useState(createButtonMalangState);
@@ -32,6 +32,7 @@ function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   const [finished, setFinished] = useState(false);
   const [now, setNow] = useState(0);
   const malangRef = useRef<HTMLButtonElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const floaterId = useRef(0);
 
   const playing = started && !finished;
@@ -59,6 +60,7 @@ function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     if (!finished) return;
     const s = stateRef.current;
     sfx.success();
+    buddyRef.current?.setBase('happy');
     const id = window.setTimeout(
       () => onFinish({ score: s.score, stats: { 누른횟수: s.hits, 최대콤보: s.maxCombo, 실수: s.misses } }),
       reduced ? 200 : 800,
@@ -81,6 +83,8 @@ function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       setState(out.state);
       sfx.tap(Math.min(12, Math.floor(out.state.combo / 5)));
       addFloater(x, y, `+${out.points}`);
+      // 몸은 아래에서 따로 눌리므로 표정만 바꾼다. 10콤보마다 반짝 눈.
+      buddyRef.current?.react(out.state.combo > 0 && out.state.combo % 10 === 0 ? 'wow' : 'happy', 450, false);
       if (!reduced) {
         malangRef.current?.animate(
           [
@@ -108,6 +112,7 @@ function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     stateRef.current = next;
     setState(next);
     sfx.hit();
+    buddyRef.current?.react('oops', 600);
     const rect = e.currentTarget.getBoundingClientRect();
     addFloater(e.clientX - rect.left, e.clientY - rect.top, '앗!');
   };
@@ -147,7 +152,14 @@ function ButtonMalangGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           // 포인터/키보드는 위 핸들러가 처리하므로 click은 무시(중복 방지)
           onClick={(e) => e.preventDefault()}
         >
-          <Malang character={partner} size={220} animation={playing ? 'idle' : 'none'} decorative />
+          <PartnerBuddy
+            ref={buddyRef}
+            partner={partner}
+            shiny={partnerShiny}
+            size={220}
+            animation={playing ? 'idle' : 'none'}
+            className="bm__buddy"
+          />
         </button>
         {floaters.map((f) => (
           <span key={f.id} className="bm__floater" style={{ left: f.x, top: f.y }} aria-hidden="true">

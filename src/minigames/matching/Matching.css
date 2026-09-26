@@ -7,6 +7,7 @@
 .mt__status {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 6px;
   min-height: 2em;
@@ -36,6 +37,12 @@
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* 파트너가 점수판 옆에서 구경하며 반응한다 */
+.mt__buddy {
+  flex: none;
+  margin: -6px 2px -4px 0;
 }
 
 .mt__grid {

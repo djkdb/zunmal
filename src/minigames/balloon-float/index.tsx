@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Malang } from '../../components/Malang';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { darken, lighten } from '../../lib/color';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -363,11 +363,12 @@ function drawScene(ctx: CanvasRenderingContext2D, s: BalloonState, fx: Fx, reduc
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function BalloonFloatGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function BalloonFloatGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const malangRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const flapBtnRef = useRef<HTMLButtonElement>(null);
   const stateRef = useRef<BalloonState | null>(null);
   if (stateRef.current === null) stateRef.current = createBalloonState(defaultRng);
@@ -479,9 +480,11 @@ function BalloonFloatGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           sfx.flip();
         } else if (ev.type === 'star') {
           sfx.pickup();
+          buddyRef.current?.react('happy', 600, false);
           fx.popups.push({ x: ev.x, y: ev.y - 8, text: `+${ev.points}`, color: '#c98a00', age: 0 });
         } else if (ev.type === 'hit') {
           sfx.hit();
+          buddyRef.current?.react('oops', 900);
           // 터진 풍선 자리에서 조각이 흩어진다
           const spot = balloonSpots(ev.balloonsLeft + 1)[ev.balloonsLeft] ?? { dx: 0, dy: -52, color: BERRY };
           if (!reduced) {
@@ -508,11 +511,13 @@ function BalloonFloatGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           });
         } else if (ev.type === 'pop') {
           sfx.fail();
+          buddyRef.current?.setBase('sad');
           fx.fallY = s.y;
           fx.fallVy = -120;
           setEnded('pop');
         } else if (ev.type === 'timeUp') {
           sfx.success();
+          buddyRef.current?.setBase('wow');
           if (ev.bonus > 0) {
             fx.popups.push({ x: WORLD.width / 2, y: WORLD.height * 0.4, text: `완주 +${ev.bonus}`, color: '#e8527f', age: 0 });
           }
@@ -619,7 +624,7 @@ function BalloonFloatGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           style={{ left: `${(PLAYER_X / WORLD.width) * 100}%`, width: `${(MALANG_WORLD_SIZE / WORLD.width) * 100}%` }}
           aria-hidden="true"
         >
-          <Malang character={partner} size={80} animation="none" decorative />
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={80} animation="none" />
         </div>
         <Countdown count={count} />
         {ended && (

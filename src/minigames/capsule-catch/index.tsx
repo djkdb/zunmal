@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Character } from '../../data/characters';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
-import { darken, isDark, lighten } from '../../lib/color';
+import { darken, lighten } from '../../lib/color';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -109,63 +110,53 @@ function drawBomb(ctx: CanvasRenderingContext2D, item: FallingItem, r: number, t
   ctx.restore();
 }
 
-function drawPlayer(ctx: CanvasRenderingContext2D, x: number, partner: Character, stunned: boolean, squash: number) {
+/**
+ * 파트너 말랑이가 들어앉은 젤리 그릇 (앞면만).
+ * 말랑이는 캔버스 뒤 DOM(SVG)에 있고, 캔버스가 그 위에 그릇 앞면과 캡슐을 그려 "그릇 속에 앉은" 모습이 된다.
+ */
+function drawBowl(ctx: CanvasRenderingContext2D, x: number, partner: Character, squash: number) {
   const w = CONFIG.playerWidth;
   const h = CONFIG.playerHeight;
   const y = CONFIG.playerY;
+  const rimY = -h * 0.35;
+  const rimRy = h * 0.14;
+  const tint = partner.accentColor ?? lighten(partner.color, 0.35);
   ctx.save();
   ctx.translate(x, y + h / 2);
   ctx.scale(1 + squash * 0.15, 1 - squash * 0.2);
   ctx.translate(0, -h / 2);
-  // 몸통 (말랑이 = 바구니)
-  const grad = ctx.createRadialGradient(-w * 0.2, -h * 0.4, 2, 0, 0, w * 0.7);
-  grad.addColorStop(0, lighten(partner.color, 0.5));
-  grad.addColorStop(0.5, partner.color);
-  grad.addColorStop(1, darken(partner.color, 0.2));
+  const grad = ctx.createLinearGradient(0, rimY, 0, h * 0.6);
+  grad.addColorStop(0, lighten(tint, 0.45));
+  grad.addColorStop(0.6, tint);
+  grad.addColorStop(1, darken(tint, 0.18));
   ctx.fillStyle = grad;
   ctx.strokeStyle = INK;
   ctx.lineWidth = 3.5;
+  ctx.lineJoin = 'round';
+  // 그릇 몸통: 테두리 앞쪽 반원에서 아래로 둥글게
   ctx.beginPath();
-  ctx.moveTo(-w / 2, -h * 0.35);
-  ctx.bezierCurveTo(-w / 2, h * 0.7, w / 2, h * 0.7, w / 2, -h * 0.35);
-  ctx.bezierCurveTo(w * 0.3, -h * 0.55, -w * 0.3, -h * 0.55, -w / 2, -h * 0.35);
+  ctx.ellipse(0, rimY, w / 2, rimRy, 0, Math.PI, 0, true);
+  ctx.bezierCurveTo(w / 2, h * 0.75, -w / 2, h * 0.75, -w / 2, rimY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  // 입구 (바구니 느낌)
-  ctx.fillStyle = 'rgba(43,34,51,0.25)';
+  // 광택 + 도트 무늬
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.beginPath();
-  ctx.ellipse(0, -h * 0.4, w * 0.4, h * 0.12, 0, 0, Math.PI * 2);
+  ctx.ellipse(-w * 0.24, h * 0.1, w * 0.1, h * 0.12, -0.4, 0, Math.PI * 2);
   ctx.fill();
-  // 얼굴
-  const featureColor = isDark(partner.color) ? '#fff6e6' : INK;
-  ctx.fillStyle = featureColor;
-  ctx.strokeStyle = featureColor;
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  if (stunned) {
-    for (const ex of [-12, 12]) {
-      ctx.beginPath();
-      ctx.moveTo(ex - 4, 0);
-      ctx.lineTo(ex + 4, 8);
-      ctx.moveTo(ex + 4, 0);
-      ctx.lineTo(ex - 4, 8);
-      ctx.stroke();
-    }
-  } else {
-    for (const ex of [-12, 12]) {
-      ctx.beginPath();
-      ctx.arc(ex, 4, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  ctx.fillStyle = darken(tint, 0.1);
+  for (const dx of [0.02, 0.24]) {
+    ctx.beginPath();
+    ctx.arc(w * dx, h * 0.22, 2.6, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.fillStyle = 'rgba(255,122,156,0.5)';
-  ctx.beginPath();
-  ctx.ellipse(-21, 11, 5, 3, 0, 0, Math.PI * 2);
-  ctx.ellipse(21, 11, 5, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
+
+/** 말랑이 스프라이트: 월드 단위 크기와 그릇 대비 위치 (몸통 아래쪽이 그릇 테두리 뒤로 살짝 들어간다) */
+const SPRITE_WORLD = 92;
+const SPRITE_TOP = CONFIG.playerY - 84;
 
 function drawScene(
   ctx: CanvasRenderingContext2D,
@@ -183,7 +174,7 @@ function drawScene(
     if (item.kind === 'bomb') drawBomb(ctx, item, r, state.elapsedMs);
     else drawCapsule(ctx, item, r);
   }
-  drawPlayer(ctx, state.playerX, partner, state.elapsedMs < state.stunnedUntilMs, squash);
+  drawBowl(ctx, state.playerX, partner, squash);
   ctx.textAlign = 'center';
   ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
   for (const p of popups) {
@@ -200,16 +191,30 @@ function drawScene(
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function CapsuleCatchGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const spriteRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
+  /** CSS px / 월드 단위 */
+  const scaleRef = useRef(1);
+  const [spritePx, setSpritePx] = useState(80);
   const stateRef = useRef<CatchState>(createCatchState());
   const inputRef = useRef<CatchInput>({ direction: 0, targetX: null });
   const keysRef = useRef({ left: false, right: false });
   const [hud, setHud] = useState({ score: 0, timeLeft: CONFIG.durationMs / 1000, streak: 0 });
   const [finished, setFinished] = useState(false);
+
+  /** 파트너 말랑이를 그릇 위치로 옮긴다 (리렌더 없이 transform만) */
+  const placeSprite = (x: number, squash: number) => {
+    const el = spriteRef.current;
+    if (!el) return;
+    const k = scaleRef.current;
+    const size = SPRITE_WORLD * k;
+    el.style.transform = `translate(${(x * k - size / 2).toFixed(1)}px, ${(SPRITE_TOP * k).toFixed(1)}px) scale(${1 + squash * 0.1}, ${1 - squash * 0.12})`;
+  };
 
   // 캔버스 해상도: 논리 월드를 devicePixelRatio에 맞춰 선명하게
   useEffect(() => {
@@ -218,6 +223,10 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cssW = canvas.clientWidth;
+      if (cssW <= 0) return;
+      scaleRef.current = cssW / WORLD.width;
+      setSpritePx(Math.round(SPRITE_WORLD * scaleRef.current));
+      placeSprite(stateRef.current.playerX, 0);
       const scale = (cssW / WORLD.width) * dpr;
       canvas.width = Math.round(WORLD.width * scale);
       canvas.height = Math.round(WORLD.height * scale);
@@ -274,9 +283,11 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           if (ev.kind === 'gold') sfx.coin();
           else sfx.pickup();
           squash = 1;
+          buddyRef.current?.react(ev.kind === 'gold' ? 'wow' : 'happy', ev.kind === 'gold' ? 800 : 450, false);
           popups.push({ x: ev.x, y: ev.y - 10, text: `+${ev.points}`, color: ev.kind === 'gold' ? '#e08a00' : '#ff5d8f', age: 0 });
         } else if (ev.type === 'bomb') {
           sfx.hit();
+          buddyRef.current?.react('oops', CONFIG.stunMs);
           if (!reduced) {
             wrapRef.current?.animate(
               [
@@ -303,6 +314,7 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       popups = popups.map((p) => ({ ...p, age: p.age + dt })).filter((p) => p.age < 700);
       squash = Math.max(0, squash - dt / 150);
       drawScene(ctx, out.state, partner, popups, reduced ? 0 : squash);
+      placeSprite(out.state.playerX, reduced ? 0 : squash);
 
       hudAcc += dt;
       if (hudAcc > 100 || out.state.finished) {
@@ -328,6 +340,7 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     if (!finished) return;
     const s = stateRef.current;
     sfx.success();
+    buddyRef.current?.setBase(s.bombsHit === 0 ? 'wow' : 'happy');
     const id = window.setTimeout(
       () =>
         onFinish({
@@ -388,6 +401,9 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         {hud.streak >= 2 ? `${hud.streak}연속 받기!` : '캡슐은 받고, 가시 폭탄은 피해요'}
       </p>
       <div ref={wrapRef} className="cc__stage">
+        <div ref={spriteRef} className="cc__partner" style={{ width: spritePx, height: spritePx }}>
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={spritePx} animation="none" />
+        </div>
         <canvas
           ref={canvasRef}
           className="cc__canvas"
