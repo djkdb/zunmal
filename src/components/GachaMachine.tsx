@@ -41,6 +41,8 @@ interface GachaMachineProps {
   run: MachineRun | null;
   /** 캡슐 오픈 연출이 끝났을 때 */
   onOpened(): void;
+  /** true면 캡슐을 열 때 결과음을 내지 않는다 (뒤이어 나오는 신화 연출이 직접 낸다) */
+  quietFanfare?: boolean;
 }
 
 const TIMINGS = {
@@ -90,7 +92,9 @@ function CapsuleShape({ top, id }: { top: string; id: string }) {
  * run이 바뀌면: 투입 → 흔들림 → 캡슐 낙하 → (탭 대기) → 오픈 → onOpened()
  * 뽑기 결과 자체는 이미 store에 반영된 상태이며, 이 컴포넌트는 연출만 담당한다.
  */
-export function GachaMachine({ run, onOpened }: GachaMachineProps) {
+export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachineProps) {
+  const quietRef = useRef(quietFanfare);
+  quietRef.current = quietFanfare;
   const reduced = useReducedMotion();
   const [phase, setPhase] = useState<MachinePhase>('idle');
   const timers = useRef<number[]>([]);
@@ -149,7 +153,7 @@ export function GachaMachine({ run, onOpened }: GachaMachineProps) {
     setPhase('opening');
     sfx.capsuleOpen();
     after(t.opening, () => {
-      playRarityFanfare(sfx, run.rarity, run.shiny);
+      if (!quietRef.current) playRarityFanfare(sfx, run.rarity, run.shiny);
       onOpenedRef.current();
     });
   };

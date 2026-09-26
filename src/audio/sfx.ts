@@ -25,6 +25,10 @@ export interface Sfx {
   secretTease(): void;
   /** 반짝 버전 획득 */
   shinyChime(): void;
+  /** 신화 이상 연출: 점점 차오르는 소리 (초 단위 길이) */
+  epicRiser(seconds: number): void;
+  /** 신화 이상 연출: 캡슐이 터지는 충격음 */
+  epicImpact(): void;
   success(): void;
   fail(): void;
   /** 미니게임: 가벼운 탭음. level이 높을수록 음이 올라간다 (콤보 표현). */
@@ -194,6 +198,56 @@ export class SfxEngine implements Sfx {
     env.connect(out);
     src.start(t0);
     src.stop(t0 + duration + 0.02);
+  }
+
+  /** 필터 주파수가 from → to로 쓸려 올라가는(내려가는) 노이즈. 길어도 끊기지 않게 버퍼를 반복한다. */
+  private sweep(duration: number, { from, to, gain = 0.2, delay = 0, q = 4 }: { from: number; to: number; gain?: number; delay?: number; q?: number }) {
+    const r = this.ready();
+    if (!r) return;
+    const { ctx, out } = r;
+    this.noise(0.001, { gain: 0.0001 }); // noiseBuffer 준비
+    if (!this.noiseBuffer) return;
+    const t0 = ctx.currentTime + delay;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = q;
+    filter.frequency.setValueAtTime(from, t0);
+    filter.frequency.exponentialRampToValueAtTime(to, t0 + duration);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.exponentialRampToValueAtTime(gain, t0 + duration * 0.9);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + duration + 0.05);
+    src.connect(filter);
+    filter.connect(env);
+    env.connect(out);
+    src.start(t0);
+    src.stop(t0 + duration + 0.1);
+  }
+
+  epicRiser(seconds: number) {
+    const d = Math.max(0.3, seconds);
+    // 바람이 몰려드는 듯한 노이즈 스윕 + 반음씩 올라가는 두 겹 톱니파 + 낮은 웅웅거림
+    this.sweep(d, { from: 180, to: 5200, gain: 0.32, q: 3 });
+    this.tone({ freq: 110, slideTo: 440, duration: d, type: 'sawtooth', gain: 0.05, attack: d * 0.8 });
+    this.tone({ freq: 111.5, slideTo: 446, duration: d, type: 'sawtooth', gain: 0.05, attack: d * 0.8 });
+    this.tone({ freq: 55, duration: d, type: 'sine', gain: 0.25, attack: d * 0.5 });
+    // 끝에 가까울수록 빨라지는 반짝임
+    const ticks = 10;
+    for (let i = 0; i < ticks; i++) {
+      const at = d * (1 - (1 - i / ticks) ** 1.8);
+      this.tone({ freq: 880 * 2 ** (i / 6), duration: 0.06, type: 'triangle', gain: 0.05, delay: at });
+    }
+  }
+
+  epicImpact() {
+    // 깊은 쿵 + 파열음 + 오래 남는 심벌 같은 치익
+    this.tone({ freq: 90, slideTo: 32, duration: 0.9, type: 'sine', gain: 0.9, attack: 0.002 });
+    this.tone({ freq: 180, slideTo: 60, duration: 0.25, type: 'triangle', gain: 0.35, attack: 0.002 });
+    this.noise(0.35, { freq: 700, gain: 0.6, q: 0.6 });
+    this.sweep(1.6, { from: 9000, to: 3000, gain: 0.12, q: 0.8, delay: 0.02 });
   }
 
   private arpeggio(notes: readonly number[], step: number, opts: Omit<ToneOptions, 'freq'> & { startDelay?: number }) {

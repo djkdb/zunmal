@@ -99,6 +99,10 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다.
 - **등급 차별화**: 등급마다 캡슐 색, 머신 흔들림, 결과음(`playRarityFanfare`), 결과 모달 테두리가 다르다.
   시크릿은 화면이 어두워지는 예고 단계(`tease`)와 밤하늘 테마 결과 모달이 따로 있다.
+- **신화 이상 전체 화면 연출** (`components/epic/EpicReveal.tsx`, 입자는 순수 모듈 `epic/particles.ts`):
+  모으기(캡슐 떨림·금·빛 흡수, `sfx.epicRiser`) → 폭발(섬광·충격파·입자 수백 개, `sfx.epicImpact`, 진동)
+  → 등장(회전 광선 + 하얗게 빛나다 색이 드는 말랑이) → 제목 도장("신화!"/"시크릿!!"). 시크릿은 더 길고 별 워프가 추가된다.
+  탭/Enter/Esc로 건너뛰기(처음 0.5초는 무시), 움직임 줄이기면 정지 카드만. 이때 머신은 결과음을 내지 않는다(`quietFanfare`).
 
 ## 컬렉션 (`data/collections.ts`)
 

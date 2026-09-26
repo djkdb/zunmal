@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
 import { PullResult } from '../components/PullResult';
+import { EpicReveal, isEpicRarity } from '../components/epic/EpicReveal';
 import { RateTable } from '../components/RateTable';
 import { GACHA_RULES, rarityRank, type Rarity } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
@@ -24,9 +25,15 @@ export function GachaPage() {
   const [run, setRun] = useState<MachineRun | null>(null);
   const [pending, setPending] = useState<PendingResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [showEpic, setShowEpic] = useState(false);
   const [message, setMessage] = useState('');
 
   const busy = run !== null;
+  // 이번 뽑기에서 가장 높은 결과가 신화 이상이면 전체 화면 연출을 먼저 보여준다
+  const epicItem = pending?.items.reduce<ResolvedPull | undefined>(
+    (best, it) => (isEpicRarity(it.rarity) && (!best || rarityRank(it.rarity) > rarityRank(best.rarity)) ? it : best),
+    undefined,
+  );
   // 같은 프레임 안에서 버튼이 여러 번 눌려도(연타) 뽑기가 한 번만 일어나도록 즉시 잠근다.
   // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다.
   const lockRef = useRef(false);
@@ -59,6 +66,7 @@ export function GachaPage() {
   const close = () => {
     sfx.button();
     setShowResult(false);
+    setShowEpic(false);
     setPending(null);
     setRun(null);
     lockRef.current = false;
@@ -71,7 +79,11 @@ export function GachaPage() {
       </h1>
 
       <div className="gacha-page__machine">
-        <GachaMachine run={run} onOpened={() => setShowResult(true)} />
+        <GachaMachine
+          run={run}
+          quietFanfare={!!epicItem}
+          onOpened={() => (epicItem ? setShowEpic(true) : setShowResult(true))}
+        />
         <div className="gacha-page__actions">
           {(['single', 'multi'] as const).map((kind) => {
             const price = PULL_PRICE[kind];
@@ -118,6 +130,15 @@ export function GachaPage() {
 
       <RateTable />
 
+      {showEpic && epicItem && (
+        <EpicReveal
+          item={epicItem}
+          onDone={() => {
+            setShowEpic(false);
+            setShowResult(true);
+          }}
+        />
+      )}
       {showResult && pending && <PullResult items={pending.items} totalRefund={pending.totalRefund} onClose={close} />}
     </section>
   );
