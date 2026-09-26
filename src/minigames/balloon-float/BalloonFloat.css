@@ -1,0 +1,85 @@
+.bf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 화면 어디를 눌러도 떠오르므로 더블탭 확대를 막는다 */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bf__info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.bf__balloons {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.bf__mark.is-gone {
+  opacity: 0.45;
+}
+
+.bf__stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-m);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf__status {
+  color: var(--ink);
+}
+
+.bf__stage {
+  position: relative;
+  /* 2:3 비율 유지 — 화면이 낮으면 폭을 줄여 떠오르기 버튼이 항상 보이도록 */
+  width: min(100%, 400px, max(180px, calc((100dvh - 250px) * 2 / 3)));
+  margin: 0 auto;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  touch-action: none;
+  cursor: pointer;
+  background: linear-gradient(180deg, #bfe8ff 0%, #dff3ff 45%, #fff0f5 80%, var(--paper) 100%);
+}
+
+.bf__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 480;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.bf__malang {
+  position: absolute;
+  top: 45%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  transform-origin: 50% 56%;
+  will-change: transform, top;
+}
+
+.bf__malang .malang {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.bf__flap {
+  align-self: center;
+  width: min(100%, 260px);
+  min-height: 52px;
+  touch-action: manipulation;
+  font-family: var(--font-display);
+}
