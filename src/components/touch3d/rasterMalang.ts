@@ -6,7 +6,7 @@
  * 애니메이션 중간 값이 찍히지 않도록 원본 쪽은 CSS 로 애니메이션을 꺼 둔다(TouchPage.css `.touch3d-src`).
  *
  * 부분 굽기:
- *  - body  : 전체 (몸통 + 무늬 + 얼굴 + 앞 장식) → 부풀린 몸에 입힘
+ *  - body  : 전체 (몸통 + 무늬 + 얼굴 + 앞 장식) → 부풀린 몸에 입힘. 2D 광택·그늘·외곽선은 빼고 바탕 색만 (빛은 3D 가 준다)
  *  - back  : 몸통 뒤 장식(날개·귀·꼬리…)만, 몸통 안쪽은 지움 → 몸 뒤 평평한 카드
  *  - front : 얼굴 앞 장식(왕관·리본…) 중 몸통 밖으로 나온 부분만 → 몸 앞 평평한 카드 (외곽선보다 위)
  */
@@ -91,8 +91,9 @@ function prune(svg: SVGSVGElement, part: RasterPart, bodyPath: string, bottom: n
   if (!group) return;
   if (part === 'body') {
     // 몸통 잉크 외곽선은 3D 외곽선(뒤집힌 껍질)이 대신 그린다 — 텍스처에 남기면 가장자리가 회색 띠로 늘어난다
-    for (const el of Array.from(group.children)) {
-      if (el.tagName.toLowerCase() !== 'path' || el.getAttribute('d') !== bodyPath) continue;
+    // 몸통 선은 콕 찌르기 묶음(.malang-poke) 안에 있다 → 자식만이 아니라 후손에서 찾는다
+    for (const el of Array.from(group.querySelectorAll('path'))) {
+      if (el.getAttribute('d') !== bodyPath) continue;
       // 복제본은 문서 밖이라 계산된 스타일이 없다 → 속성과 옮겨 적은 style 로 판단
       const style = (el.getAttribute('style') ?? '').replace(/\s/g, '');
       if (el.getAttribute('fill') === 'none' || /(^|;)fill:none/.test(style)) {
@@ -100,6 +101,11 @@ function prune(svg: SVGSVGElement, part: RasterPart, bodyPath: string, bottom: n
         el.setAttribute('stroke', 'none');
       }
     }
+    // 3D 몸은 진짜 빛·그늘을 받는다 → 그림에 그려 둔 광택·아랫면 그늘·속빛·바닥 그림자는 빼고 바탕 색만 굽는다
+    // (남기면 반사가 두 번 생기고 "스티커"처럼 보인다). 얼굴·무늬·반짝 무지개는 그대로.
+    group.querySelectorAll('.malang-spec, .malang-jelly').forEach((el) => el.remove());
+    const first = group.firstElementChild;
+    if (first && first.tagName.toLowerCase() === 'ellipse' && Number(first.getAttribute('cy')) >= bottom - 1) first.remove();
     return;
   }
   const top = Array.from(svg.children);
@@ -202,6 +208,27 @@ export async function rasterizeMalang(
         }
       }
       ctx.restore();
+    }
+    if (part === 'body') {
+      // 몸통 밖 투명한 칸을 가장자리 색으로 메운다 (번짐 늘리기): 둥근 옆면·늘어난 가장자리는 윤곽 바로 밖을 읽는데,
+      // 투명(검정)이면 옆면이 회색 띠로 보인다. 몸통 안쪽은 원본이 위에 그대로 남는다.
+      const copy = document.createElement('canvas');
+      copy.width = size;
+      copy.height = height;
+      const cctx = copy.getContext('2d');
+      if (cctx) {
+        ctx.globalCompositeOperation = 'destination-over';
+        // 3 단계 × 6 방향 (굽기는 얼굴마다 한 번뿐이라 가볍다)
+        for (const r of [2, 5, 11]) {
+          cctx.clearRect(0, 0, size, height);
+          cctx.drawImage(canvas, 0, 0);
+          for (let k = 0; k < 6; k++) {
+            const a = (k / 6) * Math.PI * 2 + r;
+            ctx.drawImage(copy, Math.round(Math.cos(a) * r), Math.round(Math.sin(a) * r));
+          }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
     if (part === 'back' || part === 'front') {
       ctx.globalCompositeOperation = 'destination-out';

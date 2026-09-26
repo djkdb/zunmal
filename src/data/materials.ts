@@ -56,6 +56,38 @@ export interface MaterialWorld {
   stick: number;
 }
 
+/**
+ * 3D 겉모습 (`components/touch3d/jellyScene.ts` 가 읽는다) — 실제 말랑이 장난감 사진처럼 보이게 하는 값.
+ * 셰이더 하나(MeshPhysicalMaterial + 덧붙인 GLSL)가 이 값만 바꿔 네 재질을 그린다. 2D 대체 화면은 쓰지 않는다.
+ */
+export interface MaterialLook {
+  /** 바탕 거칠기 (0 = 거울, 1 = 가루처럼 흐림) */
+  roughness: number;
+  /** 겉 코팅 광택 세기와 거칠기 — 젤리·찐득이의 또렷한 반사 */
+  clearcoat: number;
+  clearcoatRoughness: number;
+  /** 스치는 각도의 보송한 빛 (벨벳·폼) */
+  sheen: number;
+  sheenRoughness: number;
+  /** 바탕 반사 세기 */
+  specular: number;
+  /** 주변(방) 반사 세기 */
+  envIntensity: number;
+  /** 가짜 속 비침 0..1: 감싸는 빛 + 두꺼운 가운데는 진하게 + 가장자리로 빛이 새어 나옴 + 바닥에 모이는 빛 */
+  translucency: number;
+  /** 표면 잔결(폼 가루·실리콘 결) 세기 0..1 와 촘촘함 (텍스처 한 장당 칸 수) */
+  grain: number;
+  grainScale: number;
+  /** 윤곽 쪽이 살짝 어두워지는 정도 (만화 외곽선 대신 몸이 둥글어 보이게) */
+  edgeDark: number;
+  /** 얇은 외곽선 진하기 0..1 (0 = 없음). 캐릭터 모양을 알아보게 가늘게만 */
+  outline: number;
+  /** 정면에서 그림 색을 지키는 정도 0..1 (얼굴·무늬를 또렷하게) */
+  albedoHold: number;
+  /** 젖은 듯 또렷한 작은 반사점 0..1 */
+  wet: number;
+}
+
 export interface MaterialSpec {
   id: MaterialId;
   /** 표시 이름 */
@@ -68,6 +100,8 @@ export interface MaterialSpec {
    * 들어서 옮기기 시작하는 거리 (말랑이 크기 대비). 쭉쭉이는 멀리 늘어난 뒤에야 따라온다.
    */
   carryFrac: number;
+  /** 3D 겉모습 */
+  look: MaterialLook;
 }
 
 export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
@@ -78,6 +112,23 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
     feel: { springK: 0.9, zetaFree: 5, riseTauMs: 720, stretch: 0.9, snap: 0, sag: 0, stickMs: 0, impact: 0.7 },
     world: { bounce: 0.12, wallBounce: 0.3, friction: 0.45, grip: 1, stiffness: 0.75, mass: 1, stick: 0 },
     carryFrac: 0.5,
+    // 매트한 메모리폼·모찌: 보송한 쉰, 가루 같은 잔결, 넓고 흐린 빛
+    look: {
+      roughness: 0.78,
+      clearcoat: 0,
+      clearcoatRoughness: 0.6,
+      sheen: 1,
+      sheenRoughness: 0.75,
+      specular: 0.35,
+      envIntensity: 0.5,
+      translucency: 0.12,
+      grain: 0.3,
+      grainScale: 60,
+      edgeDark: 0.28,
+      outline: 0.35,
+      albedoHold: 0.3,
+      wet: 0,
+    },
   },
   jelly: {
     id: 'jelly',
@@ -86,6 +137,23 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
     feel: { springK: 1.35, zetaFree: 0.75, riseTauMs: 0, stretch: 1.1, snap: 1.25, sag: 0, stickMs: 0, impact: 1.35 },
     world: { bounce: 0.56, wallBounce: 0.78, friction: 0.24, grip: 0.8, stiffness: 1.25, mass: 1, stick: 0 },
     carryFrac: 0.5,
+    // 반투명 구미 젤리: 또렷한 코팅 반사 + 속 비침
+    look: {
+      roughness: 0.24,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      sheen: 0,
+      sheenRoughness: 0.3,
+      specular: 0.8,
+      envIntensity: 0.95,
+      translucency: 1,
+      grain: 0,
+      grainScale: 90,
+      edgeDark: 0.1,
+      outline: 0.3,
+      albedoHold: 0.22,
+      wet: 0.55,
+    },
   },
   stretchy: {
     id: 'stretchy',
@@ -94,6 +162,23 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
     feel: { springK: 0.85, zetaFree: 0.8, riseTauMs: 0, stretch: 2.5, snap: 1.7, sag: 0, stickMs: 0, impact: 1.1 },
     world: { bounce: 0.3, wallBounce: 0.5, friction: 0.35, grip: 0.9, stiffness: 0.85, mass: 1, stick: 0 },
     carryFrac: 1.1,
+    // 새틴 실리콘 고무: 중간 광택, 스치는 각도에 은은한 쉰
+    look: {
+      roughness: 0.45,
+      clearcoat: 0.45,
+      clearcoatRoughness: 0.28,
+      sheen: 0.55,
+      sheenRoughness: 0.4,
+      specular: 0.55,
+      envIntensity: 0.7,
+      translucency: 0.3,
+      grain: 0.14,
+      grainScale: 50,
+      edgeDark: 0.2,
+      outline: 0.35,
+      albedoHold: 0.26,
+      wet: 0.15,
+    },
   },
   sticky: {
     id: 'sticky',
@@ -102,6 +187,23 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
     feel: { springK: 0.6, zetaFree: 2.6, riseTauMs: 0, stretch: 1.4, snap: 0.5, sag: 0.07, stickMs: 380, impact: 0.8 },
     world: { bounce: 0.06, wallBounce: 0.2, friction: 0.75, grip: 1.3, stiffness: 0.6, mass: 1.1, stick: 1 },
     carryFrac: 0.7,
+    // 젖은 슬라임: 아주 매끈한 코팅, 날카로운 반사점, 가장자리가 조금 어둡다
+    look: {
+      roughness: 0.16,
+      clearcoat: 1,
+      clearcoatRoughness: 0.02,
+      sheen: 0,
+      sheenRoughness: 0.3,
+      specular: 1,
+      envIntensity: 1.15,
+      translucency: 0.55,
+      grain: 0,
+      grainScale: 90,
+      edgeDark: 0.35,
+      outline: 0.3,
+      albedoHold: 0.2,
+      wet: 1,
+    },
   },
 };
 
