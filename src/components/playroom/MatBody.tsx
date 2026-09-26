@@ -5,14 +5,18 @@ import { SHAPES } from '../malang/shapes';
 import type { JellyFace, JellyStage } from '../touch3d/jellyScene';
 import { SHINY_TOUCH_FX, TOUCH_FX } from '../../data/rarity';
 import { baseEyes, faceExtras, isExtraFace } from '../../touch/faceExtras';
+import { fillKindIndex } from '../../touch/filling';
 import { fxStylesFor } from '../../touch/touchFx';
 import type { BodyRec } from './bodyRec';
+import { FillingArt } from './FillingArt';
 
 /** 3D 에서 구워 두는 얼굴 (필요할 때 굽는다) */
-const JELLY_FACES: readonly JellyFace[] = ['default', 'happy', 'sleepy', 'wide', 'dizzy', 'yawn', 'blush'];
+const JELLY_FACES: readonly JellyFace[] = ['default', 'happy', 'sleepy', 'wide', 'dizzy', 'yawn', 'blush', 'strain'];
 const BLINK_MIN_MS = 2600;
 const BLINK_RANGE_MS = 3200;
 const BLINK_MS = 140;
+/** TouchPage.css 의 pr-doze 한 주기 */
+const DOZE_BREATH_MS = 4400;
 
 export type RenderMode = 'loading' | '3d' | '2d';
 
@@ -52,12 +56,15 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
   }, [rec]);
   const { character, shiny } = rec;
   const actor = rec.actor;
+  const filling = actor?.env.filling ?? null;
   const shape = SHAPES[character.shape];
   const frac = bodyFrac(shape);
   const srcRef = useRef<HTMLDivElement>(null);
   const [ready3d, setReady3d] = useState(false);
   const face = actor?.face ?? 'default';
   const dozing = actor?.dozing ?? false;
+  // 2D 졸음 숨(4.4초 CSS 애니메이션)을 페이지 시계에 맞춘다 → 같이 조는 말랑이끼리 숨이 맞는다
+  const dozeDelay = useMemo(() => (dozing ? -Math.round(performance.now() % DOZE_BREATH_MS) : 0), [dozing]);
 
   // 가끔 눈을 깜빡인다 (원래 눈을 감은 말랑이는 제외)
   const [blink, setBlink] = useState(false);
@@ -100,6 +107,7 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
       getSource: (f) => srcRef.current?.querySelector<SVGSVGElement>(`[data-face="${f}"] svg`) ?? null,
       glow: glowStrength > 0 ? { color: glowColor, strength: glowStrength } : undefined,
       iridescence: shiny ? SHINY_TOUCH_FX.iridescence : 0,
+      filling: filling ? { kind: fillKindIndex(filling.kind), colors: filling.colors } : undefined,
     });
     view.ready.then(
       () => {
@@ -121,7 +129,7 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
       setReady3d(false);
       onView();
     };
-  }, [mode, stage, rec, character.shape, glowStrength, glowColor, shiny, onView]);
+  }, [mode, stage, rec, character.shape, glowStrength, glowColor, shiny, onView, filling]);
 
   useEffect(() => {
     if (ready3d) rec.view?.setFace(jellyFace);
@@ -138,6 +146,7 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
     '--pr-r': frac.right,
     '--pr-t': frac.top,
     '--pr-b': frac.bottom,
+    '--pr-doze-delay': `${dozeDelay}ms`,
   } as CSSProperties;
 
   return (
@@ -164,7 +173,9 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
         aria-hidden="true"
       >
         <Malang character={shown} size={148} animation="none" decorative aura="auto" shiny={shiny} />
+        {filling && <FillingArt id={rec.id} shape={shape} filling={filling} />}
         {extras.length > 0 && (
+
           <svg className="pr-body__extra" viewBox={VIEWBOX_ATTR} aria-hidden="true" focusable="false">
             <g className="pr-body__extra-g" strokeLinecap="round" strokeLinejoin="round">
               {extras.map((p, i) => (

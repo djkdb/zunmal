@@ -197,6 +197,8 @@
 .pr-body--doze .pr-body__sprite .malang {
   transform-origin: 50% 92%;
   animation: pr-doze 4.4s ease-in-out infinite;
+  /* 같이 조는 말랑이끼리 숨이 맞도록 모두 같은 시계에 맞춘다 (MatBody 가 음수 지연을 적는다) */
+  animation-delay: var(--pr-doze-delay, 0ms);
 }
 
 @keyframes pr-doze {
@@ -1284,4 +1286,150 @@
   to {
     opacity: 0;
   }
+}
+
+/* ── 촉감·특별한 속 (2단계) ─────────────────────────────── */
+
+/* 2D 몸속 특별한 속: 누른 만큼 밝아지고(--fill-glow) 소용돌이친다(--fill-swirl, 페이지가 적는다) */
+.pr-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  opacity: calc(0.4 + var(--fill-glow, 0) * 0.6);
+}
+
+.pr-fill__spin {
+  transform: rotate(var(--fill-swirl, 0rad));
+}
+
+.pr-info__feel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0 1px;
+}
+
+.pr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 1px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 0.6875rem;
+  line-height: 17px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.pr-chip[data-material='slowRise'] {
+  background: color-mix(in srgb, var(--lemon) 30%, #fff);
+}
+
+.pr-chip[data-material='jelly'] {
+  background: color-mix(in srgb, var(--soda) 26%, #fff);
+}
+
+.pr-chip[data-material='stretchy'] {
+  background: color-mix(in srgb, var(--berry) 24%, #fff);
+}
+
+.pr-chip[data-material='sticky'] {
+  background: color-mix(in srgb, var(--matcha) 30%, #fff);
+}
+
+.pr-chip--filling {
+  background: linear-gradient(90deg, #fff4fb, #f1ecff);
+}
+
+/* 폰 폭: 속 이름은 그림만 (화면 읽기 프로그램에는 그대로 읽힌다) — 정보 패널이 한 줄을 넘지 않게 */
+@media (max-width: 420px) {
+  .pr-chip--filling {
+    padding-right: 1px;
+  }
+
+  .pr-chip--filling .pr-chip__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.pr-guide__filling {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: var(--fs-xs);
+}
+
+/* 선반 칸 구석의 촉감 딱지 */
+.pr-shelf__feel {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+/* 방법 보기: 함께 놀기·촉감 */
+.pr-guide__head {
+  margin: 16px 0 0;
+  font-size: var(--fs-s);
+}
+
+.pr-guide__row--pair {
+  grid-template-columns: 60px 1fr;
+}
+
+.pr-guide__feels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-guide__feel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.pr-guide__feel.is-current {
+  background: color-mix(in srgb, var(--lemon) 28%, #fff);
+}
+
+.pr-guide__feel > svg {
+  flex-shrink: 0;
+}
+
+.pr-guide__feel-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  min-width: 0;
+}
+
+.pr-guide__feel-text .pr-guide__how {
+  flex-basis: 100%;
+  margin: 0;
 }

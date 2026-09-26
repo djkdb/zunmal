@@ -1,0 +1,206 @@
+/**
+ * 말랑이 촉감(재질) 표 — 놀이방에서 말랑이마다 손맛이 다르다. 순수 데이터 (React/DOM 의존 없음).
+ *
+ * 실제 말랑이 장난감의 네 가지 촉감을 흉내 낸다.
+ *  - 슬로우 라이징(slowRise): 메모리폼. 누르면 금방 들어가고 놓으면 자국이 1.5~3초에 걸쳐 천천히 차오른다.
+ *  - 탱탱 젤리(jelly): 잘 튀고 빠르게 출렁인다. 높은 "뾰잉".
+ *  - 쭉쭉이(stretchy): 당기면 두세 배 멀리 늘어나고 놓으면 넘치듯 튕겨 돌아온다.
+ *  - 찐득이(sticky): 손가락을 떼도 잠깐 붙어 있다가 "쩍" 떨어진다. 다른 말랑이·매트에 살짝 달라붙고 천천히 처진다.
+ *
+ * 컴포넌트는 숫자를 들고 있지 않는다: 물리(`touch/physics.ts`·`softbody.ts`·`world.ts`)가 이 표의 값만 읽는다.
+ * 전설 이상은 몸속에 특별한 속(filling)이 있어 누르면 반응한다 (`FILLING_BY_ID`).
+ * 저장 데이터가 아니다 — 캐릭터 id 에서 바로 계산하므로 저장 구조를 바꾸지 않는다.
+ */
+import type { Character } from './characters';
+import { RARITIES, type Rarity } from './rarity';
+
+export const MATERIAL_IDS = ['slowRise', 'jelly', 'stretchy', 'sticky'] as const;
+export type MaterialId = (typeof MATERIAL_IDS)[number];
+
+/** 몸 안쪽 출렁임(physics.ts·softbody.ts)에 쓰는 값. 1 = 예전 기본 말랑 */
+export interface MaterialFeel {
+  /** 눌림·기울기·자국 스프링 강성 배수 (작을수록 느릿느릿) */
+  springK: number;
+  /** 놓았을 때 감쇠비 배수 (작을수록 오래 출렁) */
+  zetaFree: number;
+  /**
+   * 슬로우 라이징: 놓은 뒤 눌린 자국이 되돌아오는 시정수 (ms). 0 이면 보통 스프링.
+   * 누를 때는 빠르고(스프링) 돌아올 때만 느리다 (히스테리시스).
+   */
+  riseTauMs: number;
+  /** 늘어나는 한계 배수 (당김·기울기·옆 이동) */
+  stretch: number;
+  /** 놓을 때 튕겨 돌아오는 반동 배수 (0 = 반동 없이 스르르) */
+  snap: number;
+  /** 쉬는 자세의 눌림 (찐득이는 조금 처져 있다) */
+  sag: number;
+  /** 손가락을 뗄 때 붙어 있는 최대 시간 (ms). 0 = 안 붙는다 */
+  stickMs: number;
+  /** 매트·다른 말랑이에 부딪힐 때 출렁임 배수 */
+  impact: number;
+}
+
+/** 매트 세계(world.ts)의 몸 재질 — `BodyMaterial` 과 같은 모양 */
+export interface MaterialWorld {
+  /** 바닥에 떨어질 때 튀어 오르는 비율 (0..1) */
+  bounce: number;
+  wallBounce: number;
+  /** 매트 위 미끄럼 마찰 */
+  friction: number;
+  /** 몸끼리 마찰 */
+  grip: number;
+  /** 몸끼리 밀어내는 강성 배수 */
+  stiffness: number;
+  mass: number;
+  /** 끈적임 0..1 — 맞닿은 말랑이를 잠깐 붙잡는다 */
+  stick: number;
+}
+
+export interface MaterialSpec {
+  id: MaterialId;
+  /** 표시 이름 */
+  label: string;
+  /** 촉감 한 줄 (방법 보기·정보 패널) */
+  feelLine: string;
+  feel: MaterialFeel;
+  world: MaterialWorld;
+  /**
+   * 들어서 옮기기 시작하는 거리 (말랑이 크기 대비). 쭉쭉이는 멀리 늘어난 뒤에야 따라온다.
+   */
+  carryFrac: number;
+}
+
+export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
+  slowRise: {
+    id: 'slowRise',
+    label: '슬로우 라이징',
+    feelLine: '누른 자국이 천천히 차올라요',
+    feel: { springK: 0.9, zetaFree: 5, riseTauMs: 720, stretch: 0.9, snap: 0, sag: 0, stickMs: 0, impact: 0.7 },
+    world: { bounce: 0.12, wallBounce: 0.3, friction: 0.45, grip: 1, stiffness: 0.75, mass: 1, stick: 0 },
+    carryFrac: 0.5,
+  },
+  jelly: {
+    id: 'jelly',
+    label: '탱탱 젤리',
+    feelLine: '통통 튀고 탱글탱글 흔들려요',
+    feel: { springK: 1.35, zetaFree: 0.75, riseTauMs: 0, stretch: 1.1, snap: 1.25, sag: 0, stickMs: 0, impact: 1.35 },
+    world: { bounce: 0.56, wallBounce: 0.78, friction: 0.24, grip: 0.8, stiffness: 1.25, mass: 1, stick: 0 },
+    carryFrac: 0.5,
+  },
+  stretchy: {
+    id: 'stretchy',
+    label: '쭉쭉이',
+    feelLine: '멀리 쭈욱 늘어났다 퐁 돌아와요',
+    feel: { springK: 0.85, zetaFree: 0.8, riseTauMs: 0, stretch: 2.5, snap: 1.7, sag: 0, stickMs: 0, impact: 1.1 },
+    world: { bounce: 0.3, wallBounce: 0.5, friction: 0.35, grip: 0.9, stiffness: 0.85, mass: 1, stick: 0 },
+    carryFrac: 1.1,
+  },
+  sticky: {
+    id: 'sticky',
+    label: '찐득이',
+    feelLine: '손가락에 붙었다가 쩍 떨어져요',
+    feel: { springK: 0.6, zetaFree: 2.6, riseTauMs: 0, stretch: 1.4, snap: 0.5, sag: 0.07, stickMs: 380, impact: 0.8 },
+    world: { bounce: 0.06, wallBounce: 0.2, friction: 0.75, grip: 1.3, stiffness: 0.6, mass: 1.1, stick: 1 },
+    carryFrac: 0.7,
+  },
+};
+
+/** 말랑이마다 촉감 (이름·설명에서 골랐다). 목록에 없으면 `DEFAULT_MATERIAL` */
+export const MATERIAL_BY_ID: Readonly<Record<string, MaterialId>> = {
+  // 일반
+  'peach-mochi': 'slowRise', // 모찌: 폭 들어갔다 천천히
+  'soda-drop': 'jelly', // 소다 젤리
+  'custard-bun': 'slowRise', // 빵
+  'matcha-bean': 'stretchy', // 쫀득한 말차 떡
+  'milk-cloud': 'stretchy', // 구름처럼 늘어난다
+  'grape-jelly': 'jelly', // 탱글탱글 탄력 최고
+  'strawberry-daifuku': 'stretchy', // 찹쌀떡은 쭉 늘어난다
+  tangerine: 'jelly', // 과즙 가득
+  'choco-chip': 'slowRise', // 쿠키 반죽
+  marshmallow: 'slowRise', // 세상에서 제일 푹신
+  // 레어
+  'ribbon-berry': 'jelly',
+  'mint-scholar': 'slowRise', // 민트 푸딩 같은 폭신함
+  'lemon-sprout': 'jelly',
+  'bubble-tea': 'sticky', // 쫀득한 펄
+  'rainy-day': 'sticky', // 빗물 슬라임
+  jellyfish: 'sticky', // 해파리
+  'cherry-twin': 'sticky', // 둘이 붙어 한 몸이 됐다
+  // 에픽
+  'starry-night': 'jelly',
+  'ember-imp': 'stretchy', // 따끈하게 녹아 늘어난다
+  'snow-scarf': 'slowRise', // 눈 뭉치
+  'sakura-spirit': 'slowRise', // 벚꽃 떡
+  'moon-bunny': 'stretchy', // 떡 찧는 토끼
+  'coral-mermaid': 'sticky', // 바다 슬라임
+  // 전설
+  'sunset-king': 'jelly',
+  'aurora-angel': 'stretchy', // 빛의 커튼처럼
+  'thunder-dragon': 'jelly', // 찌릿찌릿 탱탱
+  'crystal-queen': 'jelly', // 수정 젤리
+  // 신화
+  'galaxy-malang': 'sticky', // 은하 슬라임
+  phoenix: 'slowRise', // 재 속에서 천천히 다시 부푼다
+  // 시크릿
+  'dream-unicorn': 'stretchy', // 솜사탕 꿈
+  'milkyway-whale': 'jelly',
+  'prism-seraph': 'jelly',
+};
+
+export const DEFAULT_MATERIAL: MaterialId = 'jelly';
+
+export function materialIdOf(character: Pick<Character, 'id'>): MaterialId {
+  return MATERIAL_BY_ID[character.id] ?? DEFAULT_MATERIAL;
+}
+
+export function materialOf(character: Pick<Character, 'id'>): MaterialSpec {
+  return MATERIALS[materialIdOf(character)];
+}
+
+// ── 특별한 속 (전설 이상) ─────────────────────────────────────
+
+export type FillingKind = 'glitter' | 'starBeads' | 'galaxy' | 'rainbowGel';
+
+export interface FillingSpec {
+  kind: FillingKind;
+  /** 표시 이름 */
+  label: string;
+  /** 주 색 두 개 (hex) */
+  colors: readonly [string, string];
+}
+
+export const FILLING_LABELS: Readonly<Record<FillingKind, string>> = {
+  glitter: '반짝이 가루 속',
+  starBeads: '물방울 속 별',
+  galaxy: '은하 속',
+  rainbowGel: '무지개 젤 속',
+};
+
+/** 속이 있는 가장 낮은 등급 */
+export const FILLING_MIN_RARITY: Rarity = 'legendary';
+
+export const FILLING_BY_ID: Readonly<Record<string, Omit<FillingSpec, 'label'>>> = {
+  'sunset-king': { kind: 'glitter', colors: ['#ffd23f', '#ff8a5c'] },
+  'aurora-angel': { kind: 'rainbowGel', colors: ['#8ff0d8', '#c7a6ff'] },
+  'thunder-dragon': { kind: 'glitter', colors: ['#fff27a', '#7ad7ff'] },
+  'crystal-queen': { kind: 'starBeads', colors: ['#8fd8ff', '#ffd84d'] },
+  'galaxy-malang': { kind: 'galaxy', colors: ['#8f6bff', '#ff8fd8'] },
+  phoenix: { kind: 'glitter', colors: ['#ffb13d', '#ff5a3c'] },
+  'dream-unicorn': { kind: 'rainbowGel', colors: ['#ffb3d9', '#9fd8ff'] },
+  'milkyway-whale': { kind: 'galaxy', colors: ['#6fb8ff', '#d9c2ff'] },
+  'prism-seraph': { kind: 'starBeads', colors: ['#ff9fd9', '#fff27a'] },
+};
+
+function rarityRank(r: Rarity): number {
+  return RARITIES.indexOf(r);
+}
+
+/** 이 말랑이 몸속의 특별한 속 (전설 미만은 null). 표에 없는 전설 이상은 등급 색 반짝이 가루 */
+export function fillingOf(character: Pick<Character, 'id' | 'rarity' | 'color' | 'accentColor'>): FillingSpec | null {
+  if (rarityRank(character.rarity) < rarityRank(FILLING_MIN_RARITY)) return null;
+  const f = FILLING_BY_ID[character.id] ?? {
+    kind: 'glitter' as const,
+    colors: [character.accentColor ?? '#fff3a8', character.color] as const,
+  };
+  return { ...f, label: FILLING_LABELS[f.kind] };
+}

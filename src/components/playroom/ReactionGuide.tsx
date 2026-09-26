@@ -1,4 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
+import { MATERIALS, MATERIAL_IDS, type FillingSpec, type MaterialId } from '../../data/materials';
+import { PAIR_PLAYS, type PairPlayId } from '../../touch/interactions';
 import {
   BASIC_GESTURES,
   REACTION_UNLOCKS,
@@ -8,6 +10,7 @@ import {
 } from '../../touch/reactions';
 import { CloseIcon } from '../icons';
 import { GestureArt } from './GestureArt';
+import { FillingIcon, MaterialIcon } from './MaterialIcon';
 
 export interface DemoSpec {
   /** 본 적 있는지 기억하는 이름 (반응 id 또는 기본 손짓 id) */
@@ -56,12 +59,16 @@ export function markDemoSeen(key: string): void {
 interface ReactionGuideProps {
   level: number;
   name: string;
+  /** 집중한 말랑이의 촉감 (강조) */
+  material: MaterialId | null;
+  /** 집중한 말랑이 몸속의 특별한 속 (전설 이상) */
+  filling?: FillingSpec | null;
   onClose: () => void;
   onShow: (demo: DemoSpec) => void;
 }
 
 /** 반응 방법 보기: 모든 손짓과 반응을 그림 + 한 줄 설명 + 열림/잠김으로 */
-export function ReactionGuide({ level, name, onClose, onShow }: ReactionGuideProps) {
+export function ReactionGuide({ level, name, material, filling = null, onClose, onShow }: ReactionGuideProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus({ preventScroll: true });
@@ -117,6 +124,43 @@ export function ReactionGuide({ level, name, onClose, onShow }: ReactionGuidePro
             row({ key: r.id, label: r.label, howTo: r.howTo, gesture: r.gesture, area: r.area }, r.level),
           )}
         </ul>
+
+        <h3 className="pr-guide__head">함께 놀기</h3>
+        <p className="pr-guide__sub">말랑이를 두 마리 이상 꺼내면 서로 반응해요.</p>
+        <ul className="pr-guide__list">
+          {PAIR_PLAYS.map((p) => (
+            <li key={p.id} className="pr-guide__row pr-guide__row--pair">
+              <PairArt play={p.id} />
+              <div className="pr-guide__text">
+                <p className="pr-guide__label">{p.label}</p>
+                <p className="pr-guide__how">{p.howTo}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <h3 className="pr-guide__head">촉감</h3>
+        <p className="pr-guide__sub">말랑이마다 촉감이 달라요: 천천히 차오르고, 통통 튀고, 쭉 늘어나고, 찐득하게 붙어요.</p>
+        <ul className="pr-guide__feels">
+          {MATERIAL_IDS.map((id) => (
+            <li key={id} className={`pr-guide__feel${id === material ? ' is-current' : ''}`} data-material={id}>
+              <MaterialIcon material={id} size={30} />
+              <span className="pr-guide__feel-text">
+                <b>{MATERIALS[id].label}</b>
+                {id === material && <span className="pr-guide__state is-open">{name}</span>}
+                <span className="pr-guide__how">{MATERIALS[id].feelLine}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        {filling && (
+          <p className="pr-guide__filling">
+            <FillingIcon kind={filling.kind} colors={filling.colors} size={30} />
+            <span>
+              <b>{name}의 {filling.label}</b>: 꾹 누르면 몸속이 반짝이며 소용돌이쳐요.
+            </span>
+          </p>
+        )}
         <button ref={closeRef} type="button" className="pr-guide__close" aria-label="닫기" onClick={onClose}>
           <CloseIcon size={22} />
         </button>
@@ -125,7 +169,69 @@ export function ReactionGuide({ level, name, onClose, onShow }: ReactionGuidePro
   );
 }
 
+/** 함께 놀기 그림: 말랑이 두 마리 실루엣 + 손짓 표시 (60×60) */
+function PairArt({ play }: { play: PairPlayId }) {
+  const blob = (x: number, y: number, fill: string, squash = 1) => (
+    <path
+      d={`M${x - 13} ${y} C${x - 13} ${y - 21 * squash} ${x + 13} ${y - 21 * squash} ${x + 13} ${y} Q${x} ${y + 3} ${x - 13} ${y} Z`}
+      fill={fill}
+      stroke="#2b2233"
+      strokeWidth={2.2}
+      strokeLinejoin="round"
+    />
+  );
+  const eyes = (x: number, y: number) => (
+    <g fill="#2b2233">
+      <circle cx={x - 3.5} cy={y} r={1.3} />
+      <circle cx={x + 3.5} cy={y} r={1.3} />
+    </g>
+  );
+  return (
+    <svg className="gesture-art" viewBox="0 0 64 64" width={60} height={60} aria-hidden="true" focusable="false">
+      <rect x={2} y={2} width={60} height={60} rx={14} fill="#fff6e8" stroke="#2b2233" strokeWidth={2} />
+      {play === 'cheekRub' && (
+        <>
+          {blob(21, 46, '#ffd0e0')}
+          {blob(43, 46, '#bff3ff')}
+          {eyes(22, 38)}
+          {eyes(42, 38)}
+          <path d="M32 18 c-3 -4 -8 -1 -5 3 l5 5 l5 -5 c3 -4 -2 -7 -5 -3 Z" fill="#ff7aa2" stroke="#2b2233" strokeWidth={1.6} />
+          <path d="M8 40 h5 M56 40 h-5" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" />
+        </>
+      )}
+      {play === 'stack' && (
+        <>
+          {blob(32, 54, '#bff3ff', 0.8)}
+          {blob(32, 36, '#ffd0e0')}
+          {eyes(32, 29)}
+          <path d="M46 14 v12 m-4 -4 l4 4 l4 -4" fill="none" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+      {play === 'bump' && (
+        <>
+          {blob(18, 48, '#ffd0e0')}
+          {blob(46, 48, '#c8f08a')}
+          {eyes(18, 40)}
+          {eyes(46, 40)}
+          <path d="M32 22 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 Z" fill="#ffd84d" stroke="#2b2233" strokeWidth={1.4} strokeLinejoin="round" />
+          <path d="M5 30 h7 M52 30 h7" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" />
+        </>
+      )}
+      {play === 'rest' && (
+        <>
+          {blob(20, 48, '#ffe2b8')}
+          {blob(44, 48, '#d9c9ff')}
+          <path d="M15 40 q2 2 4 0 M21 40 q2 2 4 0 M39 40 q2 2 4 0 M45 40 q2 2 4 0" fill="none" stroke="#2b2233" strokeWidth={1.6} strokeLinecap="round" />
+          <text x={48} y={22} fontSize={11} fontWeight={700} fill="#6f63c9">z</text>
+          <text x={54} y={15} fontSize={8} fontWeight={700} fill="#6f63c9">z</text>
+        </>
+      )}
+    </svg>
+  );
+}
+
 // ── 손가락 시범 ──
+
 
 /** 스프라이트 상자 안에서 손짓 자리 (비율) */
 const AREA_AT: Record<ReactionArea, { x: number; y: number }> = {

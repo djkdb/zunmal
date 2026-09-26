@@ -15,7 +15,7 @@
  */
 import type { RNG } from '../lib/rng';
 
-/** 몸 재질 — 2단계(말랑이마다 다른 재질)에서 캐릭터별 값을 넣는 자리 */
+/** 몸 재질 — 말랑이마다 촉감 표(`data/materials.ts` 의 `world`)에서 온다 */
 export interface BodyMaterial {
   /** 바닥에 떨어질 때 튀어 오르는 비율 (0..1) */
   bounce: number;
@@ -29,6 +29,11 @@ export interface BodyMaterial {
   stiffness: number;
   /** 질량 배수 */
   mass: number;
+  /**
+   * 끈적임 0..1 (찐득이). 맞닿은 두 몸을 잠깐 붙잡는다: 둘 다 끈적이면 세게, 한쪽만이면 살짝.
+   * 붙은 지 `stickHoldMs` 가 지나면 힘이 사라져 떨어진다.
+   */
+  stick: number;
 }
 
 export const JELLY_MATERIAL: Readonly<BodyMaterial> = {
@@ -38,7 +43,21 @@ export const JELLY_MATERIAL: Readonly<BodyMaterial> = {
   grip: 0.9,
   stiffness: 1,
   mass: 1,
+  stick: 0,
 };
+
+/** 지난 스텝 끝에 맞닿아 있던 두 몸 (n 은 b → a 방향 단위 벡터, 높이는 몸 높이 비율로 잰 값) */
+export interface WorldContact {
+  a: string;
+  b: string;
+  nx: number;
+  ny: number;
+  nz: number;
+  /** 파고든 정도 (반지름 합 대비, 끈적여 떨어져 있으면 음수) */
+  overlap: number;
+  /** 맞닿은 지 얼마나 됐나 (ms) */
+  ageMs: number;
+}
 
 export interface WorldBody {
   id: string;
@@ -86,11 +105,16 @@ export interface World {
   contacts: Set<string>;
   /** 계속 붙어 있으면 마지막으로 소리 낸 시각 대신 누적 시간 (ms) */
   timeMs: number;
+  /** 쌍마다 맞닿기 시작한 시각 (timeMs) — 끈적임이 풀리는 시간·오래 붙어 있기 판정 */
+  contactSince: Map<string, number>;
+  /** 지난 스텝 끝의 맞닿음 목록 (말랑이끼리 상호작용 판정에 쓴다) */
+  touching: WorldContact[];
 }
 
 export type WorldEvent =
   | { kind: 'land'; id: string; speed: number }
-  | { kind: 'bump'; a: string; b: string; speed: number; nx: number; ny: number }
+  /** nz > 0 이면 a 가 위에서 b 를 덮쳤다 */
+  | { kind: 'bump'; a: string; b: string; speed: number; nx: number; ny: number; nz: number }
   | { kind: 'wall'; id: string; speed: number; nx: number; ny: number };
 
 export const WORLD_TUNING = {
@@ -110,6 +134,11 @@ export const WORLD_TUNING = {
   liftZ: 0.22,
   /** 들고 옮기는 말랑이가 다른 말랑이에 이만큼(반지름 합 대비) 다가가면 그 위로 올라탄다 */
   climbReach: 1.25,
+  /**
+   * 단, 손가락 목표가 그 말랑이 가운데에서 이만큼(반지름 합 대비) 안쪽일 때만 — 옆구리에 대고 살짝 미는 것은
+   * 올라타지 않고 맞대어 누른다 (볼 비비기). 이미 위에 있으면 계속 얹혀 간다.
+   */
+  climbTarget: 0.8,
   /** 이보다 느리게 옮길 때만 올라탄다 (빠르면 밀어낸다) */
   climbSpeed: 2.2,
   /** 이 속도 미만의 착지는 튀지 않는다 (미세 떨림 방지) */
@@ -129,6 +158,12 @@ export const WORLD_TUNING = {
   settleSpeed: 0.03,
   /** 기본 상한 (저장 상한과 같다) */
   maxBodies: 5,
+  /** 끈적임: 붙잡는 가속도 (세계 단위/s², 단위 질량) — 중력보다 조금 약하다 */
+  adhesion: 26,
+  /** 끈적임이 닿는 거리 (반지름 합 대비 더 멀리) — 떨어지려 할 때 실처럼 잠깐 버틴다 */
+  stickReach: 0.14,
+  /** 이만큼 붙어 있으면 끈적임이 다 풀린다 (ms) */
+  stickHoldMs: 1400,
 } as const;
 
 // ── 만들기 ─────────────────────────────────────────────────
@@ -141,6 +176,8 @@ export function createWorld(bounds: WorldBounds, options: { cap?: number; reduce
     reducedMotion: options.reducedMotion ?? false,
     contacts: new Set(),
     timeMs: 0,
+    contactSince: new Map(),
+    touching: [],
   };
 }
 
@@ -219,6 +256,8 @@ export function removeBody(world: World, id: string): boolean {
   if (i < 0) return false;
   world.bodies.splice(i, 1);
   for (const key of [...world.contacts]) if (key.split('|').includes(id)) world.contacts.delete(key);
+  for (const key of [...world.contactSince.keys()]) if (key.split('|').includes(id)) world.contactSince.delete(key);
+  world.touching = world.touching.filter((c) => c.a !== id && c.b !== id);
   return true;
 }
 
@@ -352,7 +391,20 @@ function pairKey(a: WorldBody, b: WorldBody): string {
   return a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
 }
 
-function subStep(world: World, h: number, events: WorldEvent[], touching: Set<string>, reported: Set<string>): void {
+/** 두 몸 사이 끈적임 0..1 (둘 다 1 이면 1, 한쪽만이면 0.25) */
+export function pairStick(a: BodyMaterial, b: BodyMaterial): number {
+  const s = ((a.stick ?? 0) + (b.stick ?? 0)) / 2;
+  return s * s;
+}
+
+function subStep(
+  world: World,
+  h: number,
+  events: WorldEvent[],
+  touching: Set<string>,
+  reported: Set<string>,
+  out: WorldContact[],
+): void {
   const T = WORLD_TUNING;
   const bodies = world.bodies;
   const n = bodies.length;
@@ -374,7 +426,9 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
         if (o === b || o.held) continue;
         const d = Math.hypot(b.x - o.x, b.y - o.y);
         const rr = b.r + o.r;
-        if (d < rr * T.climbReach) {
+        const aiming = Math.hypot(b.holdX - o.x, b.holdY - o.y) < rr * T.climbTarget;
+        const above = b.z > o.z + o.h * 0.5;
+        if (d < rr * T.climbReach && (aiming || above)) {
           // 가까워질수록 미리 올라가 옆으로 밀지 않고 넘어간다 (위아래는 높이 비율로 줄여 잰다)
           const zs = rr / ((b.h + o.h) / 2);
           const up = Math.sqrt(Math.max(0, rr * rr - d * d * 0.6)) / zs;
@@ -404,7 +458,13 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
       // 위아래는 두 몸 높이의 평균이 반지름 합이 되도록 늘려 잰다 (납작한 말랑이끼리 딱 붙어 쌓이게)
       const dz = (a.z + a.h / 2 - (b.z + b.h / 2)) * (rr / ((a.h + b.h) / 2));
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 >= rr * rr) continue;
+      const key = pairKey(a, b);
+      // 끈적이는 쌍은 조금 더 멀리서도 붙잡는다 (붙은 지 오래되면 풀린다)
+      const since = world.contactSince.get(key);
+      const age = since === undefined ? 0 : world.timeMs - since;
+      const stick = pairStick(a.material, b.material) * Math.max(0, 1 - age / T.stickHoldMs);
+      const reach = rr * (1 + (stick > 0 && world.contacts.has(key) ? T.stickReach : 0));
+      if (d2 >= reach * reach) continue;
       const dist = Math.sqrt(d2);
       // 완전히 겹치면 옆으로 민다
       const nx = dist > 1e-6 ? dx / dist : 1;
@@ -421,8 +481,8 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
       const rvy = a.vy - b.vy;
       const rvz = a.vz - b.vz;
       const vn = rvx * nx + rvy * ny + rvz * nz;
-      // 단위 질량당 k 를 두 몸의 유효 질량에 곱해 힘으로 (밀어내기만, 끌어당기지 않는다)
-      const fn = Math.max(0, (k * overlap - c * vn) * mEff * 2);
+      // 단위 질량당 k 를 두 몸의 유효 질량에 곱해 힘으로 (밀어내기만 — 끈적이면 조금 끌어당긴다)
+      const fn = Math.max(-T.adhesion * stick * mEff * 2, (k * overlap - c * vn) * mEff * 2);
       const jn = fn * h;
       a.vx += (jn * nx) / ma;
       a.vy += (jn * ny) / ma;
@@ -435,7 +495,7 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
       const tvy = rvy - vn * ny;
       const tvz = rvz - vn * nz;
       const vt = Math.hypot(tvx, tvy, tvz);
-      if (vt > 1e-6) {
+      if (vt > 1e-6 && jn > 0) {
         const mu = Math.sqrt(a.material.grip * b.material.grip);
         // 매트에 붙어 있는 쪽은 매트 마찰이 함께 버텨 준다 → 접선 방향으로는 훨씬 무겁게 본다.
         // (그러지 않으면 위에 얹힌 말랑이가 아래 말랑이를 조금씩 밀며 천천히 미끄러진다)
@@ -449,7 +509,7 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
         b.vy += (jt * tvy) / vt / tb;
         b.vz += (jt * tvz) / vt / tb;
       }
-      const sq = overlap / rr;
+      const sq = Math.max(0, overlap) / rr;
       a.squeezeX += nx * sq;
       a.squeezeY += ny * sq;
       a.squeezeZ += nz * sq;
@@ -457,13 +517,13 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
       b.squeezeY -= ny * sq;
       b.squeezeZ -= nz * sq;
       // 위쪽에서 받쳐 준다
-      if (nz > 0.45) supported[i] = true;
-      if (nz < -0.45) supported[j] = true;
-      const key = pairKey(a, b);
+      if (overlap > 0 && nz > 0.45) supported[i] = true;
+      if (overlap > 0 && nz < -0.45) supported[j] = true;
       touching.add(key);
+      out.push({ a: a.id, b: b.id, nx, ny, nz, overlap: overlap / rr, ageMs: age });
       if (!world.contacts.has(key) && !reported.has(key) && -vn > T.bumpEventSpeed) {
         reported.add(key);
-        events.push({ kind: 'bump', a: a.id, b: b.id, speed: -vn, nx, ny });
+        events.push({ kind: 'bump', a: a.id, b: b.id, speed: -vn, nx, ny, nz });
       }
     }
   }
@@ -518,15 +578,22 @@ export function stepWorld(world: World, dtMs: number): WorldEvent[] {
   let remaining = ms / 1000;
   const touching = new Set<string>();
   const reported = new Set<string>();
+  const out: WorldContact[] = [];
   while (remaining > 1e-9) {
     const h = Math.min(WORLD_TUNING.subStep, remaining);
     touching.clear();
-    subStep(world, h, events, touching, reported);
+    out.length = 0;
+    subStep(world, h, events, touching, reported, out);
+    // 하위 스텝마다 맞닿음을 갱신해야 끈적임이 제때 붙고 풀린다
+    for (const key of touching) if (!world.contactSince.has(key)) world.contactSince.set(key, world.timeMs);
+    for (const key of [...world.contactSince.keys()]) if (!touching.has(key)) world.contactSince.delete(key);
+    world.contacts = new Set(touching);
+    world.timeMs += h * 1000;
     remaining -= h;
   }
-  world.contacts = new Set(touching);
-  world.timeMs += ms;
+  world.touching = out.slice();
   return events;
+
 }
 
 // ── 상태 읽기 ──────────────────────────────────────────────
