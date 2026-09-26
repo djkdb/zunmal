@@ -26,7 +26,8 @@ src/
   styles/         global.css — 디자인 토큰, 공용 클래스
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
-  data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속)
+  data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
+                  playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
@@ -98,7 +99,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   이모지 아이콘, `.eyebrow` 외의 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`, 넓은 영역의 무거운 blur,
   섹션마다 등장 애니메이션.
 - **이전 이름**(`--cream`, `--paper`, `--berry`, `--soda`, `--matcha`, `--ink-soft`, `--line`, `--keycap` …)은 호환용 별칭으로만 남아 있다
-  (놀이방 `/touch` 화면과 미니게임 속 그림이 아직 쓴다). 새 코드에서 쓰지 말고, 놀이방을 다시 칠할 때 위 토큰으로 옮긴다.
+  (미니게임 속 그림과 결과 화면 일부가 아직 쓴다. 놀이방 `/touch`는 새 토큰으로 옮겼다). 새 코드에서 쓰지 말고, 다시 칠할 때 위 토큰으로 옮긴다.
   미니게임 안의 게임 그림(블록·컵·점수 튀어나옴 등)은 자기 그림을 유지해도 되지만 틀·버튼·HUD는 토큰을 따른다.
 - **조사**: 말랑이 이름 뒤 조사는 직접 쓰지 말고 `lib/josa.ts`의 `josa(name, '과/와')`로 받침에 맞춰 붙인다.
 - **문구**: 존댓말, 짧고 구체적으로. 행동 이름은 끝까지 같게 쓴다(예: "보상 받기" → "받았어요").
@@ -158,7 +159,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 쿠폰: 목록은 `economy/config.ts`의 `COUPONS`(id·코드·코인·이름·기간), 확인은 순수 모듈 `economy/coupons.ts`(대소문자·공백 무시, 저장당 1회).
   받은 쿠폰 id는 저장 v6 `redeemedCoupons`. 입력 칸은 홈 아래 `components/CouponBox.tsx`. 서버가 없어 코드는 앱 안에 있다(선물용, 보안 수단 아님).
   현재: `zun` = 오픈 기념 1000코인.
-- 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성). 배포 주소 `https://zunmal.pages.dev`.
+- 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성 — 스카이 소다:
+  하늘 바탕·머리글·제목 글꼴 Jua(`@fontsource/jua`, 본문은 `src/assets/fonts`의 NanumSquareRound가 있으면)·흰 칩·도트 매트 위 말랑이). 배포 주소 `https://zunmal.pages.dev`.
 
 ## 컬렉션 (`data/collections.ts`)
 
@@ -174,9 +176,14 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 
 ## 놀이방 — 말랑 만지기 (`pages/TouchPage.tsx`, `components/playroom/`, `touch/`, `audio/squish.ts`)
 
-- `/touch`, `/touch/:id`는 **화면 전체가 책상 위 깅엄 놀이 매트**인 독립 창이다. AppShell이 위 막대·아래 탭을 숨기고
-  (`useMatch('/touch/*')`), 왼쪽 위 나가기(이전 화면, 없으면 홈) · 집중한 말랑이 정보(애정 단계 + 다음 반응 방법) · 방법 보기 · 사진 버튼.
-- **말랑이 2~5마리를 함께** 꺼내 논다. 상한은 폰 3, 계속 55fps 이상이면 5(`touch/perfGovernor.ts`, 순수·테스트).
+- `/touch`, `/touch/:id`는 **화면 전체가 하늘 바탕 위 폭신한 놀이 매트**(스카이 소다: 흰 파이핑 + 흰 바느질 + 고른 무늬)인 독립 창이다.
+  AppShell이 위 막대·아래 탭을 숨기고(`useMatch('/touch/*')`), 위 HUD는 왼쪽 두 동그라미(나가기 = 이전 화면, 없으면 홈 · 꾸미기)
+  · 가운데 흰 카드(집중한 말랑이 정보: 애정 단계 + 촉감 + 다음 반응 방법) · 오른쪽 두 동그라미(방법 보기 · 사진). 버튼은 흰 원 + 파란 그림자.
+- **기본은 한 마리만 크게 만진다.** 들어올 때(`soloMalang`) 매트에는 주소의 말랑이(도감 "만지러 가기", 안 열었으면 그 캡슐) 또는 파트너
+  하나만 둔다 — 저장된 `out`에 여럿이 있어도 줄인다. 혼자면 배치가 커지고(`computeMatLayout(…, { solo })`, 말랑이 그림 최대 240px) 가운데
+  (`soloSpot`)에 선다. 선반 손잡이는 "친구 꺼내기"로 바뀐다. 친구를 꺼내면 여럿 배치(100~180px)로, 다시 하나가 되면 남은 말랑이가
+  가운데로 돌아온다. 배치가 바뀌어도 몸은 화면 위 같은 자리에 머문다(`remapPoint`). 손짓·반응은 그대로다.
+- **여럿이 함께**는 선반에서 꺼내 2~5마리. 상한은 폰 3, 계속 55fps 이상이면 5(`touch/perfGovernor.ts`, 순수·테스트).
   3D가 35fps 아래로 떨어지면 2D로, 2D도 30fps 아래면 상한을 줄인다(나와 있는 말랑이는 치우지 않음).
 - **두 층 물리** (모두 순수·dt 주입·테스트):
   - 몸 전체 위치 = 매트 세계 하나 `touch/world.ts`: 매트 쪽 중력, 반지름 r 인 말랑한 공끼리 부드러운 밀어내기 + 쿨롱 마찰
@@ -185,6 +192,9 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
     재질(`BodyMaterial`: 튐·마찰·강성·질량·끈적임)은 말랑이마다 촉감 표에서 온다(아래 **촉감**).
     옆구리에 대고 살짝 미는 것은 올라타지 않는다: 손가락 목표가 상대 가운데 가까이(`climbTarget`)일 때만 올라탄다.
     지난 스텝의 맞닿음 목록(`world.touching`: 법선·파고듦·맞닿은 시간)과 부딪힘 사건의 `nz`를 말랑이끼리 판정에 넘긴다.
+    움직이지 않는 장애물(`world.obstacles`, `setObstacles`/`moveObstacle`) = 꾸미기 소품: 질량이 무한한 공이라 말랑이만 밀려나고
+    (크게 겹쳐도 `obstaclePushMax` 깊이까지만 밀어 확 튀지 않음) 위에 얹히거나 들고 가면 올라탄다. 부딪히면 `wall` 사건.
+    상한(cap)·맞닿음 목록·말랑이끼리 판정에는 들어가지 않는다. `findDropSpot`은 소품을 피한다.
   - 몸 안쪽 출렁임 = 말랑이마다 `components/playroom/malangActor.ts`(`MalangActor`): 예전 한 마리 코드 그대로 —
     `physics.ts`(눌림·기울기, 착지·부딪힘은 `impact`) + `softbody.ts`(3D 자국·당김) + 반응·눈길·졸음·소리·입자·진동·애정.
   - 화면 배치는 `touch/matView.ts`(3/4 시점: 깊이 y는 화면 아래, 높이 z는 위, 맞닿아 눌린 모양 `squeezePose`).
@@ -192,12 +202,13 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   (늘어난 채 따라옴), 휙 놓으면 던진다. 말랑이마다 손가락 하나, 여러 손가락으로 여러 마리 동시에. 3D 는 레이캐스트로 가장 앞 몸,
   2D 는 몸통 타원 + 폰용 넉넉한 거리. 키보드: Tab 으로 매트 위 말랑이(투명 버튼), Enter/Space = 콕(길게 = 꾹), 누른 채 화살표 = 당기기,
   화살표만 = 그쪽으로 톡 밀기.
-- **선반**(`components/playroom/Shelf.tsx`, 순서는 `touch/shelf.ts`): 아래 손잡이를 올리면 나무 선반. 등급 높은 순 → 최근 얻은 순.
-  나와 있는 칸은 빈 받침, 누르면 넣기. 매트가 꽉 차면 알림.
+- **선반**(`components/playroom/Shelf.tsx`, 순서는 `touch/shelf.ts`): 아래 흰 손잡이를 올리면 하얀 아크릴 선반(칸마다 투명 받침).
+  등급 높은 순 → 최근 얻은 순. 나와 있는 칸은 빈 받침, 누르면 넣기. 매트가 꽉 차면 알림. 선반이 열려 있어도 매트 배치는 닫힌 손잡이 기준.
 - **캡슐 열기** (`touch/capsule.ts`, 순수·테스트): v7부터 새로 얻은 말랑이는 선반에 봉인된 캡슐(등급 색 + NEW 딱지).
   꺼내면 매트에 캡슐이 떨어지고 두 손가락 비틀기(70°) · 두 손가락으로 벌리기 · 톡 세 번 · 꾹 0.9초 중 아무거나로 연다.
   비틀 때 톱니 딱(`squish.capsuleTick`) → 딸깍(`capsuleClick`) + 뽁(`popOut`) → 뚜껑이 날아가고 말랑이가 폴짝 튀어나와 철퍽 착지,
   반짝이는 `TOUCH_FX.milestone`(등급별) + 등급 진동. 연 순간 `unboxMalang`으로 저장. 캡슐은 DOM(SVG)으로 3D 캔버스 위에 그린다.
+  캡슐 그림(`CapsuleArt`)은 캡슐 머신과 같은 파스텔 캡슐 + 흰 이음새 + 부드러운 그림자(잉크 외곽선 없음).
 - **반응을 찾게 돕기**: 반응 표(`REACTION_UNLOCKS`)에 `howTo`(한 줄 방법)·`gesture`·`area`가 있고 기본 손짓은 `BASIC_GESTURES` —
   방법 보기 시트(`ReactionGuide`, 그림 `GestureArt`: 실루엣 + 만질 곳 + 손짓 표시, 열림/잠김 단계), 반투명 손가락 시범(`GhostFinger`,
   처음 방문·새 반응이 열릴 때·시트의 "보기", 만지면 사라짐, 움직임 줄이기면 움직이지 않는 그림), 열림 딱지 "새 반응: 이름" + 방법 줄,
@@ -229,9 +240,15 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   - 가만히 있는 이웃끼리 가끔 서로 흘끔(`idleInteractions`, 1초마다), 옆에서 졸면 9초만 가만히 있어도 따라 졸고 숨 위상을 맞춘다
     (3D 는 `soft.timeMs` 복사, 2D 는 졸음 애니메이션 음수 지연 = 페이지 시계).
   - 방법 보기 시트: 기본 손짓·반응 표 아래 "함께 놀기"(`PAIR_PLAYS`)와 "촉감"(네 촉감 + 집중한 말랑이 표시, 특별한 속 한 줄).
-- **3단계(꾸미기·단체 사진) 자리**: 매트 위 물건 기록 `components/playroom/bodyRec.ts`(`kind`에 소품 추가), 3D 무대 `stage.scene`,
-
-  사진 `composePhoto`의 `caption`(단체 사진 한 줄).
+- **꾸미기** (HUD 붓 버튼 → 아래 시트 `components/playroom/DecorSheet.tsx`, 무료): 매트 무늬 6가지(하늘 도트 기본 · 구름 · 파스텔 체크 ·
+  딸기우유 · 민트 줄무늬 · 별밤)와 소품(쿠션 · 작은 화분 · 별 조명 · 리본 상자) 최대 3개(`MAX_PROPS`).
+  - 무늬는 `data/matPatterns.ts`의 코드로 그린 타일 SVG 한 장(`matTileSvg`) → CSS 배경(`--mat-bg`, data: URL)과 사진 카드 캔버스 패턴이 같은 그림.
+    id 목록·저장 검사는 첫 화면 번들에 들어가는 `data/playroomDecor.ts`에만(무늬 그림은 놀이방 청크).
+  - 소품은 `data/playroomDecor.ts`의 `PROPS`(부딪힘 반지름·높이·그림 폭) + 그림 `PropArt`(색은 모두 속성 — 사진에 그대로 구움).
+    새 소품은 말랑이·소품에서 먼 가장자리(`propSpot`)에 놓이고, 손가락으로 끌어 옮기면(말랑이·캡슐이 아닌 곳을 눌렀을 때 `hitProp`)
+    놓은 자리(매트 바닥 기준 0..1)를 저장한다. 화면 기록은 `bodyRec.ts`의 `PropRec`(세계 장애물 id `prop:<id>`).
+    3D에서는 3D 캔버스 아래 층(`.playroom__props`), 2D에서는 말랑이와 같은 층에서 깊이 순서. 크기는 `groupSprite` 기준이라 혼자 놀 때도 같다.
+    움직이지 않으니 그리기 루프를 깨우지 않는다(끄는 동안만).
 - **3D 젤리** (`components/touch3d/`, three.js): 무대 하나(`createJellyStage`: 렌더러·장면·카메라) 안에 몸 N개(`stage.addBody`).
   몸은 화면을 보고 서 있고 매트 깊이는 z로 두되 원근만큼 위치·크기를 되돌려 DOM 좌표와 정확히 맞춘다. 멈춘 몸은 정점을 다시 계산하지 않는다.
   윤곽 path를 부풀린 메시(`touch/jellyMesh.ts`) +
@@ -258,8 +275,12 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   - 눈길: 손가락/마우스 쪽으로 얼굴이 옮겨 간다(2D는 `.malang-face` CSS 변수, 3D는 셰이더 UV 당김). 떼면 다시 앞을 본다.
   - 만지기 전용 얼굴(`touch/faceExtras.ts`: 소용돌이 눈·하품 입·진한 볼·"끙" 얼굴)은 SVG path — 2D는 덧그린 `<svg>`, 3D는 구운 텍스처에 Path2D.
   - 가만히 8초 → 하품, 20초 → 졸기(말랑이마다 따로. 감은 눈, z 입자, 느린 숨 — 3D는 20fps로만 그림). 만지거나 세게 부딪히면 깜짝 놀라 폴짝.
-- **사진 찍기** (`touch3d/photo.ts` 동적 import, 배치는 순수 `touch/photoCard.ts`): 매트 위 모든 말랑이(3D 무대 스냅샷 또는 2D SVG)+입자를
-  1080×1350 카드(이름 풍선 글씨·등급 딱지·애정 단계·가게 이름, 여럿이면 "말랑이 N마리" + 한 줄)로 PNG. 미리보기에서 한 번 더 눌러 공유(Web Share 파일) 또는 저장.
+- **사진 찍기** (`touch3d/photo.ts` 동적 import, 배치는 순수 `touch/photoCard.ts`): 매트 위 모든 말랑이(3D 무대 스냅샷 또는 2D SVG)+소품+입자를
+  1080×1350 스카이 소다 카드(하늘 그라데이션 + 비눗방울, 흰 카드 + 파란 그림자, 사진 칸 바탕은 고른 매트 무늬 — 화면과 같은 자리·배율
+  `patternPlacement`)로 PNG. 사진 칸은 모든 말랑이 그림 상자를 감싸고 여백을 준 뒤 칸 비율로 넓힌 영역(`frameGroup`, 넓히기만 해서 아무도 안 잘림,
+  한 마리는 `FRAME_MIN_W`보다 확대하지 않음). 등급 칩(색 + 별 + 글자, 여럿이면 `groupRarityChips` 등급별 마릿수), 제목 글꼴 이름
+  (여럿이면 `groupTitle` "말랑이 N마리와 함께"), 하트 + 애정 단계 또는 `caption`(`groupCaption`: 왼쪽부터 이름을 조사 맞춰 나란히, 길면
+  "A와 친구 N마리"), 가게 이름. 캔버스 글꼴은 CSS 토큰(`--font-display`/`--font-body`)을 읽는다. 미리보기에서 한 번 더 눌러 공유(Web Share 파일) 또는 저장.
   셔터 소리 `squish.shutter`, 흰 번쩍임(움직임 줄이기면 없음).
 
 ## 소리 (`audio/`)
@@ -301,11 +322,13 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v7: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
+- 현재 v8: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
   소리 설정 `settings: { sfxOn, musicOn }`(v4의 `muted: true`는 둘 다 끔으로 옮긴다. 새 플레이어는 둘 다 켬 — 음악은 첫 입력 뒤에 시작),
   받은 쿠폰(`redeemedCoupons`, v6), 놀이방(v7): `unboxed: string[]`(캡슐을 연 말랑이) + `playroom: { out: string[] }`(매트 위, 최대 `PLAYROOM_MAX_OUT` 5).
   v6→v7은 이미 가진 말랑이를 모두 연 것으로 치고 매트에는 파트너 하나. 새 플레이어의 시작 말랑이는 열린 채 매트에.
   `pull`로 새로 얻은 말랑이는 `unboxed`에 넣지 않는다(놀이방에서 캡슐로 연다). sanitize: `unboxed` ⊆ 보유, `out` ⊆ unboxed ∩ 보유, 중복 없음, 5개까지.
+  꾸미기(v8): `playroom.mat`(무늬 id, 모르면 기본 `sky-dots`) + `playroom.props: {id, x, y}[]`(x·y는 매트 바닥 기준 0..1로 자름, 모르는 id·중복 제거,
+  최대 3개). v7→v8은 기본 무늬·소품 없음 + 매트에는 한 마리만 남긴다(나와 있던 파트너, 없으면 처음 꺼낸 말랑이). 들어올 때마다 `soloMalang`이 한 마리로 줄인다.
   v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
@@ -315,7 +338,9 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 가챠: 10만 회 확률 검증을 서로 다른 시드 여러 개로 수행(±5σ 허용), 천장/비율/10연 보장/환급.
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계.
 - 저장: 손상/구버전 데이터 migrate.
-- 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한), 캡슐 손짓, 선반 순서, 성능 조절, 화면 배치, 반응 부위·쓰다듬기.
+- 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,
+  화면 배치(혼자 배치·자리 옮기기), 반응 부위·쓰다듬기, 꾸미기 데이터(타일 SVG·저장 검사·놓기/치우기·빈자리), 사진 카드(`frameGroup` 모두 담기·비율,
+  무늬 자리, 등급 칩·칩 줄, 단체 한 줄 조사).
 - 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰).
 - 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트), 촉감별 소리 맛(`squish`).
 - 놀이방 촉감·말랑이끼리: 슬로우 라이징 회복 시간·젤리 출렁임·쭉쭉이 한계·찐득이 떼기 지연·끈적임 풀림(`touch/materials.test.ts`), 볼 비비기 시간·쉬기·1분 상한·쌓기·쿵·흘끔·같이 졸기(`touch/interactions.test.ts`).
