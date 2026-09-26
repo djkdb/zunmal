@@ -3,7 +3,22 @@ import { playRarityFanfare, sfx } from '../audio/sfx';
 import { rarityRank, type Rarity } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { buzz } from './pullHaptics';
+import { getLoadedMachine3d, isMachine3dUnsupported, markMachine3dUnsupported, preloadMachine3d } from './machine3d/loadMachine3d';
+import type { MachineScene } from './machine3d/machineScene';
 import './GachaMachine.css';
+
+/** 3D 머신 모듈을 이만큼 안에 못 받으면 이번 방문은 SVG 머신 그대로 */
+const LOAD_WAIT_MS = 1500;
+
+/** 개발 서버에서만: 소프트웨어 WebGL(swiftshader) 스크린숏용으로 성능 조절(SVG 전환)을 끈다 */
+function keep3dForTests(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return localStorage.getItem('machine-keep-3d') === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** 캡슐 색 (위쪽 반구). 희귀도 힌트 — 텍스트는 결과 화면에서 제공. */
 const CAPSULE_TOP: Record<Rarity, string> = {
@@ -116,6 +131,78 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
 
   const t = reduced ? TIMINGS.reduced : TIMINGS.normal;
 
+  // ── 3D 머신: 받아지면 SVG 머신 위에 겹쳐 그린다 (움직임 줄이기·WebGL 없음·느림이면 SVG 그대로) ──
+  const rootRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<MachineScene | null>(null);
+  const [is3d, setIs3d] = useState(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const swapWhenIdle = useRef(false);
+
+  useEffect(() => {
+    if (reduced || isMachine3dUnsupported()) return undefined;
+    let cancelled = false;
+    const started = performance.now();
+    const teardown = () => {
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+      setIs3d(false);
+    };
+    const mount = (m: NonNullable<ReturnType<typeof getLoadedMachine3d>>) => {
+      // 연출 도중에 모습이 바뀌지 않게 가만히 있을 때만 바꾼다
+      if (cancelled || sceneRef.current || !stageRef.current || phaseRef.current !== 'idle') return;
+      try {
+        const scene = m.createMachineScene({
+          container: stageRef.current,
+          noGovernor: keep3dForTests(),
+          onSlow: () => {
+            markMachine3dUnsupported();
+            teardown();
+          },
+          onHeroRect: ({ x, y, size }) => {
+            const el = rootRef.current;
+            if (!el) return;
+            el.style.setProperty('--hero-x', `${x}px`);
+            el.style.setProperty('--hero-y', `${y}px`);
+            el.style.setProperty('--hero-size', `${size}px`);
+          },
+        });
+        sceneRef.current = scene;
+        if (import.meta.env.DEV) (window as unknown as { __machine3dStats?: unknown }).__machine3dStats = () => sceneRef.current?.stats();
+        void scene.ready.then(() => {
+          if (cancelled || sceneRef.current !== scene) return;
+          // 준비되는 사이 뽑기가 시작됐으면 연출이 끝나고 가만해질 때 바꾼다
+          if (phaseRef.current === 'idle') setIs3d(true);
+          else swapWhenIdle.current = true;
+        });
+      } catch {
+        markMachine3dUnsupported();
+      }
+    };
+    const ready = getLoadedMachine3d();
+    if (ready) mount(ready);
+    else
+      void preloadMachine3d().then((m) => {
+        if (m && performance.now() - started <= LOAD_WAIT_MS) mount(m);
+      });
+    return () => {
+      cancelled = true;
+      teardown();
+    };
+  }, [reduced]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    if (phase === 'idle' && swapWhenIdle.current) {
+      swapWhenIdle.current = false;
+      setIs3d(true);
+    }
+    const ms = phase === 'idle' || phase === 'ready' ? 1 : TIMINGS.normal[phase];
+    scene.setPhase(phase, run ? { rarity: run.rarity, shiny: run.shiny } : null, ms);
+  }, [phase, run?.id, is3d]);
+
   const clearTimers = () => {
     timers.current.forEach((id) => window.clearTimeout(id));
     timers.current = [];
@@ -184,7 +271,16 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
   const rarityClass = run && phase !== 'idle' && phase !== 'inserting' ? ` machine--r-${run.rarity}` : '';
 
   return (
-    <div className={`machine machine--${phase}${rarityClass}`}>
+    <div ref={rootRef} className={`machine machine--${phase}${rarityClass}${is3d ? ' machine--3d' : ''}`}>
+      <div
+        ref={stageRef}
+        className="machine__stage3d"
+        aria-hidden="true"
+        onPointerDown={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          sceneRef.current?.poke((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+        }}
+      />
       <svg className="machine__svg" viewBox="0 0 204 300" role="img" aria-label="말랑 캡슐 머신">
         <defs>
           <radialGradient id="machine-glass" cx="35%" cy="28%" r="80%">

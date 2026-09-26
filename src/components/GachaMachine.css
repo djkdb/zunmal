@@ -505,3 +505,68 @@
     opacity: 1;
   }
 }
+
+/* ── 3D 머신 (machine3d/): SVG 머신과 같은 상자에 겹쳐 그린다. 캔버스는 장식, 캡슐 버튼은 그대로 DOM ── */
+.machine__stage3d {
+  /* 머신 상자보다 옆 14%·위 4%·아래 6% 크다 (빛살·흔들림 여유) — machineScene.ts 의 STAGE_PAD 와 같게 */
+  position: absolute;
+  left: -14%;
+  top: 0;
+  margin-top: -5.88%; /* 위 4% × 300/204 (여백 %는 폭 기준) */
+  width: 128%;
+  aspect-ratio: 1.28 / 1.6176; /* 폭 1.28 : 높이 1.4706 × 1.1 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.machine__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.machine--3d .machine__stage3d {
+  opacity: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.machine--3d .machine__svg {
+  opacity: 0;
+  visibility: hidden;
+  animation: none;
+  filter: none;
+  transition:
+    opacity 0.25s ease,
+    visibility 0s 0.25s;
+}
+
+.machine--3d.machine--tease .machine__stage3d {
+  z-index: 26;
+}
+
+/* 결과 캡슐은 3D 가 그린다 → 버튼은 그 자리에 올린 투명한 누르기 칸 (빛·빛살도 3D, 반짝이·고리만 DOM) */
+.machine--3d .machine__capsule,
+.machine--3d .machine__aura {
+  left: var(--hero-x, 50%);
+  top: var(--hero-y, 78%);
+  width: max(48px, calc(var(--hero-size, 60px) * 1.25));
+  height: max(48px, calc(var(--hero-size, 60px) * 1.25));
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
+
+.machine--3d .machine__capsule {
+  animation: none;
+}
+
+.machine--3d .machine__capsule svg {
+  visibility: hidden;
+}
+
+.machine--3d .machine__capsule.is-shiny::after,
+.machine--3d .machine__glow,
+.machine--3d .machine__rays {
+  display: none;
+}
