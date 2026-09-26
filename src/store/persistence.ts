@@ -164,7 +164,8 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
   const settings = isRecord(raw.settings) ? raw.settings : {};
 
   return {
-    coins: nonNegInt(raw.coins, base.coins),
+    // 시작 선물 코인은 새 저장(createInitialSave)에만 준다. 기존 저장의 코인이 손상되면 0으로.
+    coins: nonNegInt(raw.coins, 0),
     ownedMalangs,
     // 보유 말랑이가 있는데 파트너가 무효하면 첫 보유 말랑이로 대체
     partnerId: partnerId ?? Object.keys(ownedMalangs)[0] ?? null,

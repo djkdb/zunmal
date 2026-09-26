@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { COLLECTIONS, findUnknownMembers } from '../data/collections';
-import { DAILY_CAP, MISSION_ALL_CLEAR_BONUS, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
+import { DAILY_CAP, MISSION_ALL_CLEAR_BONUS, PULL_PRICE, SET_REWARD_COINS, STARTING_COINS } from '../economy/config';
 import { generateDailyMissions } from '../missions/missions';
 import { createSeededRng } from '../lib/rng';
 import { SAVE_KEY, SAVE_VERSION } from './persistence';
@@ -76,7 +76,7 @@ describe('game store', () => {
   it('미니게임 결과: 코인 지급, 최고 기록, 일일 상한', () => {
     const store = makeStore();
     const now = new Date('2026-05-05T03:00:00Z');
-    store.setState({ lastDailyResetDate: '2026-05-05', dailyEarnedCoins: DAILY_CAP - 20 });
+    store.setState({ coins: 0, lastDailyResetDate: '2026-05-05', dailyEarnedCoins: DAILY_CAP - 20 });
     const first = store.getState().finishMiniGame('button-malang', 300, now);
     expect(first.reward.grantedCoins).toBe(20);
     expect(first.isNewBest).toBe(true);
@@ -127,7 +127,7 @@ describe('persist', () => {
     backend.setItem(SAVE_KEY, '{not json');
     const store = makeStore();
     await store.persist.rehydrate();
-    expect(store.getState().coins).toBe(0);
+    expect(store.getState().coins).toBe(STARTING_COINS);
     expect(typeof store.getState().pull).toBe('function');
   });
 

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { canPromptInstall, promptInstall, subscribeInstall, wasInstalled } from '../app/installPrompt';
 import { sfx } from '../audio/sfx';
+import { useGameStore } from '../store/useGameStore';
+import { SaveCopyButton } from './SaveTransfer';
 import { IN_APP_LABEL, detectInstallEnv, externalBrowserUrl, openInBrowserSteps, type InstallEnv } from '../lib/installEnv';
 import { CloseIcon, HomeAddIcon, MoreIcon, ShareIcon } from './icons';
 import './InstallCard.css';
@@ -40,6 +42,10 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
   const [dismissed, setDismissed] = useState(readDismissed);
   const [showSteps, setShowSteps] = useState(false);
   const [copied, setCopied] = useState(false);
+  // 뽑기나 미니게임을 한 번이라도 했으면 옮겨 갈 기록이 있다
+  const hasProgress = useGameStore(
+    (s) => s.totalPulls > 0 || Object.values(s.miniGameRecords).some((r) => r.plays > 0),
+  );
 
   useEffect(() => subscribeInstall(() => force((n) => n + 1)), []);
 
@@ -63,7 +69,8 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
           {appName} 안에서 열렸어요
         </p>
         <p className="install__text">
-          브라우저로 열면 홈 화면에 추가해서 앱처럼 쓸 수 있어요. 여기서 모은 기록은 {appName} 안에만 남아요.
+          브라우저로 열면 홈 화면에 추가해서 앱처럼 쓸 수 있어요. 여기서 모은 기록은 {appName} 안에만 남고, 지워질
+          수도 있어요.
         </p>
         <div className="install__actions">
           {openUrl && (
@@ -83,6 +90,16 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
             </li>
           ))}
         </ol>
+        {hasProgress && (
+          <div className="install__save">
+            <p className="install__text">
+              브라우저로 옮길 때 기록 코드를 복사해 가세요. 새 브라우저의 도감 맨 아래 '기록 옮기기'에서 불러오면 이어서 할 수 있어요.
+            </p>
+            <div className="install__actions">
+              <SaveCopyButton className="btn btn--small" />
+            </div>
+          </div>
+        )}
       </aside>
     );
   }

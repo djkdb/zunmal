@@ -1,18 +1,50 @@
 import { useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characters';
 import { COLLECTIONS, collectionProgress, type Collection as CollectionSet } from '../data/collections';
 import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL } from '../data/rarity';
-import { PARTNER_RARITY_BONUS, SET_REWARD_COINS } from '../economy/config';
+import { PARTNER_RARITY_BONUS, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
 import { Modal } from './Modal';
 import { RarityBadge } from './RarityBadge';
-import { CoinIcon } from './icons';
+import { CapsuleIcon, CoinIcon, JoystickIcon } from './icons';
 import './Collection.css';
 
 type Tab = 'book' | 'sets';
+
+/** 홈 "다음 목표"에서 세트 탭으로 바로 오도록 라우터 state로 탭을 받는다 */
+function initialTab(state: unknown): Tab {
+  return typeof state === 'object' && state !== null && (state as { tab?: unknown }).tab === 'sets' ? 'sets' : 'book';
+}
+
+/** 이 수 이하로 모았으면 "선반이 비어 있어요" 안내를 보여 준다 (시작 말랑이 1마리) */
+const FEW_OWNED = 1;
+
+/** 거의 빈 도감: 무엇을 하면 선반이 채워지는지 한 가지 행동으로 안내 */
+function EmptyShelfNote() {
+  const coins = useGameStore((s) => s.coins);
+  const canPull = coins >= PULL_PRICE.single;
+  return (
+    <div className="collection__empty">
+      <p className="collection__empty-text">
+        아직 선반이 거의 비어 있어요. 캡슐을 뽑을 때마다 새 말랑이가 한 칸씩 채워져요.
+      </p>
+      {canPull ? (
+        <Link to="/gacha" className="btn btn--small btn--primary" onClick={() => sfx.button()}>
+          <CapsuleIcon size={22} />
+          캡슐 뽑기
+        </Link>
+      ) : (
+        <Link to="/play" className="btn btn--small btn--mint" onClick={() => sfx.button()}>
+          <JoystickIcon size={22} />
+          게임하기
+        </Link>
+      )}
+    </div>
+  );
+}
 
 function formatBonus(rate: number): string {
   return `+${Math.round(rate * 100)}%`;
@@ -20,7 +52,8 @@ function formatBonus(rate: number): string {
 
 /** 도감: 등급별 진열장 + 테마 컬렉션 세트 */
 export function Collection() {
-  const [tab, setTab] = useState<Tab>('book');
+  const location = useLocation();
+  const [tab, setTab] = useState<Tab>(() => initialTab(location.state));
   const owned = useGameStore((s) => s.ownedMalangs);
   const [detailId, setDetailId] = useState<string | null>(null);
   const ownedCount = CHARACTERS.filter((c) => owned[c.id]).length;
@@ -73,6 +106,7 @@ export function Collection() {
               <div className="progress__fill" style={{ width: `${(ownedCount / CHARACTERS.length) * 100}%` }} />
             </div>
           </div>
+          {ownedCount <= FEW_OWNED && <EmptyShelfNote />}
           {RARITIES.map((rarity) => (
             <RarityShelf key={rarity} rarity={rarity} onOpen={setDetailId} />
           ))}

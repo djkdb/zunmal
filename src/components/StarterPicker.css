@@ -40,6 +40,16 @@
   gap: 12px;
 }
 
-.starter__intro p {
-  max-width: 34ch;
+.starter__lead {
+  align-self: center;
+  max-width: 30ch;
+  text-align: center;
+  color: var(--ink-soft);
+  word-break: keep-all;
+  text-wrap: balance;
+}
+
+.starter__desc {
+  word-break: keep-all;
+  text-wrap: balance;
 }

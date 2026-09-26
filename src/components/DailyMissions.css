@@ -107,8 +107,33 @@
   font-size: var(--fs-s);
 }
 
-.missions__bonus {
-  text-align: center;
+/* 모두 끝낸 날: 목록 대신 완료 도장 한 줄 */
+.missions__done {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.missions__stamp {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 3px double var(--berry-deep);
+  border-radius: 50%;
+  color: var(--berry-deep);
   font-size: var(--fs-s);
+  transform: rotate(-12deg);
+}
+
+.missions__done-title {
+  font-size: var(--fs-s);
+}
+
+.missions__done-text {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
   color: var(--ink-soft);
+  word-break: keep-all;
 }

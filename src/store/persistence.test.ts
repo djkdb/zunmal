@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PULL_PRICE, STARTING_COINS } from '../economy/config';
 import { SAVE_VERSION, createInitialSave, migrateSave, sanitizeSave } from './persistence';
 
 const NOW = new Date('2026-05-05T03:00:00Z');
@@ -54,6 +55,17 @@ describe('sanitizeSave', () => {
     expect(s.miniGameRecords).toEqual({ 'button-malang': { bestScore: 0, lastScore: 0, plays: 2 } });
     expect(s.dailyEarnedCoins).toBe(0);
     expect(s.lastDailyResetDate).toBe('2026-05-05');
+  });
+
+  it('시작 선물 코인은 새 저장에만: 첫 뽑기 1회 가격', () => {
+    expect(STARTING_COINS).toBe(PULL_PRICE.single);
+    expect(createInitialSave(NOW).coins).toBe(STARTING_COINS);
+    // 기존 저장은 코인이 그대로거나(0 포함), 없거나 손상돼도 선물을 다시 받지 않는다
+    expect(sanitizeSave({ coins: 0, totalPulls: 3 }, NOW).coins).toBe(0);
+    expect(sanitizeSave({ coins: 37 }, NOW).coins).toBe(37);
+    expect(sanitizeSave({ totalPulls: 3 }, NOW).coins).toBe(0);
+    expect(migrateSave({ coins: 0 }, 3, NOW).coins).toBe(0);
+    expect(migrateSave({ coins: 0 }, SAVE_VERSION, NOW).coins).toBe(0);
   });
 
   it('소수 값은 내림', () => {

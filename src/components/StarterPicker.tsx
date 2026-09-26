@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sfx } from '../audio/sfx';
 import { STARTER_CHARACTER_IDS, getCharacter, type Character } from '../data/characters';
+import { STARTING_COINS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
 import './StarterPicker.css';
@@ -16,10 +17,10 @@ export function StarterPicker() {
     <section className="page starter" aria-labelledby="starter-title">
       <div className="starter__intro">
         <h1 id="starter-title" className="page-title">
-          어서 오세요, 말랑 뽑기방이에요
+          첫 말랑이를 골라요
         </h1>
-        <p className="muted">
-          처음 함께할 말랑이를 골라 주세요. 미니게임으로 코인을 모아 캡슐을 뽑으면 새 말랑이를 만날 수 있어요.
+        <p className="starter__lead">
+          함께 놀 파트너예요. 첫 캡슐을 뽑을 코인 {STARTING_COINS}개도 선물로 드려요.
         </p>
       </div>
       <div className="starter__options" role="radiogroup" aria-label="시작 말랑이">
