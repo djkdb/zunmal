@@ -26,7 +26,7 @@ src/
   styles/         global.css — 디자인 토큰, 공용 클래스
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
-  data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트)
+  data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
@@ -156,7 +156,9 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   - 몸 전체 위치 = 매트 세계 하나 `touch/world.ts`: 매트 쪽 중력, 반지름 r 인 말랑한 공끼리 부드러운 밀어내기 + 쿨롱 마찰
     (가운데 올리면 얹혀 쉬고 많이 비끼면 기대다 미끄러짐), 벽 튕김, 들어 옮기기(`grabBody`/`moveHeld`, 천천히 다른 말랑이 위로
     가져가면 올라타 쌓이고 빠르면 밀어냄), 던지기(`releaseBody`), 화살표 툭(`nudgeBody`). 착지·부딪힘·벽 사건을 돌려준다.
-    재질(`BodyMaterial`: 튐·마찰·강성·질량)은 **2단계 말랑이별 재질**을 넣을 자리.
+    재질(`BodyMaterial`: 튐·마찰·강성·질량·끈적임)은 말랑이마다 촉감 표에서 온다(아래 **촉감**).
+    옆구리에 대고 살짝 미는 것은 올라타지 않는다: 손가락 목표가 상대 가운데 가까이(`climbTarget`)일 때만 올라탄다.
+    지난 스텝의 맞닿음 목록(`world.touching`: 법선·파고듦·맞닿은 시간)과 부딪힘 사건의 `nz`를 말랑이끼리 판정에 넘긴다.
   - 몸 안쪽 출렁임 = 말랑이마다 `components/playroom/malangActor.ts`(`MalangActor`): 예전 한 마리 코드 그대로 —
     `physics.ts`(눌림·기울기, 착지·부딪힘은 `impact`) + `softbody.ts`(3D 자국·당김) + 반응·눈길·졸음·소리·입자·진동·애정.
   - 화면 배치는 `touch/matView.ts`(3/4 시점: 깊이 y는 화면 아래, 높이 z는 위, 맞닿아 눌린 모양 `squeezePose`).
@@ -178,7 +180,31 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다. 착지·부딪힘 소리
   (`squish.land`/`bump`)는 연타 간격 제한.
 - 만지면 친밀도(`affection`)가 오른다(만진 말랑이만). 친밀도는 코인을 주지 않는다.
+- **촉감** (`data/materials.ts`, 순수 데이터 + 테스트): 32종 모두 네 촉감 중 하나(`MATERIAL_BY_ID`, 없으면 탱탱 젤리).
+  컴포넌트는 숫자를 들지 않는다 — 물리 모듈이 `feel`(몸 안쪽)·`world`(매트 세계)·`carryFrac`(들어 옮기기 시작 거리)만 읽는다.
+  - 슬로우 라이징(모찌·빵·마시멜로…): 누를 때는 빠르고 놓으면 눌림·3D 자국이 지수 곡선으로 1.5~3초에 걸쳐 차오른다
+    (`physics.relaxSpring`, 히스테리시스), 거의 안 튄다, 낮고 조용한 소리 + 차오르는 "스으"(`squish.riseSigh`).
+  - 탱탱 젤리(젤리·소다·과일…): 강하고 덜 감쇠된 스프링, 매트에서 높이 튐, 높은 "뾰잉".
+  - 쭉쭉이(떡·구름·솜사탕…): 늘림 한계 2.5배(같은 거리를 당겨 2~3배), 멀리 끌어야(`carryFrac` 1.1) 들려 따라오고,
+    놓으면 넘치듯 튕긴다. 늘어난 길이만큼 올라가는 "쭈우욱"(`startStretch('stretchy')`의 고무 음).
+  - 찐득이(펄·해파리·슬라임…): 쉬는 자세가 살짝 처짐(`sag`), 손을 떼도 `peelPlan`만큼 붙어 위로 딸려 오다 "쩍"(`squish.peel`).
+    매트 마찰이 크고, 맞닿은 말랑이를 잠깐 붙잡는다(`world` 끈적임 — 둘 다 찐득이면 세게, `stickHoldMs` 뒤 풀림).
+  - 소리 맛: `squish.*`의 선택 인수 `flavor`(`FLAVOR_TONES`, 순수·테스트). 인수 없으면 예전 소리 그대로.
+  - 정보 패널에 촉감 딱지(`MaterialIcon` + 이름), 선반 칸 구석에 촉감 그림. 저장 구조는 그대로(캐릭터 id 에서 계산).
+- **특별한 속** (전설 이상, `FILLING_BY_ID`): 반짝이 가루 속·물방울 속 별·은하 속·무지개 젤 속. 누른 만큼 밝아지고 누름이 바뀔 때
+  소용돌이친다(`touch/filling.ts`, 순수·테스트). 3D 는 몸 셰이더 uniform 하나(`uFill`: 종류·소용돌이·밝기 + 두 색, 얼굴은 비켜서),
+  2D 는 몸 윤곽 마스크 SVG(`FillingArt`, `--fill-glow`·`--fill-swirl`). 움직임 줄이기면 돌지 않고 밝기만. 다 식으면 그리기를 쉰다.
+- **말랑이끼리** (`touch/interactions.ts`, 순수·테스트, 시간·RNG 주입): 세계 맞닿음·부딪힘에서 사건을 고른다.
+  - 볼 비비기: 한 말랑이를 끌어 옆 말랑이 옆구리에 대고 1초(`rubHoldMs`) — 둘 다 빨개져 비비고 하트, 애정 +2 씩(`petMalang`),
+    말랑이마다 1분에 3번까지만(`rubPetsPerMin`). 같은 쌍은 3.5초 쉬었다가 다시.
+  - 쌓기: 위에 얹혀 자리 잡으면 아래는 "끙"(`strain` 얼굴: 감은 눈·물결 입·땀방울, `squish.groan`), 위는 신남.
+    높이서 덮치면 둘 다 통 튄다(`popBody`, `squish.boing`).
+  - 쿵: 빠르게 부딪히면 둘 다 깜짝 + 머리 위 별. 같은 촉감끼리: 젤리 둘은 더 멀리 튕기고, 찐득이 둘은 붙었다 떨어질 때 "쩍".
+  - 가만히 있는 이웃끼리 가끔 서로 흘끔(`idleInteractions`, 1초마다), 옆에서 졸면 9초만 가만히 있어도 따라 졸고 숨 위상을 맞춘다
+    (3D 는 `soft.timeMs` 복사, 2D 는 졸음 애니메이션 음수 지연 = 페이지 시계).
+  - 방법 보기 시트: 기본 손짓·반응 표 아래 "함께 놀기"(`PAIR_PLAYS`)와 "촉감"(네 촉감 + 집중한 말랑이 표시, 특별한 속 한 줄).
 - **3단계(꾸미기·단체 사진) 자리**: 매트 위 물건 기록 `components/playroom/bodyRec.ts`(`kind`에 소품 추가), 3D 무대 `stage.scene`,
+
   사진 `composePhoto`의 `caption`(단체 사진 한 줄).
 - **3D 젤리** (`components/touch3d/`, three.js): 무대 하나(`createJellyStage`: 렌더러·장면·카메라) 안에 몸 N개(`stage.addBody`).
   몸은 화면을 보고 서 있고 매트 깊이는 z로 두되 원근만큼 위치·크기를 되돌려 DOM 좌표와 정확히 맞춘다. 멈춘 몸은 정점을 다시 계산하지 않는다.
@@ -204,7 +230,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   애정 단계(`levelOf`, 50마다)로 하나씩 열린다(`REACTION_UNLOCKS`, 1단계는 기본 말랑만) — 게이지 아래 줄에 다음 반응, 열리면 축하 딱지.
   저장 구조는 그대로(애정 값에서 계산).
   - 눈길: 손가락/마우스 쪽으로 얼굴이 옮겨 간다(2D는 `.malang-face` CSS 변수, 3D는 셰이더 UV 당김). 떼면 다시 앞을 본다.
-  - 만지기 전용 얼굴(`touch/faceExtras.ts`: 소용돌이 눈·하품 입·진한 볼)은 SVG path — 2D는 덧그린 `<svg>`, 3D는 구운 텍스처에 Path2D.
+  - 만지기 전용 얼굴(`touch/faceExtras.ts`: 소용돌이 눈·하품 입·진한 볼·"끙" 얼굴)은 SVG path — 2D는 덧그린 `<svg>`, 3D는 구운 텍스처에 Path2D.
   - 가만히 8초 → 하품, 20초 → 졸기(말랑이마다 따로. 감은 눈, z 입자, 느린 숨 — 3D는 20fps로만 그림). 만지거나 세게 부딪히면 깜짝 놀라 폴짝.
 - **사진 찍기** (`touch3d/photo.ts` 동적 import, 배치는 순수 `touch/photoCard.ts`): 매트 위 모든 말랑이(3D 무대 스냅샷 또는 2D SVG)+입자를
   1080×1350 카드(이름 풍선 글씨·등급 딱지·애정 단계·가게 이름, 여럿이면 "말랑이 N마리" + 한 줄)로 PNG. 미리보기에서 한 번 더 눌러 공유(Web Share 파일) 또는 저장.
@@ -265,7 +291,8 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 저장: 손상/구버전 데이터 migrate.
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한), 캡슐 손짓, 선반 순서, 성능 조절, 화면 배치, 반응 부위·쓰다듬기.
 - 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰).
-- 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트).
+- 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트), 촉감별 소리 맛(`squish`).
+- 놀이방 촉감·말랑이끼리: 슬로우 라이징 회복 시간·젤리 출렁임·쭉쭉이 한계·찐득이 떼기 지연·끈적임 풀림(`touch/materials.test.ts`), 볼 비비기 시간·쉬기·1분 상한·쌓기·쿵·흘끔·같이 졸기(`touch/interactions.test.ts`).
 
 ## 미니게임 추가 방법
 
