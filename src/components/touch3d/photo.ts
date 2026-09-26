@@ -131,9 +131,17 @@ function gatherScene(input: PhotoInput): HTMLCanvasElement {
   return c;
 }
 
-/** 2D 말랑이 SVG 를 그대로 이미지로 (외곽선 포함) */
+/** 2D 사진에서 그림 상자 밖으로 번지는 몫 (전설 이상 오라가 네모로 잘리지 않게) — 상자 폭 대비 한쪽 */
+export const RASTER_PAD = 0.3;
+
+/**
+ * 2D 말랑이 SVG 를 그대로 이미지로 (외곽선·오라 포함). 결과는 상자보다 한쪽마다 RASTER_PAD 만큼 넓다 —
+ * 놓을 때도 svg 상자를 같은 비율로 넓혀 놓는다.
+ */
 export async function rasterizeVisibleMalang(svg: SVGSVGElement, bodyPath: string, bottom: number): Promise<HTMLCanvasElement> {
-  return rasterizeMalang(svg, { part: 'full', rect: { ...VIEWBOX }, size: 720, bodyPath, bottom });
+  const p = VIEWBOX.w * RASTER_PAD;
+  const rect = { x: VIEWBOX.x - p, y: VIEWBOX.y - p, w: VIEWBOX.w + 2 * p, h: VIEWBOX.h + 2 * p };
+  return rasterizeMalang(svg, { part: 'full', rect, size: 900, bodyPath, bottom });
 }
 
 export async function composePhoto(input: PhotoInput): Promise<Blob> {

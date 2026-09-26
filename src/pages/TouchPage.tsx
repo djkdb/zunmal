@@ -762,13 +762,13 @@ function Playroom() {
       }
     }
     // 성능: 연속으로 그리는 프레임 간격만
-    if (last !== null) {
+    if (last !== null && !keep3dForTests()) {
       const next = samplePerf(perfRef.current, ts - last);
       if (next !== perfRef.current) {
         const prev = perfRef.current;
         perfRef.current = next;
         if (next.cap !== prev.cap) setCap(next.cap);
-        if (next.quality === '2d' && prev.quality === '3d' && modeRef.current !== '2d' && !keep3dForTests()) setMode('2d');
+        if (next.quality === '2d' && prev.quality === '3d' && modeRef.current !== '2d') setMode('2d');
       }
     }
     if (busy || worldMoving || pointersRef.current.size > 0) {
@@ -1231,7 +1231,10 @@ function Playroom() {
         if (!svg) continue;
         const shape = SHAPES[r.character.shape];
         const img = await mod.rasterizeVisibleMalang(svg, shape.body, shape.bottom);
-        layers.push({ image: img, rect: toRect(svg.getBoundingClientRect()) });
+        const sr = svg.getBoundingClientRect();
+        const px = sr.width * mod.RASTER_PAD;
+        const py = sr.height * mod.RASTER_PAD;
+        layers.push({ image: img, rect: { x: sr.left - px, y: sr.top - py, w: sr.width + 2 * px, h: sr.height + 2 * py } });
       }
       if (fxCopy && fxCanvas) layers.push({ image: fxCopy, rect: toRect(fxCanvas.getBoundingClientRect()) });
       // 사진 칸은 모든 말랑이를 감싸는 상자에 맞춘다
@@ -1557,7 +1560,7 @@ function Playroom() {
   );
 }
 
-/** 개발 서버에서만: 소프트웨어 WebGL(swiftshader)로 3D 화면을 확인할 때 자동 2D 전환을 끈다 */
+/** 개발 서버에서만: 소프트웨어 WebGL(swiftshader)로 3D 화면을 확인할 때 성능 조절(2D 전환·상한 줄이기)을 끈다 */
 function keep3dForTests(): boolean {
   if (!import.meta.env.DEV) return false;
   try {
