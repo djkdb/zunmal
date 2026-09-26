@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { installAudioUnlock, sfx } from '../audio/sfx';
+import { useRouteMusic } from '../audio/useRouteMusic';
 import { BottomNav } from '../components/BottomNav';
 import { StarterPicker } from '../components/StarterPicker';
 import { TopBar } from '../components/TopBar';
@@ -8,7 +9,8 @@ import { useGameStore } from '../store/useGameStore';
 
 export function AppShell() {
   const needsStarter = useGameStore((s) => Object.keys(s.ownedMalangs).length === 0);
-  const muted = useGameStore((s) => s.settings.muted);
+  const sfxOn = useGameStore((s) => s.settings.sfxOn);
+  const musicOn = useGameStore((s) => s.settings.musicOn);
   const refreshDaily = useGameStore((s) => s.refreshDaily);
   // 게임 플레이 중에는 하단 내비게이션을 숨겨 조작 영역을 확보한다
   const inGame = useMatch('/play/:gameId') !== null;
@@ -19,12 +21,15 @@ export function AppShell() {
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  // 첫 사용자 입력 이후에만 AudioContext 생성
+  // 첫 사용자 입력 이후에만 AudioContext 생성 (iOS 중단 뒤 재개·화면 숨김 처리 포함)
   useEffect(() => installAudioUnlock(), []);
 
   useEffect(() => {
-    sfx.setMuted(muted);
-  }, [muted]);
+    sfx.setSettings({ sfxOn, musicOn });
+  }, [sfxOn, musicOn]);
+
+  // 화면별 배경음악 (첫 입력 뒤에만 재생)
+  useRouteMusic();
 
   // 서울 날짜 변경 시 일일 한도 초기화 (앱 진입 / 탭 복귀 시)
   useEffect(() => {

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { useGameStore } from '../store/useGameStore';
-import { CoinIcon, SoundOffIcon, SoundOnIcon } from './icons';
+import { CoinIcon } from './icons';
+import { SoundSettings } from './SoundSettings';
 import './TopBar.css';
 
 /** 값이 증가할 때마다 바뀌는 key → CSS 애니메이션 재생 */
@@ -19,8 +20,6 @@ function useBumpKey(value: number): number {
 /** 게임 HUD: 코인(큰 아이콘 + 숫자 + 벌러 가기 버튼)과 소리 켜기/끄기 */
 export function TopBar() {
   const coins = useGameStore((s) => s.coins);
-  const muted = useGameStore((s) => s.settings.muted);
-  const setMuted = useGameStore((s) => s.setMuted);
   const coinKey = useBumpKey(coins);
 
   return (
@@ -38,21 +37,7 @@ export function TopBar() {
           </Link>
         </div>
       </div>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-pressed={muted}
-        aria-label={muted ? '소리 켜기' : '소리 끄기'}
-        onClick={() => {
-          setMuted(!muted);
-          if (muted) {
-            sfx.setMuted(false);
-            sfx.button();
-          }
-        }}
-      >
-        {muted ? <SoundOffIcon size={22} /> : <SoundOnIcon size={22} />}
-      </button>
+      <SoundSettings />
     </header>
   );
 }

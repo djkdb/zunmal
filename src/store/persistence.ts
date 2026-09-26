@@ -16,8 +16,9 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
  *  - v2: 반짝 수집(shinyCount), 컬렉션 보상 수령(claimedSets), 친밀도(affection), 반짝 파트너(partnerShiny)
  *  - v3: 뽑기권 폐지 — 재화는 코인 하나. 남은 뽑기권(gachaTickets)은 코인으로 환산
  *  - v4: 일일 미션 진행(missions)
+ *  - v5: 소리 설정 분리 — settings { muted } → { sfxOn, musicOn } (효과음/배경음악)
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const SAVE_KEY = 'malang-gacha-save';
 
 export interface OwnedMalang {
@@ -35,7 +36,10 @@ export interface MiniGameRecord {
 }
 
 export interface Settings {
-  muted: boolean;
+  /** 효과음(버튼·뽑기·미니게임·만지기 소리) */
+  sfxOn: boolean;
+  /** 배경음악. 켜져 있어도 첫 사용자 입력 전에는 재생하지 않는다. */
+  musicOn: boolean;
 }
 
 export interface SaveData {
@@ -64,7 +68,7 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     ownedMalangs: {},
     pityCount: 0,
     partnerId: null,
-    settings: { muted: false },
+    settings: { sfxOn: true, musicOn: true },
     miniGameRecords: {},
     dailyEarnedCoins: 0,
     lastDailyResetDate: seoulDateKey(now),
@@ -169,7 +173,10 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     // 보유 말랑이가 있는데 파트너가 무효하면 첫 보유 말랑이로 대체
     partnerId: partnerId ?? Object.keys(ownedMalangs)[0] ?? null,
     pityCount: nonNegInt(raw.pityCount, 0, GACHA_RULES.pityThreshold - 1),
-    settings: { muted: typeof settings.muted === 'boolean' ? settings.muted : base.settings.muted },
+    settings: {
+      sfxOn: typeof settings.sfxOn === 'boolean' ? settings.sfxOn : base.settings.sfxOn,
+      musicOn: typeof settings.musicOn === 'boolean' ? settings.musicOn : base.settings.musicOn,
+    },
     miniGameRecords: sanitizeRecords(raw.miniGameRecords),
     dailyEarnedCoins: nonNegInt(raw.dailyEarnedCoins, 0),
     lastDailyResetDate: isValidDateKey(raw.lastDailyResetDate) ? raw.lastDailyResetDate : base.lastDailyResetDate,
@@ -216,6 +223,13 @@ function migrateV2toV3(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, coins: coins + tickets * LEGACY_TICKET_TO_COINS };
 }
 
+/** v4 → v5: 한 개였던 음소거를 효과음/배경음악 두 설정으로. 음소거였다면 둘 다 끈다. */
+function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
+  const settings = isRecord(raw.settings) ? raw.settings : {};
+  const on = settings.muted !== true;
+  return { ...raw, settings: { sfxOn: on, musicOn: on } };
+}
+
 /**
  * 저장된 버전에서 현재 버전으로 마이그레이션한 뒤 sanitize한다.
  * 알 수 없는(미래) 버전도 가능한 필드만 살려 복구한다.
@@ -227,6 +241,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   // v1 → v2: 새 필드는 sanitize가 기본값(반짝 0, 세트 없음, 친밀도 없음)으로 채운다.
   if (fromVersion < 3) data = migrateV2toV3(data);
   // v3 → v4: missions는 sanitize가 오늘 날짜의 빈 진행으로 채운다.
-  // 향후: if (fromVersion < 5) data = migrateV4toV5(data);
+  if (fromVersion < 5) data = migrateV4toV5(data);
+  // 향후: if (fromVersion < 6) data = migrateV5toV6(data);
   return sanitizeSave(data, now);
 }

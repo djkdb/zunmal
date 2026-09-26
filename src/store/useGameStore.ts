@@ -53,7 +53,12 @@ export interface GameActions {
   claimMission(id: MissionKind, now?: Date): { ok: true; coins: number } | { ok: false; reason: string };
   /** 미션 3개를 모두 받은 뒤 추가 보너스 받기. 받은 코인(없으면 0)을 돌려준다. */
   claimMissionBonus(now?: Date): number;
+  /** 모든 소리 끄기/켜기 (효과음 + 배경음악) */
   setMuted(muted: boolean): void;
+  /** 효과음 켜기/끄기 */
+  setSfxOn(on: boolean): void;
+  /** 배경음악 켜기/끄기 */
+  setMusicOn(on: boolean): void;
   /** 서울 날짜 변경 시 일일 획득량 초기화 */
   refreshDaily(now?: Date): void;
   resetAll(): void;
@@ -264,7 +269,15 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
         },
 
         setMuted(muted) {
-          set((s) => ({ settings: { ...s.settings, muted } }));
+          set((s) => ({ settings: { ...s.settings, sfxOn: !muted, musicOn: !muted } }));
+        },
+
+        setSfxOn(on) {
+          set((s) => ({ settings: { ...s.settings, sfxOn: on } }));
+        },
+
+        setMusicOn(on) {
+          set((s) => ({ settings: { ...s.settings, musicOn: on } }));
         },
 
         refreshDaily(now = new Date()) {

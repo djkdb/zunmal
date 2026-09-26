@@ -120,7 +120,17 @@ describe('persist', () => {
     await b.persist.rehydrate();
     expect(b.getState().coins).toBe(321);
     expect(b.getState().partnerId).toBe('matcha-bean');
-    expect(b.getState().settings.muted).toBe(true);
+    expect(b.getState().settings).toEqual({ sfxOn: false, musicOn: false });
+  });
+
+  it('효과음과 배경음악은 따로 켜고 끈다', () => {
+    const store = makeStore();
+    store.getState().setMusicOn(false);
+    expect(store.getState().settings).toEqual({ sfxOn: true, musicOn: false });
+    store.getState().setSfxOn(false);
+    expect(store.getState().settings).toEqual({ sfxOn: false, musicOn: false });
+    store.getState().setMuted(false);
+    expect(store.getState().settings).toEqual({ sfxOn: true, musicOn: true });
   });
 
   it('손상된 JSON이면 초기 상태로 시작', async () => {
