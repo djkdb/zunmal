@@ -185,7 +185,7 @@ function drawScene(ctx: CanvasRenderingContext2D, state: StackState, partner: Ch
 
   // 점수 팝업
   ctx.textAlign = 'center';
-  ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
+  ctx.font = '20px "Gowun Dodum", "Pretendard Variable", sans-serif';
   ctx.lineJoin = 'round';
   for (const p of fx.popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 800);

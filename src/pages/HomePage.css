@@ -3,61 +3,27 @@
   padding-top: 0;
 }
 
-/* 가게 간판: 차양 + 풍선 글씨 로고. 앱에서 가장 과감한 장식 */
+/* 간판: 영문 머리글 + 고운돋움 가게 이름 (시안 G) */
 .home__sign {
-  position: relative;
-  margin: 0 calc(var(--gutter) * -1);
-  padding-bottom: 6px;
-  text-align: center;
-}
-
-.home__awning {
-  --stripe: 26px;
-  height: 22px;
-  margin-bottom: 18px;
-  background: repeating-linear-gradient(90deg, var(--berry) 0 var(--stripe), var(--paper) var(--stripe) calc(var(--stripe) * 2));
-  border-top: var(--line) solid var(--ink);
-  border-bottom: var(--line) solid var(--ink);
-  position: relative;
-}
-
-.home__awning::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 16px;
-  background:
-    radial-gradient(circle at calc(var(--stripe) / 2) 0, var(--berry) 0 11px, var(--ink) 11.5px 14px, transparent 14.5px),
-    radial-gradient(circle at calc(var(--stripe) * 1.5) 0, var(--paper) 0 11px, var(--ink) 11.5px 14px, transparent 14.5px);
-  background-size: calc(var(--stripe) * 2) 16px;
-  background-repeat: repeat-x;
-}
-
-.home__logo {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 1;
+  gap: 2px;
+  padding-top: 2px;
+  text-align: center;
 }
 
-.home__logo-small {
-  font-size: var(--fs-m);
-  color: var(--lemon);
-  -webkit-text-stroke: 8px var(--ink);
-  paint-order: stroke fill;
-  transform: rotate(-4deg) translateX(-40px);
-  margin-bottom: -6px;
+.home__eyebrow {
+  /* 단어 사이를 넓게 (시안의 "CAPSULE  MALANG  SHOP") */
+  word-spacing: 0.35em;
 }
 
-.home__logo-big {
-  font-size: clamp(2.2rem, 7dvh, 3rem);
-  color: var(--berry);
-  -webkit-text-stroke: 10px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 6px 0 var(--ink);
-  letter-spacing: 0.02em;
+.home__logo {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 5.4dvh, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--ink);
 }
 
 /* 파트너 무대 */
@@ -66,40 +32,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 6px;
 }
 
 .home__bubble {
   position: relative;
   /* 한 줄에 들어가야 360×640에서도 주요 버튼이 첫 화면에 남는다 */
   max-width: min(100%, 320px);
-  padding: 8px 16px 9px;
-  border: var(--line) solid var(--ink);
-  border-radius: 20px;
-  background: var(--paper);
-  font-size: var(--fs-s);
+  padding: 7px 16px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 0.875rem;
+  font-weight: 500;
   text-align: center;
   line-height: 1.4;
   word-break: keep-all;
 }
 
-.home__bubble::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -11px;
-  width: 16px;
-  height: 16px;
-  background: var(--paper);
-  border-right: var(--line) solid var(--ink);
-  border-bottom: var(--line) solid var(--ink);
-  transform: translateX(-50%) rotate(45deg);
-}
-
 .home__partner {
   position: relative;
   z-index: 1;
-  margin-top: 4px;
+  margin-top: 6px;
   border-radius: 50%;
 }
 
@@ -108,91 +61,97 @@
   transition: transform 0.1s ease;
 }
 
+/* 흰 받침: 말랑이가 올라선 부드러운 타원 */
 .home__pedestal {
-  width: clamp(150px, 26dvh, 200px);
-  height: 32px;
-  margin-top: -26px;
-  border: var(--line) solid var(--ink);
+  width: clamp(150px, 26dvh, 190px);
+  height: 26px;
+  margin-top: -22px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 30%, #fff 0 20%, var(--grape) 70%);
-  box-shadow: 0 6px 0 var(--ink);
+  background: radial-gradient(ellipse at 50% 40%, #fff 0 45%, rgba(255, 255, 255, 0.82) 70%);
+  box-shadow:
+    0 8px 18px rgba(26, 64, 128, 0.12),
+    inset 0 -3px 6px rgba(143, 195, 255, 0.25);
 }
 
 .home__name {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: var(--fs-m);
+  gap: 8px;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  letter-spacing: var(--tracking-title);
 }
 
 .home__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .home__action {
-  flex-direction: column;
-  gap: 2px;
+  position: relative;
   padding-inline: 8px;
 }
 
-/* 화면이 낮은 폰에서도 게임하기·뽑기 버튼이 첫 화면에 보이도록 말랑이 크기를 화면 높이에 맞춘다 */
+/* 화면이 낮은 폰에서도 주요 버튼이 첫 화면에 보이도록 말랑이 크기를 화면 높이에 맞춘다 */
 .home__partner .malang {
-  width: clamp(120px, 23dvh, 190px);
+  width: clamp(112px, 21dvh, 180px);
   height: auto;
 }
 
-
-/* 도감 진행: 캡슐 15칸 */
+/* 도감 진행: 등급색 점 32칸 */
 .home__jar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: var(--line) solid var(--ink);
-  border-radius: 999px;
-  background: rgba(255, 252, 245, 0.8);
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   color: var(--ink);
   text-decoration: none;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+.home__jar:active {
+  transform: scale(0.98);
+  transition-duration: var(--press-in);
 }
 
 .home__slots {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(15, 1fr);
-  gap: 3px;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 4px;
 }
 
 .home__slot {
   aspect-ratio: 1;
-  border: 2px dashed rgba(43, 34, 51, 0.35);
   border-radius: 50%;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .home__slot.is-filled {
-  border: 2px solid var(--ink);
+  box-shadow: none;
 }
 
 .home__jar-count {
+  font-weight: 700;
   font-size: var(--fs-s);
   font-variant-numeric: tabular-nums;
 }
 
 /* ── 다음 목표 말풍선 ─────────────────────────────────────────
  * 파트너 말풍선 자리를 그대로 쓴다(높이를 더하지 않아 주요 버튼이 첫 화면에 남는다).
- * 누를 수 있으므로 말풍선에 아랫단 그림자를 준다. */
+ * 누를 수 있어서 알약 모양 + 조금 더 짙은 그림자. */
 .home__goal {
   display: flex;
   align-items: center;
-  max-width: min(100%, 320px);
+  max-width: min(100%, 330px);
   padding: 0;
-  box-shadow: var(--keycap-s);
-}
-
-.home__goal::after {
-  bottom: -11px;
+  box-shadow: var(--shadow-btn);
 }
 
 .home__goal-link {
@@ -203,7 +162,7 @@
   gap: 8px;
   min-height: 44px;
   padding: 6px 4px 7px 16px;
-  border-radius: 20px 0 0 20px;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
   color: var(--ink);
   text-decoration: none;
   word-break: keep-all;
@@ -225,19 +184,18 @@
 }
 
 .home__goal-dot {
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--ink);
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--paper);
+  background: var(--sky-tint);
 }
 
 .home__goal-dot.is-done {
-  background: var(--matcha);
+  background: var(--sky);
 }
 
 .home__goal-dot.is-now {
-  background: var(--berry);
+  background: var(--primary-deep);
 }
 
 .home__goal-close {
@@ -245,36 +203,31 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 42px;
   min-height: 44px;
   padding: 0;
   border: 0;
-  border-left: 2px dashed rgba(43, 34, 51, 0.25);
-  border-radius: 0 20px 20px 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
   background: none;
-  color: var(--ink-soft);
+  color: var(--sub);
   cursor: pointer;
 }
 
 /* 안내 중인 버튼에 붙는 스티커 (절대 위치라 높이를 더하지 않는다) */
-.home__action {
-  position: relative;
-}
-
 .home__sticker {
   position: absolute;
-  top: -12px;
-  right: -4px;
+  top: -11px;
+  right: 2px;
   padding: 2px 10px 3px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--lemon);
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.16);
   color: var(--ink);
-  -webkit-text-stroke: 0;
-  font-size: var(--fs-xs);
+  font-size: 0.75rem;
+  font-weight: 700;
   line-height: 1.3;
   white-space: nowrap;
-  transform: rotate(6deg);
   animation: home-sticker 1.6s ease-in-out infinite;
   pointer-events: none;
 }
@@ -282,10 +235,10 @@
 @keyframes home-sticker {
   0%,
   100% {
-    transform: rotate(6deg) translateY(0);
+    transform: translateY(0);
   }
   50% {
-    transform: rotate(6deg) translateY(-4px);
+    transform: translateY(-3px);
   }
 }
 

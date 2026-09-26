@@ -31,7 +31,7 @@ import {
 import './MalangSling.css';
 
 const INK = '#2b2233';
-const FONT = "'Cafe24 Ssurround', 'Jua', sans-serif";
+const FONT = "'Gowun Dodum', 'Pretendard Variable', sans-serif";
 const JELLY_COLORS = ['#ff8fab', '#7fd8be', '#8ecdf7', '#ffd966'];
 const ENEMY_COLORS = ['#b98cff', '#8fd14f', '#ff9f5a'];
 const CHOCO = '#8b5a3c';

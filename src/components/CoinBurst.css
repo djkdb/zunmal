@@ -15,5 +15,5 @@
   display: grid;
   opacity: 0;
   will-change: transform, opacity;
-  filter: drop-shadow(0 2px 0 var(--ink));
+  filter: drop-shadow(0 2px 3px rgba(26, 64, 128, 0.25));
 }

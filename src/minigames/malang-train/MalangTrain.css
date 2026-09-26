@@ -63,7 +63,8 @@
 .trn__field {
   position: relative;
   aspect-ratio: 1;
-  border: var(--line) solid var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-s);
   background:
     linear-gradient(90deg, rgba(255, 122, 162, 0.16) 50%, transparent 0) 0 0 / calc(200% / var(--mt-n)) 100%,

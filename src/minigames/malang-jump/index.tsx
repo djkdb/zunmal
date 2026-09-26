@@ -180,7 +180,7 @@ function drawScene(ctx: CanvasRenderingContext2D, s: JumpState, popups: Popup[])
   ctx.fillStyle = 'rgba(43,34,51,0.35)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 8]);
-  ctx.font = '14px "Cafe24 Ssurround", Jua, sans-serif';
+  ctx.font = '14px "Gowun Dodum", "Pretendard Variable", sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
   const first = Math.ceil(s.cameraY / step) * step;
@@ -202,7 +202,7 @@ function drawScene(ctx: CanvasRenderingContext2D, s: JumpState, popups: Popup[])
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = '18px "Cafe24 Ssurround", Jua, sans-serif';
+  ctx.font = '18px "Gowun Dodum", "Pretendard Variable", sans-serif';
   for (const p of popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 700);
     ctx.fillStyle = '#e0457b';

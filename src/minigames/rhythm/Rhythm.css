@@ -35,7 +35,8 @@
   position: relative;
   height: min(60dvh, 420px);
   min-height: 300px;
-  border: var(--line) solid var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-panel);
   background:
     radial-gradient(circle at 50% 50%, rgba(185, 156, 255, 0.2), transparent 62%),

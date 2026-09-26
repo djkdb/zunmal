@@ -7,17 +7,19 @@
 
 .game-hud__time {
   position: relative;
-  height: 28px;
-  border: var(--line) solid var(--ink);
+  height: 26px;
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--surface);
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    0 2px 8px rgba(26, 64, 128, 0.08);
   overflow: hidden;
 }
 
 .game-hud__bar {
   position: absolute;
   inset: 0;
-  background: var(--mint);
+  background: var(--sky);
   transform-origin: left center;
   transition: transform 0.1s linear;
 }
@@ -30,8 +32,9 @@
   position: relative;
   display: block;
   text-align: center;
-  font-family: var(--font-display);
-  line-height: 22px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 26px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -41,13 +44,15 @@
   align-items: flex-end;
   min-width: 56px;
   line-height: 1.1;
-  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--sub);
   font-variant-numeric: tabular-nums;
 }
 
 .game-hud__score strong {
   font-size: 1.3rem;
-  font-weight: 400;
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .countdown {
@@ -56,9 +61,10 @@
   z-index: 5;
   display: grid;
   place-items: center;
-  background: rgba(255, 246, 230, 0.75);
+  background: rgba(234, 244, 255, 0.72);
   font-family: var(--font-display);
   font-size: 5rem;
+  color: var(--ink);
   pointer-events: none;
 }
 

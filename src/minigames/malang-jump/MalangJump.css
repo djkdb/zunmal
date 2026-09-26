@@ -15,7 +15,8 @@
   /* 2:3 비율 유지 — 화면이 낮으면 폭을 줄여 조작 버튼이 항상 보이도록 */
   width: min(100%, 400px, max(180px, calc((100dvh - 250px) * 2 / 3)));
   margin: 0 auto;
-  border: var(--line, 3px) solid var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-panel);
   overflow: hidden;
   background:

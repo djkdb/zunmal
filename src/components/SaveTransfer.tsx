@@ -166,7 +166,7 @@ export function SaveTransfer() {
               {error}
             </p>
           )}
-          <button type="button" className="btn btn--small btn--sky" disabled={input.trim() === ''} onClick={check}>
+          <button type="button" className="btn btn--small btn--secondary" disabled={input.trim() === ''} onClick={check}>
             불러오기
           </button>
         </div>

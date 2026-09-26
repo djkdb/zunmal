@@ -176,7 +176,7 @@ function drawScene(
   }
   drawBowl(ctx, state.playerX, partner, squash);
   ctx.textAlign = 'center';
-  ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
+  ctx.font = '20px "Gowun Dodum", "Pretendard Variable", sans-serif';
   for (const p of popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 700);
     ctx.fillStyle = p.color;

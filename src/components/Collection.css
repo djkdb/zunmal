@@ -1,65 +1,67 @@
 .collection {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
 }
 
 .collection__progress {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .collection__progress-value {
-  font-family: var(--font-display);
   font-size: var(--fs-s);
 }
 
 .collection__progress-value strong {
+  font-family: var(--font-display);
   font-weight: 400;
   font-size: var(--fs-l);
+  letter-spacing: var(--tracking-title);
 }
 
-.progress {
-  height: 16px;
-  border: var(--line) solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
+.collection .progress {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--sky-tint);
   overflow: hidden;
 }
 
 .progress__fill {
   height: 100%;
-  background: var(--berry);
-  border-right: var(--line) solid var(--ink);
+  border-radius: inherit;
+  background: var(--primary);
   transition: width 0.4s ease;
 }
 
-.collection__heading {
-  margin-bottom: 10px;
+/* 등급 한 칸 = 흰 선반 카드 */
+.collection__section {
+  padding: 14px 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
-/* 진열장 한 칸 = 선반 한 줄 */
+.collection__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 12px;
+}
+
 .collection__grid {
   position: relative;
   list-style: none;
   margin: 0;
-  padding: 0 6px 18px;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px 8px;
-}
-
-.collection__grid::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 12px;
-  background: var(--shelf);
-  border: var(--line) solid var(--ink);
-  border-radius: 5px;
+  gap: 14px 6px;
 }
 
 .collection__card {
@@ -69,61 +71,66 @@
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 0 2px 6px;
+  padding: 0 2px 2px;
   border: none;
-  border-radius: var(--radius-slot);
+  border-radius: var(--radius-btn);
   background: none;
   cursor: pointer;
   text-align: center;
   color: var(--ink);
 }
 
-/* 캡슐 창: 말랑이가 들어 있는 투명 캡슐 */
+/* 캡슐 창: 말랑이가 들어 있는 동그란 유리창 (등급색이 옅게 비친다) */
 .collection__window {
   display: grid;
   place-items: center;
   width: 86px;
   max-width: 100%;
   aspect-ratio: 1;
-  border: var(--line) solid var(--ink);
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%), var(--capsule, #f3eadb);
-  transition: transform 0.1s ease;
+  background: radial-gradient(circle at 35% 28%, #fff 0 16%, rgba(255, 255, 255, 0.5) 42%), var(--capsule, var(--rarity-common-tint));
+  box-shadow:
+    inset 0 -4px 10px rgba(26, 64, 128, 0.06),
+    0 3px 8px rgba(26, 64, 128, 0.08);
+  transition: transform var(--press-out) var(--ease-jelly);
 }
 
 .collection__card:active .collection__window {
   transform: scale(0.94);
+  transition-duration: var(--press-in);
 }
 
 .collection__card--rare {
-  --capsule: #d4ecff;
+  --capsule: var(--rarity-rare-tint);
 }
 
 .collection__card--epic {
-  --capsule: #e6dcff;
+  --capsule: var(--rarity-epic-tint);
 }
 
 .collection__card--legendary {
-  --capsule: #ffeaa8;
+  --capsule: var(--rarity-legendary-tint);
 }
 
 .collection__card--mythic {
-  --capsule: conic-gradient(#ffc2d1, #fff0a8, #c8f0c0, #c9e8ff, #e2d6ff, #ffc2d1);
+  --capsule: conic-gradient(#ffd6e1, #fff3c4, #d9f5d4, #d9ecff, #ebe2ff, #ffd6e1);
 }
 
 .collection__card.is-locked {
   cursor: default;
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .collection__card.is-locked .collection__window {
-  border-style: dashed;
-  border-color: rgba(43, 34, 51, 0.45);
-  background: rgba(255, 252, 245, 0.6);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1.5px var(--border);
 }
 
 .collection__card.is-partner .collection__window {
-  box-shadow: 0 0 0 4px var(--lemon), 0 0 0 7px var(--ink);
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 5.5px var(--primary),
+    0 4px 10px rgba(26, 64, 128, 0.12);
 }
 
 .collection__partner-tag {
@@ -131,18 +138,17 @@
   top: -8px;
   right: 2px;
   z-index: 1;
-  padding: 0 7px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--lemon);
-  font-family: var(--font-display);
-  font-size: var(--fs-xs);
-  transform: rotate(8deg);
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  box-shadow: 0 2px 6px rgba(26, 64, 128, 0.16);
+  font-weight: 700;
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 
 .collection__name {
-  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-xs);
   line-height: 1.25;
   word-break: keep-all;
@@ -150,7 +156,7 @@
 
 .collection__count {
   font-size: 0.75rem;
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .collection-detail {
@@ -177,64 +183,58 @@
   min-height: 1.25em;
 }
 
-/* ── 탭 ─────────────────────────────────────────────────────── */
+/* ── 탭: 흰 알약 안에서 고른 쪽이 딸기우유 ─────────────────────── */
 .collection__tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  padding: 5px;
-  border: var(--line) solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .collection__tab {
   min-height: 44px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
-  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-s);
-  color: var(--ink-soft);
+  color: var(--sub);
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .collection__tab.is-active {
-  background: linear-gradient(180deg, #fff3a8, var(--lemon) 60%);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 0 0 2.5px var(--ink);
+  background: var(--primary);
   color: var(--ink);
+  font-weight: 700;
 }
 
 .collection__shiny-count {
   margin-left: 8px;
   padding: 1px 10px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffb8e0 60%, #b8e8ff);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffc8e6 60%, #c6ecff);
+  font-weight: 700;
   font-size: var(--fs-xs);
   vertical-align: middle;
 }
 
-.collection__heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .collection__found {
   font-size: var(--fs-s);
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
-/* 반짝 표시: 캡슐 창 오른쪽 위 반짝이 */
+/* 반짝 표시: 캡슐 창 왼쪽 위 반짝이 */
 .collection__shiny-mark {
   position: absolute;
   top: 2px;
   left: 6px;
   width: 22px;
   height: 22px;
-  background: #ffe07a;
+  background: #ffd35c;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  filter: drop-shadow(0 0 0 var(--ink));
   animation: mark-twinkle 1.4s ease-in-out infinite;
 }
 
@@ -247,20 +247,20 @@
 .collection__card.is-shiny .collection__window {
   background:
     linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.8) 46%, rgba(255, 190, 230, 0.55) 54%, transparent 70%),
-    radial-gradient(circle at 35% 30%, #fff 0 18%, rgba(255, 255, 255, 0.4) 40%),
-    var(--capsule, #f3eadb);
+    radial-gradient(circle at 35% 28%, #fff 0 16%, rgba(255, 255, 255, 0.5) 42%),
+    var(--capsule, var(--rarity-common-tint));
 }
 
-/* 시크릿 진열장: 밤하늘 선반 */
+/* 시크릿 진열장: 밤하늘 카드 */
 .collection__section--secret {
-  padding: 14px 10px 4px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-panel);
   background:
     radial-gradient(circle at 12% 20%, #fff 0 1px, transparent 1.5px),
     radial-gradient(circle at 88% 30%, #ffe07a 0 1.3px, transparent 2px),
     radial-gradient(circle at 70% 75%, #fff 0 1px, transparent 1.5px),
     radial-gradient(ellipse at 50% 20%, #4b2a8f, #1b1040);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 224, 122, 0.5),
+    var(--shadow-card);
   color: #fff;
 }
 
@@ -270,12 +270,12 @@
 }
 
 .collection__section--secret .collection__card.is-locked .collection__window {
-  border-color: rgba(255, 224, 122, 0.6);
   background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 224, 122, 0.45);
 }
 
 .collection__secret-hint {
-  margin: -2px 0 10px;
+  margin: -6px 4px 12px;
   font-size: var(--fs-xs);
   color: #ffe07a;
 }
@@ -283,10 +283,6 @@
 .collection__card--secret {
   --capsule: radial-gradient(circle at 50% 40%, #6b4bd0, #1b1040);
   color: #fff;
-}
-
-.collection__section--secret .collection__grid::after {
-  background: #6b4bd0;
 }
 
 /* ── 컬렉션 세트 카드 ───────────────────────────────────────── */
@@ -299,15 +295,15 @@
   gap: 14px;
 }
 
+/* 흰 카드 위쪽에 세트 색이 옅게 물든다 */
 .set-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-panel);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--set-color) 60%, #fff), var(--set-color));
-  box-shadow: inset 0 -6px 0 rgba(43, 34, 51, 0.08);
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--set-color) 30%, #fff), #fff 72%);
+  box-shadow: var(--shadow-card);
 }
 
 .set-card--ultimate {
@@ -316,13 +312,15 @@
     radial-gradient(circle at 15% 25%, #fff 0 1px, transparent 1.5px),
     radial-gradient(circle at 80% 20%, #ffe07a 0 1.3px, transparent 2px),
     radial-gradient(ellipse at 50% 20%, #5a3bb0, #1b1040);
-  box-shadow: 0 0 0 3px #ffe07a inset;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 224, 122, 0.6),
+    var(--shadow-card);
 }
 
 .set-card.is-complete {
   box-shadow:
-    inset 0 -6px 0 rgba(43, 34, 51, 0.08),
-    0 0 0 3px var(--lemon);
+    inset 0 0 0 2px var(--lemon),
+    var(--shadow-card);
 }
 
 .set-card__head {
@@ -333,22 +331,28 @@
 }
 
 .set-card__name {
-  font-size: var(--fs-m);
+  font-size: 1.1875rem;
 }
 
 .set-card__desc {
+  margin-top: 2px;
   font-size: var(--fs-xs);
-  opacity: 0.8;
+  color: var(--sub);
+}
+
+.set-card--ultimate .set-card__desc {
+  color: #e6dcff;
 }
 
 .set-card__count {
   flex-shrink: 0;
-  padding: 2px 12px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
+  padding: 1px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
   color: var(--ink);
-  font-size: var(--fs-s);
+  font-weight: 700;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -358,7 +362,7 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .set-card__member {
@@ -367,16 +371,22 @@
   width: 54px;
   height: 54px;
   padding: 0;
-  border: 2.5px solid var(--ink);
+  border: 0;
   border-radius: 50%;
-  background: rgba(255, 252, 245, 0.9);
+  background: var(--surface);
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.12);
   cursor: pointer;
 }
 
 .set-card__member.is-locked {
-  border-style: dashed;
-  background: rgba(255, 252, 245, 0.35);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1.5px var(--border);
   cursor: default;
+}
+
+.set-card--ultimate .set-card__member.is-locked {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 224, 122, 0.45);
 }
 
 .set-card__reward {
@@ -390,15 +400,17 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font-weight: 600;
   font-size: var(--fs-s);
 }
 
 .set-card__claimed {
   padding: 4px 14px;
-  border: 2.5px dashed currentColor;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--sub);
+  font-weight: 600;
   font-size: var(--fs-s);
-  opacity: 0.8;
 }
 
 /* ── 상세 모달 ─────────────────────────────────────────────── */
@@ -421,7 +433,7 @@
 
 .collection-detail__desc {
   max-width: 30ch;
-  color: var(--ink-soft);
+  color: var(--sub);
   font-size: var(--fs-s);
 }
 
@@ -434,24 +446,29 @@
 }
 
 .collection-detail__facts div {
-  padding: 6px 2px;
-  border: 2px dashed rgba(43, 34, 51, 0.25);
-  border-radius: var(--radius-s);
+  padding: 8px 2px;
+  border-radius: 14px;
+  background: var(--surface-2);
 }
 
 .collection-detail__facts dt {
   font-size: 0.7rem;
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .collection-detail__facts dd {
   margin: 0;
+  font-weight: 700;
   font-size: var(--fs-s);
 }
 
 .detail-modal--secret {
   background: radial-gradient(ellipse at 50% 20%, #5a3bb0, #1b1040);
   color: #fff;
+}
+
+.detail-modal--secret .collection-detail__facts div {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .detail-modal--secret .collection-detail__desc,
@@ -468,16 +485,16 @@
   }
 }
 
-/* 거의 빈 도감: 선반 앞에 붙인 안내 쪽지 + 행동 하나 */
+/* 거의 빈 도감: 안내 한 줄 + 행동 둘 */
 .collection__empty {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 14px 14px;
-  border: 2.5px dashed rgba(43, 34, 51, 0.35);
-  border-radius: var(--radius-slot);
-  background: rgba(255, 252, 245, 0.85);
+  padding: 14px 16px 16px;
+  border-radius: var(--radius-card);
+  background: var(--lemon-tint);
+  box-shadow: inset 4px 0 0 var(--lemon);
 }
 
 .collection__empty-text {

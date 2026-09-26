@@ -17,18 +17,15 @@
 }
 
 .crash__title {
-  font-size: var(--fs-xl);
-  line-height: 1.15;
-  color: var(--paper);
-  -webkit-text-stroke: 8px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 5px 0 var(--ink);
+  font-size: 1.75rem;
+  line-height: 1.2;
+  color: var(--ink);
   word-break: keep-all;
 }
 
 .crash__text {
   max-width: 30ch;
-  color: var(--ink-soft);
+  color: var(--sub);
   line-height: 1.5;
   word-break: keep-all;
 }
@@ -49,15 +46,15 @@
   width: 100%;
   margin-top: 12px;
   padding-top: 16px;
-  border-top: 2.5px dashed rgba(43, 34, 51, 0.25);
+  border-top: 1px solid var(--border);
 }
 
 .crash__code {
   width: 100%;
   padding: 8px 10px;
-  border: 2.5px solid var(--ink);
-  border-radius: var(--radius-s);
-  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
   font: 0.8125rem/1.35 ui-monospace, Menlo, monospace;
   word-break: break-all;
 }

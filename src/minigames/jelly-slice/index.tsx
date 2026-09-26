@@ -385,7 +385,7 @@ function drawScene(
   ctx.globalAlpha = 1;
   drawTrail(ctx, trail, now, blade);
   ctx.textAlign = 'center';
-  ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
+  ctx.font = '20px "Gowun Dodum", "Pretendard Variable", sans-serif';
   for (const p of fx.popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 750);
     ctx.fillStyle = p.color;

@@ -78,7 +78,7 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
               브라우저로 열기
             </a>
           )}
-          <button type="button" className="btn btn--sky btn--small" onClick={() => void copy()}>
+          <button type="button" className="btn btn--secondary btn--small" onClick={() => void copy()}>
             {copied ? '복사했어요' : '링크 복사'}
           </button>
         </div>
@@ -135,7 +135,7 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
         </p>
         <p className="install__text">설치 파일 없이 아이콘만 생겨요. 인터넷이 약해도 열려요.</p>
         <div className="install__actions">
-          <button type="button" className="btn btn--mint btn--small" onClick={() => void onAdd()} aria-expanded={canPrompt ? undefined : showSteps}>
+          <button type="button" className="btn btn--primary btn--small" onClick={() => void onAdd()} aria-expanded={canPrompt ? undefined : showSteps}>
             <HomeAddIcon size={22} />
             홈 화면에 추가
           </button>

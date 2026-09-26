@@ -58,7 +58,7 @@ export function PartnerPicker({ className }: PartnerPickerProps) {
       </div>
       <button
         type="button"
-        className="btn btn--small btn--sky partner-card__change"
+        className="btn btn--small btn--secondary partner-card__change"
         aria-haspopup="dialog"
         onClick={() => {
           sfx.button();

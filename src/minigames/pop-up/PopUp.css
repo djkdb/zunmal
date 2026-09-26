@@ -37,7 +37,8 @@
   width: min(100%, 360px);
   margin: 0 auto;
   padding: 10px;
-  border: var(--line) solid var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-panel);
   background: var(--shelf);
 }

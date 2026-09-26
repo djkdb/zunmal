@@ -103,7 +103,7 @@ export function DailyMissions() {
                   }}
                   aria-label={`${missionLabel(m)} 보상 ${m.reward}코인 받기`}
                 >
-                  <CoinIcon size={18} />
+                  <CoinIcon size={16} />
                   {m.reward}
                 </button>
               )}
@@ -122,7 +122,7 @@ export function DailyMissions() {
           }
         }}
       >
-        <CoinIcon size={22} />
+        <CoinIcon size={20} />
         {bonusReady ? `보너스 ${MISSION_ALL_CLEAR_BONUS}코인 받기` : `모두 끝내면 +${MISSION_ALL_CLEAR_BONUS}`}
       </button>
     </section>

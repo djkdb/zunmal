@@ -6,7 +6,7 @@ import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
 import { CouponBox } from '../components/CouponBox';
 import { InstallCard } from '../components/InstallCard';
-import { CapsuleIcon, CloseIcon, JoystickIcon } from '../components/icons';
+import { CloseIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
 import { RARITY_META } from '../data/rarity';
 import { DAILY_CAP, PARTNER_RARITY_BONUS, PULL_COUNT, PULL_PRICE } from '../economy/config';
@@ -118,10 +118,11 @@ export function HomePage() {
   return (
     <section className="page home" aria-labelledby="home-title">
       <header className="home__sign">
-        <div className="home__awning" aria-hidden="true" />
+        <p className="eyebrow home__eyebrow" aria-hidden="true">
+          Capsule Malang Shop
+        </p>
         <h1 id="home-title" className="home__logo">
-          <span className="home__logo-small">말랑</span>
-          <span className="home__logo-big">뽑기방</span>
+          말랑 뽑기방
         </h1>
       </header>
 
@@ -150,15 +151,13 @@ export function HomePage() {
       )}
 
       <div className="home__actions">
-        <Link to="/play" className="btn btn--mint btn--big home__action" onClick={() => sfx.button()}>
-          <JoystickIcon size={34} />
-          게임하기
-          {coachStep === 'play' && <span className="home__sticker">코인 모으기</span>}
-        </Link>
         <Link to="/gacha" className="btn btn--primary btn--big home__action" onClick={() => sfx.button()}>
-          <CapsuleIcon size={32} />
-          뽑기
+          캡슐 뽑기
           {coachStep === 'pull' && <span className="home__sticker">첫 뽑기</span>}
+        </Link>
+        <Link to="/play" className="btn btn--secondary btn--big home__action" onClick={() => sfx.button()}>
+          미니게임
+          {coachStep === 'play' && <span className="home__sticker">코인 모으기</span>}
         </Link>
       </div>
 

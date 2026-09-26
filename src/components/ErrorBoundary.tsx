@@ -63,8 +63,8 @@ function CrashScreen() {
   return (
     <main className="crash" role="alert" aria-labelledby="crash-title">
       <svg className="crash__capsule" viewBox="0 0 120 120" aria-hidden="true">
-        <path d="M18 60a42 42 0 0 1 84 0z" fill="var(--berry)" stroke="var(--ink)" strokeWidth="5" transform="rotate(-18 60 60) translate(0 -8)" />
-        <path d="M18 60a42 42 0 0 0 84 0z" fill="var(--paper)" stroke="var(--ink)" strokeWidth="5" transform="rotate(10 60 60) translate(0 8)" />
+        <path d="M18 60a42 42 0 0 1 84 0z" fill="var(--primary)" stroke="rgba(26,64,128,0.16)" strokeWidth="2.5" transform="rotate(-18 60 60) translate(0 -8)" />
+        <path d="M18 60a42 42 0 0 0 84 0z" fill="#fff" stroke="rgba(26,64,128,0.16)" strokeWidth="2.5" transform="rotate(10 60 60) translate(0 8)" />
         <circle cx="46" cy="44" r="6" fill="#fff" opacity="0.8" />
       </svg>
       <h1 id="crash-title" className="crash__title">

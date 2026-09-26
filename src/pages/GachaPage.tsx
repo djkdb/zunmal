@@ -13,7 +13,45 @@ import type { ResolvedPull } from '../gacha/engine';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useGameStore, type PullKind } from '../store/useGameStore';
 import { CoinIcon } from '../components/icons';
+import { Malang } from '../components/Malang';
+import { getCharacter } from '../data/characters';
 import './GachaPage.css';
+
+/** 가장 최근에 만난 말랑이 한 칸. 아직 캡슐을 안 열었으면 NEW → 놀이방에서 연다 */
+function RecentMalang() {
+  const owned = useGameStore((s) => s.ownedMalangs);
+  const unboxed = useGameStore((s) => s.unboxed);
+  let latestId: string | undefined;
+  let latestAt = -1;
+  for (const [id, o] of Object.entries(owned)) {
+    if (o.firstObtainedAt > latestAt) {
+      latestAt = o.firstObtainedAt;
+      latestId = id;
+    }
+  }
+  const character = latestId ? getCharacter(latestId) : undefined;
+  if (!character) return null;
+  const isNew = !unboxed.includes(character.id);
+  return (
+    <Link
+      to={isNew ? '/touch' : '/collection'}
+      className="gacha-recent"
+      onClick={() => sfx.button()}
+      aria-label={`최근 만난 말랑이 ${character.name}${isNew ? ', 새 캡슐, 놀이방에서 열기' : ', 도감 보기'}`}
+    >
+      <Malang character={character} size={44} animation="none" decorative />
+      <span className="gacha-recent__text" aria-hidden="true">
+        <span className="gacha-recent__label">최근 만난 말랑이</span>
+        <span className="gacha-recent__name">{character.name}</span>
+      </span>
+      {isNew && (
+        <span className="chip chip--lemon gacha-recent__new" aria-hidden="true">
+          NEW
+        </span>
+      )}
+    </Link>
+  );
+}
 
 interface PendingResult {
   items: ResolvedPull[];
@@ -106,9 +144,12 @@ export function GachaPage() {
 
   return (
     <section className="page gacha-page" aria-labelledby="gacha-title">
-      <h1 id="gacha-title" className="page-title">
-        캡슐 뽑기
-      </h1>
+      <header className="gacha-page__head">
+        <h1 id="gacha-title" className="page-title">
+          캡슐 뽑기
+        </h1>
+        <p className="page-subtitle">동전을 넣고 손잡이를 돌려요</p>
+      </header>
 
       <div className="gacha-page__machine">
         <GachaMachine
@@ -117,6 +158,23 @@ export function GachaPage() {
           quietFanfare
           onOpened={() => (epicItem ? setShowEpic(true) : setShowResult(true))}
         />
+        <div
+          className={`pity${untilPity <= 10 ? ' pity--near' : ''}`}
+          role="group"
+          aria-label={`${pityLabel} 이상 확정까지 ${untilPity}회 남았어요`}
+        >
+          <div className="pity__row">
+            <p className="pity__text" aria-hidden="true">
+              {pityLabel} 이상까지 <strong>{untilPity}</strong>회
+            </p>
+            <button type="button" className="gacha-page__rates" onClick={openRates} aria-controls="rate-table">
+              확률 보기
+            </button>
+          </div>
+          <span className="pity__bar" aria-hidden="true">
+            <span style={{ '--fill': shownPity / (threshold - 1) } as CSSProperties} />
+          </span>
+        </div>
         <div className="gacha-page__actions">
           {(['single', 'multi'] as const).map((kind) => {
             const price = PULL_PRICE[kind];
@@ -125,7 +183,7 @@ export function GachaPage() {
               <button
                 key={kind}
                 type="button"
-                className={`btn ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
+                className={`btn ${kind === 'multi' ? 'btn--secondary' : 'btn--primary'}`}
                 disabled={busy || !enough}
                 onClick={() => {
                   sfx.button();
@@ -140,29 +198,12 @@ export function GachaPage() {
                 )}
                 {kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기'}
                 <span className="gacha-page__cost" aria-hidden="true">
-                  <CoinIcon size={20} />
+                  <CoinIcon size={14} />
                   {price.toLocaleString()}
                 </span>
               </button>
             );
           })}
-        </div>
-        <div className="gacha-page__info">
-          <div
-            className={`pity${untilPity <= 10 ? ' pity--near' : ''}`}
-            role="group"
-            aria-label={`${pityLabel} 이상 확정까지 ${untilPity}회 남았어요`}
-          >
-            <p className="pity__text" aria-hidden="true">
-              {pityLabel} 이상까지 <strong>{untilPity}</strong>회
-            </p>
-            <span className="pity__bar" aria-hidden="true">
-              <span style={{ '--fill': shownPity / (threshold - 1) } as CSSProperties} />
-            </span>
-          </div>
-          <button type="button" className="btn btn--small gacha-page__rates" onClick={openRates} aria-controls="rate-table">
-            확률 보기
-          </button>
         </div>
         <p className="gacha-page__message small" role="status" aria-live="polite">
           {message}
@@ -174,6 +215,8 @@ export function GachaPage() {
           )}
         </p>
       </div>
+
+      {!busy && <RecentMalang />}
 
       <RateTable ref={rateRef} pityCount={shownPity} />
 

@@ -238,15 +238,14 @@
 }
 
 .epic__title {
-  font-family: var(--font-display);
+  /* 도장 글자만은 가장 굵은 본문 글꼴(Pretendard 900) — 고운돋움은 이 크기의 무지개 글자에 너무 가늘다 */
+  font-family: var(--font-ui);
+  font-weight: 900;
+  letter-spacing: -0.03em;
   font-size: clamp(3rem, 16vw, 4.5rem);
   line-height: 1;
   color: #fff;
-  -webkit-text-stroke: 10px var(--ink);
-  paint-order: stroke fill;
-  text-shadow:
-    0 6px 0 var(--ink),
-    0 0 30px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
   animation: title-stamp 0.55s cubic-bezier(0.2, 1.8, 0.4, 1) both;
 }
 
@@ -258,7 +257,7 @@
   background-clip: text;
   color: transparent;
   -webkit-text-stroke: 0;
-  filter: drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 0 2px var(--ink)) drop-shadow(0 0 2px var(--ink));
+  filter: drop-shadow(0 3px 0 rgba(22, 26, 64, 0.55)) drop-shadow(0 0 16px rgba(255, 255, 255, 0.45));
   text-shadow: none;
   animation:
     title-stamp 0.55s cubic-bezier(0.2, 1.8, 0.4, 1) both,
@@ -266,8 +265,7 @@
 }
 
 .epic--secret .epic__title {
-  filter: drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 0 2px var(--ink)) drop-shadow(0 0 2px var(--ink))
-    drop-shadow(0 0 18px var(--epic-a));
+  filter: drop-shadow(0 3px 0 rgba(22, 26, 64, 0.55)) drop-shadow(0 0 18px var(--epic-a));
 }
 
 .epic {
@@ -289,18 +287,20 @@
 .epic__name {
   font-family: var(--font-display);
   font-size: var(--fs-l);
+  letter-spacing: var(--tracking-title);
   color: #fff;
-  -webkit-text-stroke: 6px var(--ink);
-  paint-order: stroke fill;
+  text-shadow:
+    0 2px 0 rgba(22, 26, 64, 0.5),
+    0 0 18px rgba(22, 26, 64, 0.6);
   animation: name-rise 0.5s ease-out 0.25s both;
 }
 
 .epic__tagline {
   margin-top: 2px;
   font-size: var(--fs-s);
+  font-weight: 600;
   color: #fff;
-  -webkit-text-stroke: 4px var(--ink);
-  paint-order: stroke fill;
+  text-shadow: 0 1px 10px rgba(22, 26, 64, 0.85);
   animation: name-rise 0.5s ease-out 0.5s both;
 }
 

@@ -1,21 +1,21 @@
-/* 홈 화면 추가 안내 — 평평한 외곽선 패널 (눌리는 버튼만 아랫단 그림자) */
+/* 홈 화면 추가 안내 — 흰 카드 (눌리는 버튼만 그림자) */
 .install {
   position: relative;
   display: flex;
   gap: 12px;
   align-items: flex-start;
   padding: 14px 14px 14px 12px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-panel);
-  background: var(--paper);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   /* 한국어는 어절 단위로 줄바꿈 ("열/려요" 같은 끊김 방지) */
   word-break: keep-all;
 }
 
 .install__icon {
   flex: none;
-  border: 2.5px solid var(--ink);
   border-radius: 14px;
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.14);
 }
 
 .install__body {
@@ -26,13 +26,14 @@
 
 .install__title {
   margin: 0;
+  font-weight: 700;
   font-size: var(--fs-s);
 }
 
 .install__text {
   margin: 4px 0 10px;
   font-size: var(--fs-xs);
-  color: var(--ink-soft);
+  color: var(--sub);
   line-height: 1.5;
 }
 
@@ -70,29 +71,18 @@
   border: 0;
   background: none;
   border-radius: 50%;
+  color: var(--sub);
   cursor: pointer;
 }
 
-/* 앱 안 브라우저 안내: 테이프로 붙인 레몬색 쪽지 — 지금 꼭 봐야 하는 안내라 모양을 다르게 */
+/* 앱 안 브라우저 안내: 지금 꼭 봐야 하는 안내라 레몬빛 카드 + 왼쪽 레몬 띠로 모양을 다르게 */
 .install--inapp {
   display: block;
-  margin-top: 6px;
-  padding: 16px 14px 12px;
-  background: #fff6c9;
-  transform: rotate(-0.6deg);
-}
-
-.install--inapp::before {
-  content: '';
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  width: 72px;
-  height: 20px;
-  margin-left: -36px;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1.5px solid rgba(43, 34, 51, 0.15);
-  transform: rotate(2deg);
+  padding: 16px 16px 14px 18px;
+  background: var(--lemon-tint);
+  box-shadow:
+    inset 4px 0 0 var(--lemon),
+    var(--shadow-card);
 }
 
 .install--inapp .install__text {
@@ -101,9 +91,9 @@
 
 /* 앱 안 브라우저: 기록 코드 복사 (브라우저로 옮기기 전에) */
 .install__save {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 2.5px dashed rgba(43, 34, 51, 0.25);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(34, 48, 74, 0.1);
 }
 
 .install__save .install__text {

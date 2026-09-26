@@ -86,8 +86,8 @@ function CapsuleBack() {
   return (
     <svg className="pull-capsule" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
       <path className="pull-capsule__top" d="M-17 0 A17 17 0 0 1 17 0 Z" />
-      <path d="M-17 0 A17 17 0 0 0 17 0 Z" fill="#fffdf8" stroke="#2b2233" strokeWidth="3" strokeLinejoin="round" />
-      <rect x="-18" y="-2" width="36" height="4" rx="2" fill="#2b2233" />
+      <path d="M-17 0 A17 17 0 0 0 17 0 Z" fill="#fff" stroke="#1a4080" strokeOpacity="0.16" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="-17" y="-1.5" width="34" height="3" rx="1.5" fill="#fff" />
       <ellipse cx="-7" cy="-9" rx="4.5" ry="2.5" fill="#fff" opacity="0.75" transform="rotate(-30 -7 -9)" />
     </svg>
   );
@@ -265,7 +265,7 @@ function Actions({
           <button
             key={kind}
             type="button"
-            className={`btn btn--small pull-actions__again ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
+            className={`btn btn--small pull-actions__again ${kind === 'multi' ? 'btn--secondary' : 'btn--primary'}`}
             disabled={!enough}
             onClick={() => {
               sfx.button();
@@ -281,7 +281,7 @@ function Actions({
           </button>
         );
       })}
-      <button ref={closeRef} type="button" className="btn btn--small btn--lemon pull-actions__close" onClick={onClose}>
+      <button ref={closeRef} type="button" className="btn btn--small btn--secondary pull-actions__close" onClick={onClose}>
         닫기
       </button>
     </div>
@@ -545,7 +545,7 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
               <p className="pull-hint">열린 캡슐을 누르면 설명이 나와요</p>
               <button
                 type="button"
-                className="btn btn--small btn--grape btn--block pull-open-all"
+                className="btn btn--small btn--primary btn--block pull-open-all"
                 onClick={() => {
                   sfx.button();
                   openAll();

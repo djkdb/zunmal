@@ -33,7 +33,8 @@
   place-items: center;
   height: min(60dvh, 420px);
   min-height: 300px;
-  border: var(--line) solid var(--ink);
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-l);
   background:
     radial-gradient(circle at 50% 60%, rgba(255, 143, 171, 0.18), transparent 60%),

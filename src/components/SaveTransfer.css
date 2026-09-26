@@ -1,19 +1,16 @@
-/* 기록 옮기기: 평평한 안내 패널(누르는 것만 아랫단 그림자를 가진다). 교환권처럼 점선으로 한 칸 나눈다. */
+/* 기록 옮기기: 흰 카드. 펼친 칸은 가는 선으로 나눈다. */
 .save-transfer {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px 16px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-slot);
-  background:
-    radial-gradient(circle at 0 50%, var(--cream) 0 9px, transparent 9.5px),
-    radial-gradient(circle at 100% 50%, var(--cream) 0 9px, transparent 9.5px),
-    var(--paper);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .save-transfer__title {
-  font-size: var(--fs-m);
+  font-size: 1.1875rem;
 }
 
 .save-transfer__text,
@@ -21,7 +18,7 @@
 .save-transfer__confirm p {
   font-size: var(--fs-s);
   line-height: 1.45;
-  color: var(--ink-soft);
+  color: var(--sub);
   word-break: keep-all;
 }
 
@@ -38,7 +35,7 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 10px;
-  border-top: 2.5px dashed rgba(43, 34, 51, 0.28);
+  border-top: 1px solid var(--border);
 }
 
 .save-transfer__form .btn {
@@ -53,9 +50,9 @@
   width: 100%;
   min-height: 72px;
   padding: 8px 10px;
-  border: 2.5px solid var(--ink);
-  border-radius: var(--radius-s);
-  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
   color: var(--ink);
   font: 0.8125rem/1.35 ui-monospace, 'SFMono-Regular', Menlo, monospace;
   word-break: break-all;
@@ -63,7 +60,7 @@
 }
 
 .save-transfer__code:focus-visible {
-  outline: 3px solid var(--soda);
+  outline: 3px solid var(--link);
   outline-offset: 2px;
 }
 

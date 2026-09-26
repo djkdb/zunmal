@@ -20,6 +20,7 @@
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 2.6rem;
+  letter-spacing: var(--tracking-title);
 }
 
 .mg-result__stats {
@@ -31,19 +32,19 @@
 }
 
 .mg-result__stats div {
-  padding: 2px 10px;
-  border: 2px dashed rgba(43, 34, 51, 0.3);
-  border-radius: var(--radius-s);
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
 }
 
 .mg-result__stats dt {
   font-size: 0.75rem;
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .mg-result__stats dd {
   margin: 0;
-  font-family: var(--font-display);
+  font-weight: 700;
 }
 
 .mg-result__coins {
@@ -51,18 +52,18 @@
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  padding: 6px 18px;
-  border: var(--line) solid var(--ink);
+  padding: 6px 20px;
   border-radius: 999px;
   background: var(--lemon);
-  box-shadow: var(--shadow-pop-s);
-  font-family: var(--font-display);
-  font-size: 1.6rem;
+  box-shadow: 0 4px 12px rgba(242, 193, 78, 0.35);
+  font-weight: 800;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
   animation: bump 0.5s ease-out 0.2s;
 }
 
 .mg-result__coins strong {
-  font-weight: 400;
+  font-weight: inherit;
 }
 
 .mg-result__coin-icon {
@@ -70,7 +71,6 @@
   place-items: center;
   width: 30px;
   height: 30px;
-  border: 2px solid var(--ink);
   border-radius: 50%;
   background: #fff1a8;
   font-size: 1rem;
@@ -80,7 +80,7 @@
   list-style: none;
   margin: 4px 0 0;
   padding: 0;
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .mg-result__actions {
@@ -99,9 +99,8 @@
   gap: 3px;
   margin-left: 4px;
   padding: 1px 10px 1px 4px;
-  border: 2.5px solid var(--ink);
   border-radius: 999px;
-  background: var(--paper);
+  background: rgba(255, 255, 255, 0.75);
   font-size: var(--fs-s);
   font-variant-numeric: tabular-nums;
 }
@@ -146,7 +145,6 @@
   top: -4px;
   width: 10px;
   height: 7px;
-  border: 1.5px solid var(--ink);
   border-radius: 2px;
   background: var(--c);
   opacity: 0;

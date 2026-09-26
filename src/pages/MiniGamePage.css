@@ -9,12 +9,9 @@
   place-items: center;
   width: 96px;
   height: 96px;
-  border: var(--line) solid var(--ink);
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 20%, var(--lemon) 75%);
-  box-shadow:
-    inset 0 -8px 0 rgba(0, 0, 0, 0.1),
-    0 6px 0 var(--ink);
+  background: radial-gradient(circle at 35% 28%, #fff 0 16%, color-mix(in srgb, var(--lemon) 55%, #fff) 70%);
+  box-shadow: var(--shadow-btn);
   animation: intro-bob 2.4s ease-in-out infinite;
 }
 
@@ -31,21 +28,22 @@
 
 .mg-intro__desc {
   max-width: 30ch;
-  font-size: var(--fs-m);
-  line-height: 1.45;
+  font-size: 1.0625rem;
+  line-height: 1.5;
 }
 
 .mg-intro__controls {
   padding: 4px 14px;
-  border: 2.5px dashed rgba(43, 34, 51, 0.4);
   border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
   font-size: var(--fs-xs);
-  color: var(--ink-soft);
+  font-weight: 500;
+  color: var(--sub);
 }
 
 .mg-intro__best {
   font-size: var(--fs-s);
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .mg-intro .btn--big {

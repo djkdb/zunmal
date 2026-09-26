@@ -7,7 +7,7 @@ import './GachaMachine.css';
 
 /** 캡슐 색 (위쪽 반구). 희귀도 힌트 — 텍스트는 결과 화면에서 제공. */
 const CAPSULE_TOP: Record<Rarity, string> = {
-  common: '#f3ebdd',
+  common: '#dfe7f1',
   rare: '#7fbfff',
   epic: '#c79bff',
   legendary: '#ffc94d',
@@ -17,14 +17,15 @@ const CAPSULE_TOP: Record<Rarity, string> = {
 
 /** 돔 안에 보이는 장식용 캡슐 배치 */
 const DOME_CAPSULES: { x: number; y: number; r: number; color: string; rot: number }[] = [
-  { x: 70, y: 112, r: 15, color: '#ff8fab', rot: -20 },
-  { x: 102, y: 118, r: 15, color: '#7fd8be', rot: 15 },
-  { x: 134, y: 114, r: 15, color: '#ffd966', rot: 40 },
-  { x: 86, y: 90, r: 14, color: '#8ecdf7', rot: 70 },
-  { x: 120, y: 88, r: 14, color: '#c3a6ff', rot: -35 },
-  { x: 58, y: 84, r: 13, color: '#ffd966', rot: 10 },
-  { x: 146, y: 86, r: 13, color: '#ff8fab', rot: -60 },
-  { x: 102, y: 64, r: 13, color: '#f3ebdd', rot: 25 },
+  { x: 84, y: 86, r: 18, color: '#cdbfea', rot: 0 },
+  { x: 124, y: 80, r: 18, color: '#b5e3c8', rot: 0 },
+  { x: 62, y: 120, r: 18, color: '#ff9fb8', rot: -6 },
+  { x: 101, y: 122, r: 19, color: '#8fc3ff', rot: 0 },
+  { x: 140, y: 116, r: 18, color: '#ffd66b', rot: 6 },
+  { x: 44, y: 150, r: 16, color: '#ffd66b', rot: 0 },
+  { x: 80, y: 154, r: 18, color: '#8fc3ff', rot: 4 },
+  { x: 120, y: 156, r: 18, color: '#ff9fb8', rot: -4 },
+  { x: 158, y: 148, r: 16, color: '#cdbfea', rot: 0 },
 ];
 
 /** 캡슐 주위 반짝이 위치 (%, 캡슐 상자 기준) · 크기 · 시작 지연 */
@@ -79,10 +80,10 @@ function CapsuleShape({ top, id }: { top: string; id: string }) {
         </linearGradient>
       </defs>
       <g className="capsule-bottom">
-        <path d="M-30 0 A30 30 0 0 0 30 0 Z" fill="#fffdf8" stroke="#2b2233" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M-30 0 A30 30 0 0 0 30 0 Z" fill="#fff" stroke="#1a4080" strokeOpacity="0.14" strokeWidth="2" strokeLinejoin="round" />
       </g>
       <g className="capsule-top">
-        <path d="M-30 0 A30 30 0 0 1 30 0 Z" fill={fill} stroke="#2b2233" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M-30 0 A30 30 0 0 1 30 0 Z" fill={fill} stroke="#1a4080" strokeOpacity="0.14" strokeWidth="2" strokeLinejoin="round" />
         <ellipse cx="-12" cy="-16" rx="8" ry="4.5" fill="#fff" opacity="0.7" transform="rotate(-30 -12 -16)" />
         {top === 'cosmic' && (
           <g fill="#ffe07a">
@@ -93,7 +94,7 @@ function CapsuleShape({ top, id }: { top: string; id: string }) {
           </g>
         )}
       </g>
-      <rect x="-31" y="-3" width="62" height="6" rx="3" fill="#2b2233" className="capsule-band" />
+      <rect x="-30" y="-2" width="60" height="4" rx="2" fill="#fff" className="capsule-band" />
     </svg>
   );
 }
@@ -186,72 +187,73 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
     <div className={`machine machine--${phase}${rarityClass}`}>
       <svg className="machine__svg" viewBox="0 0 204 300" role="img" aria-label="말랑 캡슐 머신">
         <defs>
-          <radialGradient id="machine-glass" cx="35%" cy="30%" r="80%">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
-            <stop offset="0.6" stopColor="#e9f6ff" stopOpacity="0.6" />
-            <stop offset="1" stopColor="#bfe3ff" stopOpacity="0.55" />
+          <radialGradient id="machine-glass" cx="35%" cy="28%" r="80%">
+            <stop offset="0" stopColor="#ffffff" stopOpacity="0.92" />
+            <stop offset="0.65" stopColor="#f2f8ff" stopOpacity="0.62" />
+            <stop offset="1" stopColor="#d6e9ff" stopOpacity="0.6" />
           </radialGradient>
           <linearGradient id="machine-body" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#ff9fba" />
-            <stop offset="1" stopColor="#ff7a9e" />
+            <stop offset="0" stopColor="#ffb3c6" />
+            <stop offset="1" stopColor="#ff97b2" />
           </linearGradient>
+          <filter id="machine-soft" x="-20%" y="-20%" width="140%" height="150%">
+            <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#1a4080" floodOpacity="0.16" />
+          </filter>
+          <filter id="machine-cap-shadow" x="-30%" y="-30%" width="160%" height="170%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#1a4080" floodOpacity="0.18" />
+          </filter>
           <clipPath id="machine-dome-clip">
-            <circle cx="102" cy="92" r="70" />
+            <circle cx="102" cy="94" r="76" />
           </clipPath>
         </defs>
 
-        {/* 받침 */}
-        <rect x="26" y="276" width="152" height="16" rx="8" fill="#2b2233" opacity="0.15" />
+        {/* 바닥 그림자 */}
+        <ellipse cx="102" cy="290" rx="84" ry="6" fill="#1a4080" opacity="0.1" />
 
-        {/* 몸통 */}
-        <path
-          d="M28 150 H176 L184 262 Q184 280 166 280 H38 Q20 280 20 262 Z"
-          fill="url(#machine-body)"
-          stroke="#2b2233"
-          strokeWidth="5"
-          strokeLinejoin="round"
-        />
-        {/* 이름표 */}
-        <rect x="52" y="164" width="100" height="26" rx="13" fill="#fffdf8" stroke="#2b2233" strokeWidth="4" />
-        <text x="102" y="183" textAnchor="middle" className="machine__label">
-          말랑 뽑기
-        </text>
-
-        {/* 코인 슬롯 */}
-        <g className="machine__slot">
-          <rect x="140" y="206" width="26" height="36" rx="8" fill="#fffdf8" stroke="#2b2233" strokeWidth="4" />
-          <rect x="150" y="213" width="6" height="20" rx="3" fill="#2b2233" />
-        </g>
-        <g className="machine__coin">
-          <circle cx="153" cy="198" r="9" fill="#ffd966" stroke="#2b2233" strokeWidth="3" />
-        </g>
-
-        {/* 손잡이 */}
-        <g className="machine__knob">
-          <circle cx="72" cy="224" r="24" fill="#fffdf8" stroke="#2b2233" strokeWidth="5" />
-          <rect x="52" y="218" width="40" height="12" rx="6" fill="#ffd966" stroke="#2b2233" strokeWidth="4" />
-          <circle cx="72" cy="224" r="5" fill="#2b2233" />
-        </g>
-
-        {/* 배출구 */}
-        <path d="M106 252 H150 Q156 252 156 258 V272 H100 V258 Q100 252 106 252 Z" fill="#2b2233" />
-
-        {/* 돔 */}
-        <rect x="42" y="142" width="120" height="16" rx="8" fill="#ffd966" stroke="#2b2233" strokeWidth="5" />
-        <circle cx="102" cy="92" r="70" fill="url(#machine-glass)" />
+        {/* 돔: 반투명 흰 유리 + 캡슐 (몸통이 아랫부분을 덮는다) */}
+        <circle cx="102" cy="94" r="76" fill="url(#machine-glass)" filter="url(#machine-soft)" />
         <g clipPath="url(#machine-dome-clip)">
-          <g className="machine__capsules">
+          <g className="machine__capsules" filter="url(#machine-cap-shadow)">
             {DOME_CAPSULES.map((c, i) => (
               <g key={i} transform={`translate(${c.x} ${c.y}) rotate(${c.rot})`} className="machine__mini">
-                <path d={`M${-c.r} 0 A${c.r} ${c.r} 0 0 1 ${c.r} 0 Z`} fill={c.color} stroke="#2b2233" strokeWidth="3" />
-                <path d={`M${-c.r} 0 A${c.r} ${c.r} 0 0 0 ${c.r} 0 Z`} fill="#fffdf8" stroke="#2b2233" strokeWidth="3" />
+                <circle r={c.r} fill={c.color} />
+                <rect x={-c.r} y="-1.2" width={c.r * 2} height="2.4" fill="#fff" />
+                <ellipse cx={-c.r * 0.35} cy={-c.r * 0.5} rx={c.r * 0.32} ry={c.r * 0.16} fill="#fff" opacity="0.55" />
               </g>
             ))}
           </g>
         </g>
-        <circle cx="102" cy="92" r="70" fill="none" stroke="#2b2233" strokeWidth="5" />
-        <path d="M60 60 Q72 40 96 34" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" opacity="0.85" />
-        <rect x="90" y="14" width="24" height="12" rx="6" fill="#ff8fab" stroke="#2b2233" strokeWidth="4" />
+        <circle cx="102" cy="94" r="76" fill="none" stroke="#fff" strokeWidth="2.5" opacity="0.95" />
+        <ellipse cx="72" cy="46" rx="20" ry="8" fill="#fff" opacity="0.85" transform="rotate(-24 72 46)" />
+
+        {/* 몸통 */}
+        <rect x="14" y="156" width="176" height="126" rx="28" fill="url(#machine-body)" filter="url(#machine-soft)" />
+        <path d="M40 162 H164" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity="0.35" />
+
+        {/* 이름표 */}
+        <rect x="56" y="170" width="92" height="22" rx="11" fill="#fff" />
+        <text x="102" y="185.5" textAnchor="middle" className="machine__label">
+          MALANG
+        </text>
+
+        {/* 코인 슬롯 */}
+        <g className="machine__slot">
+          <rect x="150" y="204" width="18" height="24" rx="6" fill="#fff" opacity="0.9" />
+          <rect x="157" y="209" width="4" height="14" rx="2" fill="#5b4a60" />
+        </g>
+        <g className="machine__coin">
+          <circle cx="159" cy="196" r="8" fill="#ffd35c" stroke="#d99a1e" strokeWidth="2" />
+        </g>
+
+        {/* 손잡이 */}
+        <g className="machine__knob">
+          <circle cx="60" cy="230" r="22" fill="#fff" filter="url(#machine-cap-shadow)" />
+          <rect x="46" y="226" width="28" height="8" rx="4" fill="#ff9fb8" />
+        </g>
+
+        {/* 배출구 */}
+        <rect x="112" y="238" width="62" height="28" rx="11" fill="#5b4a60" />
+        <rect x="118" y="241" width="50" height="4" rx="2" fill="#fff" opacity="0.12" />
       </svg>
 
       {/* 원신식 예고: 캡슐 뒤 빛이 묶음 최고 등급을 알린다. 일반·레어는 잔잔하게, 에픽은 보라 반짝이,
