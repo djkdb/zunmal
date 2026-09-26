@@ -32,7 +32,7 @@ src/
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
-  components/     Malang, TopBar, GachaMachine, PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
+  components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
   pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방)
@@ -46,7 +46,8 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 ```
 
 - 라우팅: `HashRouter` (GitHub Pages 새로고침 404 회피). 경로: `/`, `/play`, `/play/:gameId`, `/gacha`, `/collection`, `/touch`, `/touch/:id`.
-- 외부 이미지/사운드 파일 사용 금지. 캐릭터는 SVG, 소리는 WebAudio로 생성한다. (3D 연출도 코드로 만든 도형·셰이더뿐)
+- 외부 이미지/사운드 파일 사용 금지. 캐릭터는 SVG, 소리는 WebAudio로 생성한다. (3D 연출·3D 머신도 코드로 만든 도형·셰이더·캔버스 텍스처뿐)
+- three.js는 신화 연출·3D 머신·놀이방 3D가 쓰는 한 청크로만 받는다(동적 import). 첫 화면 번들에 정적 import 금지.
 
 ## 코딩 컨벤션
 
@@ -96,6 +97,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **아이콘**(`components/icons.tsx`): 둥근 선 + 파스텔 채움, 선 색은 `currentColor`(코인만 금빛).
 - **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 주아 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
 - **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
+  기본은 같은 구성의 3D(아래 가챠 규칙의 **3D 캡슐 머신**), SVG는 대체용.
   등급이 높을수록 연출(빛·흔들림·신화 이상 전체 화면)이 화려해지는 건 그대로다.
 - **금지**: 굵은 잉크 UI 테두리·잉크색 아랫단 그림자, 흰 글자 + 잉크 외곽선(`-webkit-text-stroke`) 제목, 크림 바탕, 스프링클 무늬,
   이모지 아이콘, `.eyebrow` 외의 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`, 넓은 영역의 무거운 blur,
@@ -130,6 +132,22 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다.
 - **등급 차별화**: 등급마다 캡슐 색, 머신 흔들림, 결과음(`playRarityFanfare`), 결과 모달 테두리가 다르다.
   시크릿은 화면이 어두워지는 예고 단계(`tease`)와 밤하늘 테마 결과 모달이 따로 있다.
+- **3D 캡슐 머신** (`components/machine3d/`, three.js): 뽑기 화면의 머신은 유리 돔 + 딸기우유 몸통 + 흰 손잡이·배출구·받침을
+  코드로 만든 3D(물리 기반 재질 + `RoomEnvironment` 반사 + 키 라이트 그림자 한 장 512px + 구운 바닥 번짐). 돔 속 캡슐 더미(두 색 캡슐 19 ·
+  광택 공 · 진주(무지갯빛) · 크롬 마디 공·네잎 꽃, 30개)는 순수 공 쌓기 풀이기 `machine3d/pile.ts`(Verlet, 시드 고정, 테스트)로 불러올 때
+  가라앉히고, 뽑을 때 `stirPile`로 휘저어 다시 가라앉힌다. 인스턴스 메시 6개라 그리기 호출이 적다.
+  - 연출 단계는 여전히 `GachaMachine`이 정하고(`setPhase`) 3D는 그리기만: 투입(동전) → 흔들림(손잡이 한 바퀴 + 더미 휘젓기, 등급만큼
+    세게, 에픽 이상은 돔 속 등급 빛) → 시크릿 예고(불이 깜빡이며 꺼짐) → 낙하(배출구 덮개가 들리고 캡슐이 폴짝 → 받침에 철퍽, 전설은
+    보라로 떨어져 착지 때 금빛 승격) → 대기(흔들흔들 + 등급 빛·빛살) → 열기(뚜껑이 날아감). 결과 캡슐 윗면은 SVG와 같은 색(신화 무지개·시크릿 밤하늘 텍스처).
+  - 캔버스는 장식(`aria-hidden`)이고 SVG 머신 상자보다 옆 14%·위 4%·아래 6% 크다(`STAGE_PAD` ↔ `.machine__stage3d`). 캡슐 열기 버튼은
+    그대로 DOM — 3D 캡슐을 투영한 자리(`onHeroRect` → `--hero-x/y/size`)에 투명하게 올린다. 반짝이·고리는 DOM, 빛·빛살은 3D.
+  - 돔 유리는 반사만 그리는 재질(검은 바탕 + 알파 = 반사 밝기, 미리 곱한 알파 "over") + 가장자리 프레넬 막. 투명 캔버스 위 가산 합성은
+    스프라이트 대신 `premultipliedAlpha` 평면으로(스프라이트 셰이더는 미리 곱한 알파가 없어 하얗게 뜬다).
+  - **대체**: `loadMachine3d.ts`로 뽑기 화면에 들어올 때 받는다(three는 epic·touch3d와 같은 청크, 정적 import 금지). 1.5초 안에 못 받거나,
+    WebGL을 못 만들거나, 움직임 줄이기거나, 계속 20fps 아래면(먼저 DPR 2 → 1로 낮춤) 예전 SVG 머신 그대로. 셰이더를 `compileAsync`로
+    컴파일한 뒤 0.25초 교차로 바꾸고, 연출 도중에는 바꾸지 않는다. 개발 서버 스크린숏은 `localStorage['machine-keep-3d']='1'`로 성능 조절을 끈다.
+  - 움직일 때만 그린다(숨쉬기·대기 흔들기는 30fps, 가만히 몇 초 뒤 멈춤, 그림자도 움직일 때만 다시 굽기). 돔을 톡 치면 캡슐이 들썩인다.
+    언마운트 시 dispose + `forceContextLoss`.
 - **신화 이상 전체 화면 연출** (`components/epic/`):
   모으기(캡슐 회전·떨림·금·빛 흡수, `sfx.epicRiser`) → 폭발(섬광·충격파·입자, `sfx.epicImpact`, 진동)
   → 등장(모티프 장치 + 말랑이) → 제목 도장("신화!"/"시크릿!!") + 테마 한 줄.
@@ -340,6 +358,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 가챠: 10만 회 확률 검증을 서로 다른 시드 여러 개로 수행(±5σ 허용), 천장/비율/10연 보장/환급.
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계.
 - 저장: 손상/구버전 데이터 migrate.
+- 3D 머신 더미: 가라앉으면 겹침 없음·돔 안·바닥 위·멈춤, 돔 아래쪽만 참, 시드 결정성, 휘젓기 후 다시 가라앉음(`machine3d/pile.test.ts`).
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,
   화면 배치(혼자 배치·자리 옮기기), 반응 부위·쓰다듬기, 꾸미기 데이터(타일 SVG·저장 검사·놓기/치우기·빈자리), 사진 카드(`frameGroup` 모두 담기·비율,
   무늬 자리, 등급 칩·칩 줄, 단체 한 줄 조사).
