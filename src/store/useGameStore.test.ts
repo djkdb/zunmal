@@ -280,3 +280,62 @@ describe('redeemCoupon', () => {
     expect(store.getState().coins).toBe(before);
   });
 });
+
+describe('놀이방 (unboxed / playroom)', () => {
+  it('시작 말랑이는 캡슐 없이 열린 채 매트에 나온다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('soda-drop');
+    expect(store.getState().unboxed).toEqual(['soda-drop']);
+    expect(store.getState().playroom.out).toEqual(['soda-drop']);
+  });
+
+  it('새로 뽑은 말랑이는 아직 열지 않은 캡슐', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('soda-drop');
+    store.setState({ coins: 100000 });
+    const r = store.getState().pull('multi', createSeededRng(3));
+    expect(r.ok).toBe(true);
+    const ids = Object.keys(store.getState().ownedMalangs).filter((id) => id !== 'soda-drop');
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(store.getState().unboxed).not.toContain(id);
+    // 안 연 말랑이는 꺼낼 수 없다
+    expect(store.getState().takeOutMalang(ids[0]!)).toBe(false);
+  });
+
+  it('캡슐을 열면 한 번만 기록되고 자리가 있으면 매트에 오른다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('soda-drop');
+    store.setState({
+      ownedMalangs: {
+        ...store.getState().ownedMalangs,
+        'ember-imp': { count: 1, shinyCount: 0, firstObtainedAt: 1 },
+      },
+    });
+    expect(store.getState().unboxMalang('ember-imp', 3)).toBe(true);
+    expect(store.getState().unboxed).toContain('ember-imp');
+    expect(store.getState().playroom.out).toEqual(['soda-drop', 'ember-imp']);
+    expect(store.getState().unboxMalang('ember-imp', 3)).toBe(false);
+    expect(store.getState().unboxed.filter((id) => id === 'ember-imp')).toHaveLength(1);
+    // 보유하지 않은 말랑이는 열 수 없다
+    expect(store.getState().unboxMalang('grape-jelly', 3)).toBe(false);
+  });
+
+  it('꺼내기·넣기: 상한을 지키고 중복되지 않는다', () => {
+    const store = makeStore();
+    const owned = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+    store.setState({
+      ownedMalangs: { 'peach-mochi': owned, 'soda-drop': owned, 'matcha-bean': owned },
+      unboxed: ['peach-mochi', 'soda-drop', 'matcha-bean'],
+      playroom: { out: [] },
+    });
+    const s = store.getState();
+    expect(s.takeOutMalang('peach-mochi', 2)).toBe(true);
+    expect(s.takeOutMalang('peach-mochi', 2)).toBe(false);
+    expect(s.takeOutMalang('soda-drop', 2)).toBe(true);
+    expect(s.takeOutMalang('matcha-bean', 2)).toBe(false);
+    s.putBackMalang('peach-mochi');
+    expect(store.getState().playroom.out).toEqual(['soda-drop']);
+    expect(s.takeOutMalang('matcha-bean', 2)).toBe(true);
+    expect(store.getState().playroom.out).toEqual(['soda-drop', 'matcha-bean']);
+  });
+});

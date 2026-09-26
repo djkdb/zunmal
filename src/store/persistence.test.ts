@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PULL_PRICE, STARTING_COINS } from '../economy/config';
-import { SAVE_VERSION, createInitialSave, migrateSave, sanitizeSave } from './persistence';
+import { PLAYROOM_MAX_OUT, SAVE_VERSION, createInitialSave, migrateSave, sanitizeSave } from './persistence';
 
 const NOW = new Date('2026-05-05T03:00:00Z');
 
@@ -73,9 +73,85 @@ describe('sanitizeSave', () => {
   });
 });
 
+describe('sanitizeSave: 놀이방 (v7)', () => {
+  const owned = {
+    'peach-mochi': { count: 1, shinyCount: 0, firstObtainedAt: 1 },
+    'soda-drop': { count: 1, shinyCount: 0, firstObtainedAt: 2 },
+    'matcha-bean': { count: 1, shinyCount: 0, firstObtainedAt: 3 },
+    'ember-imp': { count: 1, shinyCount: 0, firstObtainedAt: 4 },
+    'grape-jelly': { count: 1, shinyCount: 0, firstObtainedAt: 5 },
+    'star-bun': { count: 1, shinyCount: 0, firstObtainedAt: 6 },
+  };
+
+  it('연 목록은 보유한 말랑이만, 중복 없이', () => {
+    const s = sanitizeSave({ ownedMalangs: owned, unboxed: ['peach-mochi', 'peach-mochi', 'nope', 7, 'lemon-x'] }, NOW);
+    expect(s.unboxed).toEqual(['peach-mochi']);
+  });
+
+  it('매트 위 말랑이는 연 것 ∩ 보유만, 상한까지', () => {
+    const ids = Object.keys(owned).filter((id) => sanitizeSave({ ownedMalangs: owned }, NOW).ownedMalangs[id]);
+    const s = sanitizeSave(
+      {
+        ownedMalangs: owned,
+        unboxed: ids.filter((id) => id !== 'soda-drop'),
+        playroom: { out: ['soda-drop', ...ids, ids[0], 'ghost'] },
+      },
+      NOW,
+    );
+    expect(s.playroom.out).not.toContain('soda-drop');
+    expect(s.playroom.out).not.toContain('ghost');
+    expect(new Set(s.playroom.out).size).toBe(s.playroom.out.length);
+    expect(s.playroom.out.length).toBeLessThanOrEqual(PLAYROOM_MAX_OUT);
+    for (const id of s.playroom.out) expect(s.unboxed).toContain(id);
+  });
+
+  it.each([null, 'x', { out: 'x' }, { out: [1, 2] }, []])('손상된 playroom(%j)은 빈 매트', (playroom) => {
+    const s = sanitizeSave({ ownedMalangs: owned, unboxed: ['peach-mochi'], playroom }, NOW);
+    expect(s.playroom).toEqual({ out: [] });
+  });
+
+  it('새 저장은 연 것도 매트도 비어 있다', () => {
+    const s = createInitialSave(NOW);
+    expect(s.unboxed).toEqual([]);
+    expect(s.playroom).toEqual({ out: [] });
+  });
+});
+
 describe('migrateSave', () => {
-  it('현재 버전은 6', () => {
-    expect(SAVE_VERSION).toBe(6);
+  it('현재 버전은 7', () => {
+    expect(SAVE_VERSION).toBe(7);
+  });
+
+  it('v6 → v7: 가진 말랑이는 모두 연 것으로, 매트에는 파트너 하나', () => {
+    const owned = {
+      'peach-mochi': { count: 2, shinyCount: 0, firstObtainedAt: 1 },
+      'soda-drop': { count: 1, shinyCount: 0, firstObtainedAt: 2 },
+      'ember-imp': { count: 1, shinyCount: 0, firstObtainedAt: 3 },
+    };
+    const s = migrateSave({ coins: 10, ownedMalangs: owned, partnerId: 'soda-drop' }, 6, NOW);
+    expect(s.unboxed.sort()).toEqual(['ember-imp', 'peach-mochi', 'soda-drop']);
+    expect(s.playroom).toEqual({ out: ['soda-drop'] });
+    expect(s.coins).toBe(10);
+  });
+
+  it('v6 → v7: 말랑이가 없으면 빈 매트, 알 수 없는 id는 연 목록에서도 빠진다', () => {
+    const empty = migrateSave({ coins: 10 }, 6, NOW);
+    expect(empty.unboxed).toEqual([]);
+    expect(empty.playroom).toEqual({ out: [] });
+    const odd = migrateSave(
+      { ownedMalangs: { 'peach-mochi': { count: 1 }, 'not-a-malang': { count: 1 } }, partnerId: 'not-a-malang' },
+      6,
+      NOW,
+    );
+    expect(odd.unboxed).toEqual(['peach-mochi']);
+    // 무효한 파트너는 옮기지 않는다 (매트는 비어 있고, 파트너는 sanitize 가 첫 말랑이로 고친다)
+    expect(odd.playroom.out).toEqual([]);
+    expect(odd.partnerId).toBe('peach-mochi');
+  });
+
+  it('아주 옛 저장(v0)도 v7까지: 가진 말랑이는 열린 상태', () => {
+    const s = migrateSave({ coins: 5, owned: ['ember-imp', 'ember-imp'] }, 0, NOW);
+    expect(s.unboxed).toEqual(['ember-imp']);
   });
 
   it('v5 → v6: 받은 쿠폰 목록이 빈 채로 생기고, 알 수 없는 쿠폰 id는 버린다', () => {
