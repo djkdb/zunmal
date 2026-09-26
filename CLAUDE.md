@@ -27,14 +27,16 @@ src/
   lib/            rng.ts (주입형/시드 RNG)
   hooks/          useReducedMotion 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
-                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
+                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf + 단계별 반응 표 REACTION_UNLOCKS), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
-                  playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
+                  playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물),
+                  affection.ts (친밀도 진행: 단계·하트·다음 단계에 받는 반응/가게 보너스/선물)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
-                  shop/(홈 ShopCard + 가게 화면 조각), home/(홈 허브: GoalCard, HubStatus, TodayStrip, useHub) …
+                  shop/(홈 ShopCard + 가게 화면 조각), home/(홈 허브: GoalCard, HubStatus, TodayStrip, useHub),
+                  collection/(도감 요약·다음 목표·세트 목록·못 만난 캡슐), AffectionMeter(친밀도 하트 게이지) …
   minigames/      types.ts, registry.ts, lobby.ts (로비 칩 거르기), shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
   goals/          홈 허브 판단 (순수): hubState.ts (저장+시각 → 지금 상태), nextGoal.ts (다음 목표 후보·우선순위),
@@ -114,6 +116,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   (미니게임 속 그림과 결과 화면 일부가 아직 쓴다. 놀이방 `/touch`는 새 토큰으로 옮겼다). 새 코드에서 쓰지 말고, 다시 칠할 때 위 토큰으로 옮긴다.
   미니게임 안의 게임 그림(블록·컵·점수 튀어나옴 등)은 자기 그림을 유지해도 되지만 틀·버튼·HUD는 토큰을 따른다.
 - **조사**: 말랑이 이름 뒤 조사는 직접 쓰지 말고 `lib/josa.ts`의 `josa(name, '과/와')`로 받침에 맞춰 붙인다.
+  숫자로 끝나면 읽는 소리로 고른다(`josa('Lv.5', '이/가')` → "Lv.5가", "Lv.3이", "300과").
 - **문구**: 존댓말, 짧고 구체적으로. 행동 이름은 끝까지 같게 쓴다(예: "보상 받기" → "받았어요").
 
 ## 가챠 규칙 (`gacha/engine.ts`, `data/rarity.ts`)
@@ -200,11 +203,29 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성 — 스카이 소다:
   하늘 바탕·머리글·제목 글꼴 Jua(`@fontsource/jua`, 본문은 `src/assets/fonts`의 NanumSquareRound가 있으면)·흰 칩·도트 매트 위 말랑이). 배포 주소 `https://zunmal.pages.dev`.
 
-## 컬렉션 (`data/collections.ts`)
+## 컬렉션 (`data/collections.ts`, 도감 화면 `components/Collection.tsx` + `components/collection/`)
 
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.
 - 세트를 완성하면 한 번 코인 보상(`SET_REWARD_COINS`, 등급 small~ultimate). 일일 상한과 무관.
 - 도감 상세는 반짝을 가졌으면 반짝 모습부터 연다(파트너로 원래 모습을 고른 경우만 원래 모습).
+- **도감 화면**은 모으고 싶게 만드는 곳이다. 값은 모두 `summarizeCollection`(`data/collectionProgress.ts`) 하나에서 온다. 순서:
+  제목 → **요약**(`CollectionSummary`: 딸기우유 비율 고리 + 주아 큰 "17 / 32" + 남은 수 + 반짝 N종 알약, 아래 등급 줄 2칸×3줄 =
+  배지(색 + 모양 + 글자) + N/M + 등급색 막대, 다 모으면 민트 + 체크, 누르면 그 등급 진열장으로 스크롤) → 탭(말랑 도감 / 컬렉션,
+  받을 세트 보상이 있으면 컬렉션 탭에 빨간 점) → 도감 탭: **다음 목표**(`CollectionGoal`) + 등급별 진열장 / 컬렉션 탭: 세트 목록.
+- **다음 목표** 카드: 받을 세트 보상이 있으면 "○○ 세트를 다 모았어요" + 보상 받기(그 자리에서, `useSetClaim`: ref 잠금 + 코인 날리기),
+  아니면 `nearestSet` — "○○ 세트까지 N마리 남았어요" + 막대 + 없는 말랑이 캡슐(최대 4, 나머지 "+N") 과 등급 배지 +
+  "완성하면 N코인" + "평균 N번쯤 뽑으면 모여요"(`expectedPullsToCollect`: 한 마리씩 나오는 수집 문제의 정확한 식, 천장 무시 →
+  `roughPullCount`로 둥글림) + 캡슐 뽑기(코인이 모자라면 "미니게임으로 코인 벌기"). 세트를 모두 받았으면 없다.
+- **세트 카드**(`SetList`): 이름·설명 + 코인 보상 알약 + 막대 N/M + 멤버(가진 것 = 누르면 상세, 없는 것 = 못 만난 캡슐) +
+  아래 줄(받을 수 있음 = 보상 받기 / 받음 = 민트 "보상을 받았어요" / 진행 중 = "N마리 남았어요" + 가장 드문 말랑이 등급 배지).
+  순서는 `orderSetsForDisplay`(받을 수 있음 → 시작한 세트 남은 수 순 → 시작 안 한 세트 덜 비싼 순 → 받은 세트), 탭을 열 때 한 번 정한다
+  (받자마자 카드가 튀지 않게).
+- **못 만난 말랑이**(`MysteryMalang`): 위 반쪽 등급 색 + 흰 아래 반쪽 + 흰 이음새 캡슐 속 등급 색 실루엣과 "?" + 구석의 등급 모양
+  (시크릿은 밤하늘 캡슐 + 금 이음새). 이름 자리는 "???". 실루엣 색은 `Malang`의 `.malang-silhouette`(`--malang-silhouette`) 변수로 입힌다.
+- **진열장 칸**: NEW 딱지(딸기우유 알약 — 뽑기 결과·선반과 같은 모양)는 `isNewInCollection` = 아직 캡슐 속(봉인)이거나 처음 얻은 지
+  `COLLECTION_NEW_MS`(24시간) 안. 파트너 딱지가 있으면 NEW 는 쉰다. 반짝 표시, 친밀도 2단계부터 창 오른쪽 아래 작은 하트 + 단계.
+- **상세 창**: 가진 수·반짝·코인 보너스 칸 + **친밀도 칸**(`AffectionMeter`) + 반짝 모습 보기 + 파트너·만지기·닫기
+  (공유 버튼은 뽑기 결과 쪽 작업에서 행동 줄에 붙는다).
 - 첫 말랑이 고르기 화면은 도감 설명 대신 `STARTER_BLURBS`(`data/characters.ts`, 등급 이야기 없는 따뜻한 존댓말 한 줄)를 보여 준다.
 
 ## 일일 미션 (`missions/missions.ts`, `components/DailyMissions.tsx`)
@@ -260,7 +281,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   선물·미션·가게 칸은 홈 안의 해당 카드로 스크롤·초점, 미니게임·뽑기는 그 화면으로.
 - **홈 탭 빨간 점**(`goals/alerts.ts`): 선물 도착, 받을 미션·세트 보상, 가게 가득 참, 열지 않은 캡슐. 탭 이름 뒤에 이유를 읽어 준다.
 - **도감 요약** (`data/collectionProgress.ts`, 테스트): `summarizeCollection({ owned, claimedSets })` → 전체 수·비율·화면용 %(`displayPercent`)·반짝 종류 수·
-  등급별 수·세트별 진행(`SetProgress`: 없는 id·가장 높은 없는 등급·대략 기대 뽑기 수·보상 받을 수 있음)·가장 가까운 미완성 세트(`nearestIncompleteSet`:
+  등급별 수·세트별 진행(`SetProgress`: 없는 id·가장 높은 없는 등급·대략 기대 뽑기 수(정렬용 Σ1/p)·보상 받을 수 있음)·가장 가까운 미완성 세트(`nearestIncompleteSet`:
   시작한 세트 중 남은 수 → 덜 비싼 순 → 많이 모은 순, 시작한 세트가 없으면 가장 덜 비싼 세트)·받을 세트. 도감 화면의 진행 표시도 이 모듈 위에 만든다.
 
 ## 놀이방 — 말랑 만지기 (`pages/TouchPage.tsx`, `components/playroom/`, `touch/`, `audio/squish.ts`)
@@ -312,6 +333,16 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다. 착지·부딪힘 소리
   (`squish.land`/`bump`)는 연타 간격 제한.
 - 만지면 친밀도(`affection`)가 오른다(만진 말랑이만). 친밀도는 코인을 주지 않는다.
+- **친밀도는 눈에 보이는 성장**이다 (`economy/affection.ts` `affectionProgress`, 순수·테스트 — 새 규칙 없이 `levelOf`·`REACTION_UNLOCKS`·
+  가게 `affectionBonus`(찐득이 두 배)·선물 `giftCoins`를 한곳에 모은다. 가게·선물 공식이 economy 에 있어 data 가 아니라 economy 에 둔다).
+  단계·단계 안 애정(xp)/50·남은 양·하트 5개 채움(`heartFills`, 하나 = 10)·지금 받는 것·다음 단계에 새로 생기는 것(`levelUpPerks` →
+  `perkLines`: "새 반응 녹아내리기", "가게 보너스 +20%", "선물 +10코인")·다 열었나(`maxed`: 반응·가게·선물이 마지막으로 오르는 단계,
+  지금은 선물 상한이 닿는 9단계 — `affectionMaxLevel`이 표·config 에서 계산). 저장 구조는 그대로.
+  - 도감 상세 `AffectionMeter`: "친밀도 Lv.4" + "다음 레벨까지 32" + 하트 5개(옅은 딸기우유 칸) + "Lv.5가 되면" 알약들.
+  - 놀이방 정보 카드: 예전 막대 자리에 작은 하트 5개 + "다음 레벨까지 N"(높이 그대로), 아래 줄은 다음 반응 방법(반응이 더 없으면
+    "Lv.8이 되면 선물 +10코인").
+  - 단계가 오르면 기존 축하 딱지 하나가 "○○와 조금 더 친해졌어요! Lv.5" + 새 반응(방법) + 가게·선물 알약으로 바뀌고 둘레에서
+    하트가 퐁퐁 떠오른다(움직임 줄이기면 멈춘 하트). 새 반응 손가락 시범은 그대로.
 - **촉감** (`data/materials.ts`, 순수 데이터 + 테스트): 32종 모두 네 촉감 중 하나(`MATERIAL_BY_ID`, 없으면 탱탱 젤리).
   컴포넌트는 숫자를 들지 않는다 — 물리 모듈이 `feel`(몸 안쪽)·`world`(매트 세계)·`carryFrac`(들어 옮기기 시작 거리)만,
   3D 무대(`touch3d/jellyScene.ts`)가 `look`(거칠기·코팅·쉰·속 비침·잔결·가장자리·외곽선·젖은 반사점)만 읽는다.
@@ -377,6 +408,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **반응** (`touch/reactions.ts`, 순수·테스트): 머리 쓰다듬기(가르랑+하트), 볼 콕(빨개짐), 배 콕(킥킥 폴짝), 빠른 연타(깔깔 흔들기),
   오래 누르기(녹아내리기, `physics.melt`), 세게 튕기기(빙글빙글 소용돌이 눈), 머리 세 번(애교 점프, `physics.hop`).
   애정 단계(`levelOf`, 50마다)로 하나씩 열린다(`REACTION_UNLOCKS`, 1단계는 기본 말랑만) — 게이지 아래 줄에 다음 반응, 열리면 축하 딱지.
+  반응 표는 `data/affection.ts`에 있고 `touch/reactions.ts`가 다시 내보낸다(도감·가게도 읽는다).
   저장 구조는 그대로(애정 값에서 계산).
   - 눈길: 손가락/마우스 쪽으로 얼굴이 옮겨 간다(2D는 `.malang-face` CSS 변수, 3D는 셰이더 UV 당김). 떼면 다시 앞을 본다.
   - 만지기 전용 얼굴(`touch/faceExtras.ts`: 소용돌이 눈·하품 입·진한 볼·"끙" 얼굴)은 SVG path — 2D는 덧그린 `<svg>`, 3D는 구운 텍스처에 Path2D.
@@ -448,7 +480,9 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`).
 - 저장: 손상/구버전 데이터 migrate.
 - 홈 허브: 도감 요약·가장 가까운 세트(`data/collectionProgress.test.ts`), 첫걸음 단계 계산(`goals/firstRun.test.ts`), 목표 우선순위·문턱값·문구
-  (`goals/nextGoal.test.ts`), 오늘 줄·탭 알림(`goals/today.test.ts`). 테스트 저장은 `goals/testSave.ts`(시작 말랑이를 고른 직후).
+  (`goals/nextGoal.test.ts`), 오늘 줄·탭 알림(`goals/today.test.ts`).
+- 도감: 세트 탭 순서·정확한 기대 뽑기 수·둥글림·NEW 판정(`data/collectionProgress.test.ts`). 친밀도 진행: levelOf·가게·선물 공식과 같은 값,
+  하트 채움, 단계별로 생기는 것, 최대 단계(`economy/affection.test.ts`). 숫자 뒤 조사(`lib/josa.test.ts`). 테스트 저장은 `goals/testSave.ts`(시작 말랑이를 고른 직후).
 - 3D 머신 더미: 가라앉으면 겹침 없음·돔 안·바닥 위·멈춤, 돔 아래쪽만 참, 시드 결정성, 휘젓기 후 다시 가라앉음(`machine3d/pile.test.ts`).
 - 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한, 소품 장애물: 뚫지 않음·얹혀 쉼·올라탐·확 튀지 않음), 캡슐 손짓, 선반 순서, 성능 조절,
   화면 배치(혼자 배치·자리 옮기기), 반응 부위·쓰다듬기, 꾸미기 데이터(타일 SVG·저장 검사·놓기/치우기·빈자리), 사진 카드(`frameGroup` 모두 담기·비율,
