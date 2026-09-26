@@ -1,0 +1,100 @@
+/* 자랑하기 버튼 + 결과 말풍선 (버튼 위에 뜬다) */
+.share {
+  position: relative;
+  display: inline-flex;
+}
+
+.share > .share-btn {
+  width: 100%;
+  gap: 6px;
+}
+
+/* 좁은 화면에서는 아이콘만 — 글자는 스크린리더용으로 남긴다 */
+@media (max-width: 349.98px) {
+  .share-btn--squeeze {
+    padding-inline: 12px;
+  }
+
+  .share-btn--squeeze .share-btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.share__toast,
+.share__manual {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+}
+
+.share--end .share__toast,
+.share--end .share__manual {
+  right: 0;
+}
+
+.share--start .share__toast,
+.share--start .share__manual {
+  left: 0;
+}
+
+.share__toast {
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  animation: share-pop 0.28s var(--ease-jelly);
+}
+
+@keyframes share-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share__toast {
+    animation: none;
+  }
+}
+
+.share__manual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(260px, calc(100vw - 48px));
+  padding: 10px;
+}
+
+.share__manual-hint {
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.share__text {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  resize: none;
+}
+
+.share__close {
+  align-self: flex-end;
+}
