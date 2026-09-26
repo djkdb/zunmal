@@ -8,6 +8,7 @@ import stack from './stack';
 import balloonFloat from './balloon-float';
 import malangTrain from './malang-train';
 import jellySlice from './jelly-slice';
+import malangSling from './malang-sling';
 import type { MiniGame } from './types';
 
 /**
@@ -25,6 +26,7 @@ export const MINI_GAMES: readonly MiniGame[] = [
   balloonFloat,
   malangTrain,
   jellySlice,
+  malangSling,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
