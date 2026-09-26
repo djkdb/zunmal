@@ -29,7 +29,7 @@ src/
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜)
-  audio/          sfx.ts — WebAudio 합성 효과음 (파일 없음)
+  audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine, PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
@@ -140,8 +140,27 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 ## 말랑 만지기 (`pages/TouchPage.tsx`, `touch/physics.ts`, `audio/squish.ts`)
 
 - 스프링 기반 말랑 물리(순수 모듈, 테스트 있음) + WebAudio로 합성한 찰박·쭉·뽁 소리.
-- 소리는 `sfx.getOutput()`으로 같은 AudioContext와 음소거 설정을 공유한다. 자체 컨텍스트를 만들지 않는다.
+- 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다.
 - 만지면 친밀도(`affection`)가 오른다. 친밀도는 코인을 주지 않는다.
+
+## 소리 (`audio/`)
+
+- **믹서** (`sfx.ts`): `sfxBus`·`uiBus`·`musicBus → duck` → 저역 컷 90Hz → 버스 컴프(3.5:1) → 리미터(-1.5dB) → 안전 클리퍼(≤0.99).
+  음량은 `BUS_LEVELS` 한 곳에서. 배경음악은 효과음 정점보다 약 10dB 낮게. 여러 소리가 한꺼번에 겹쳐도 클리핑 없음(오프라인 렌더로 확인).
+- **iOS/모바일**: 첫 입력 전 컨텍스트 금지는 그대로. `installAudioUnlock`은 첫 입력 뒤에도 계속 듣고, `state !== 'running'`이면
+  (Safari의 `'interrupted'` 포함) 입력 안에서 `resume()`한다. 화면이 숨겨지면 `suspend()`, 효과음·배경음악을 모두 끄면 컨텍스트를 멈춘다.
+  컨텍스트 생성 전 `navigator.audioSession.type = 'ambient'`(지원 시) — 무음 스위치를 존중하고 다른 앱 음악과 섞인다.
+- **폰 스피커**: 200Hz 아래만 있는 소리는 폰에서 안 들린다. 큰 충격음은 `boom()`(사인 + 포화 배음 + 150~400Hz 노크), 박자음·실수음은 `knock()`을 얹는다.
+- **반복 피로**: 버튼·탭·코인·획득·실수음은 작은 음높이(센트)·음량(dB) 변주 + 같은 소리 연타 간격 제한(`gate`).
+  콤보는 `tuning.comboPitch(level)` — 장조 5음 음계 사다리, 1.5옥타브(`MAX_COMBO_STEP`)에서 멈추고 넘으면 반짝임만 얹는다.
+- **배경음악** (`music.ts`): 25ms 타이머 + 오디오 시계 기준 120ms 미리 예약(`StepClock`). 곡은 `TRACKS`(home 92 / collection 76 /
+  touch 68 / gacha 100 / minigame 120 BPM)이고 시드 고정 8마디 악절 4종(`generatePhrase`, 순수·테스트)이 돌아가며 나온다.
+  음색은 마림바(1:3.92:9.24)·오르골·FM 종(1:1.4)·칼림바·패드·베이스(≥110Hz + 배음)·셰이커·클릭. 화면 전환은 다음 마디 경계에서 1초 교차 페이드.
+  경로 → 곡은 `trackForPath`, AppShell의 `useRouteMusic()`이 적용. 리듬 게임(`QUIET_GAME_IDS`)은 박자가 부딪혀 음악을 끈다.
+- **덕킹**: 팡파레·신화 연출 소리(`result*`, `epic*`, `secretBoom`, `secretTease`)가 스스로 `sfx.duck(초, dB)`를 불러 음악을 -5~-20dB 낮춘다.
+  화면 코드는 신경 쓰지 않아도 된다.
+- **설정**: 효과음/배경음악 따로(`settings.sfxOn`, `settings.musicOn`, HUD 소리 버튼 → `SoundSettings` 말풍선).
+  토글은 입력 안에서 엔진에도 바로 알린다(iOS 재개 조건).
 
 ## 경제 시스템 (`economy/`)
 
@@ -163,7 +182,8 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v4: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`).
+- 현재 v5: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
+  소리 설정 `settings: { sfxOn, musicOn }`(v4의 `muted: true`는 둘 다 끔으로 옮긴다. 새 플레이어는 둘 다 켬 — 음악은 첫 입력 뒤에 시작).
   v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
@@ -174,6 +194,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계.
 - 저장: 손상/구버전 데이터 migrate.
 - 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰).
+- 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트).
 
 ## 미니게임 추가 방법
 
