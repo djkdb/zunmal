@@ -7,6 +7,13 @@ import { createSeededRng, shuffle } from '../lib/rng';
 
 export const MISSION_KINDS = ['play-games', 'pull', 'pet', 'earn-coins', 'new-best'] as const;
 export type MissionKind = (typeof MISSION_KINDS)[number];
+
+/**
+ * 하루 동안 세는 사건. 미션 종류 + 미션은 아니지만 홈 "오늘" 줄이 보는 사건(가게 코인 받기).
+ * 진행(progress)은 미션에 없는 사건도 함께 세어 두고, 날짜가 바뀌면 같이 비운다.
+ */
+export const DAILY_EVENT_KINDS = [...MISSION_KINDS, 'shop-claim'] as const;
+export type DailyEventKind = (typeof DAILY_EVENT_KINDS)[number];
 export type MissionDifficulty = keyof typeof MISSION_REWARD_COINS;
 
 export interface Mission {
@@ -78,7 +85,8 @@ export function generateDailyMissions(dateKey: string): Mission[] {
 export interface MissionState {
   /** 이 진행도가 속한 날짜 (서울) */
   date: string;
-  progress: Partial<Record<MissionKind, number>>;
+  /** 오늘 센 사건 수 (미션 종류 + DAILY_EVENT_KINDS 의 나머지) */
+  progress: Partial<Record<DailyEventKind, number>>;
   claimed: MissionKind[];
   bonusClaimed: boolean;
 }
@@ -93,7 +101,7 @@ export function rollMissions(state: MissionState, dateKey: string): MissionState
 }
 
 /** 이벤트 기록. 오늘 미션에 없는 종류여도 기록해 두면 무해하다. */
-export function recordMission(state: MissionState, kind: MissionKind, amount: number): MissionState {
+export function recordMission(state: MissionState, kind: DailyEventKind, amount: number): MissionState {
   const add = Math.max(0, Math.floor(amount));
   if (add === 0) return state;
   return { ...state, progress: { ...state.progress, [kind]: (state.progress[kind] ?? 0) + add } };

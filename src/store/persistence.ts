@@ -4,7 +4,7 @@
  */
 import { isCharacterId } from '../data/characters';
 import { isCollectionId } from '../data/collections';
-import { MISSION_KINDS, createMissionState, type MissionKind, type MissionState } from '../missions/missions';
+import { DAILY_EVENT_KINDS, MISSION_KINDS, createMissionState, type MissionKind, type MissionState } from '../missions/missions';
 import { GACHA_RULES } from '../data/rarity';
 import { LEGACY_TICKET_TO_COINS, SHOP_BANK_MAX, STARTING_COINS } from '../economy/config';
 import { unlockedSlots, type ShopSave } from '../economy/shop';
@@ -177,7 +177,7 @@ function sanitizeMissions(value: unknown, fallback: MissionState): MissionState 
   if (!isRecord(value) || !isValidDateKey(value.date)) return fallback;
   const progress: MissionState['progress'] = {};
   if (isRecord(value.progress)) {
-    for (const kind of MISSION_KINDS) {
+    for (const kind of DAILY_EVENT_KINDS) {
       const n = nonNegInt(value.progress[kind], 0);
       if (n > 0) progress[kind] = n;
     }

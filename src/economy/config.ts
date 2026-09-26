@@ -228,3 +228,19 @@ export const SHOP_BANK_MAX = 10_000;
  * 첫 선물은 시작한 다음 날부터(첫날은 처음 안내에 집중).
  */
 export const GIFT_COINS = { base: 30, perLevel: 10, max: 120 } as const;
+
+// ── 홈 "다음 목표" (goals/nextGoal.ts) ───────────────────────────────
+/**
+ * 홈 허브가 "지금 할 한 가지"를 고를 때 쓰는 문턱값. 코인 값이 아니라 안내 기준이지만 밸런스와 함께 조정하므로 여기에 둔다.
+ *  - shopReadyCoins: 가게에 이만큼 쌓이면(또는 가득 차면) "가게 코인 받기"를 권한다. 1회 뽑기 값.
+ *    지금 코인 + 가게 코인으로 뽑을 수 있게 되면 이보다 적어도 권한다.
+ *  - pityCloseWithin: 천장까지 이 횟수 이하로 남았고 뽑을 코인이 있으면 "전설 이상까지 N회"를 앞세운다.
+ *  - missionNearRatio: 오늘의 미션이 이 비율 이상 진행됐으면 "조금만 더 하면 +N코인"을 권한다.
+ *  - setNearMissing: 세트가 이 수 이하로 남았으면 "이 세트까지 N마리"를 뽑기 권유 앞에 둔다.
+ */
+export const GOAL_THRESHOLDS = {
+  shopReadyCoins: PULL_PRICE.single,
+  pityCloseWithin: 10,
+  missionNearRatio: 0.6,
+  setNearMissing: 2,
+} as const;

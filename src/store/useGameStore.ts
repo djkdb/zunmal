@@ -30,6 +30,7 @@ import {
   generateDailyMissions,
   recordMission,
   rollMissions,
+  type DailyEventKind,
   type MissionKind,
   type MissionState,
 } from '../missions/missions';
@@ -164,7 +165,7 @@ export function createSafeStorage(getBackend: () => Storage | undefined): Persis
 const browserStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
 
 /** 오늘 날짜로 미션을 넘긴 뒤 이벤트들을 기록한다. */
-function progressMissions(missions: MissionState, now: Date, events: [MissionKind, number][]): MissionState {
+function progressMissions(missions: MissionState, now: Date, events: [DailyEventKind, number][]): MissionState {
   let next = rollMissions(missions, seoulDateKey(now));
   for (const [kind, amount] of events) next = recordMission(next, kind, amount);
   return next;
@@ -409,7 +410,12 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
             if (res.save.lastTickAt !== state.shop.lastTickAt) set({ shop: res.save });
             return 0;
           }
-          set({ coins: state.coins + res.coins, shop: res.save });
+          // 홈 "오늘" 줄: 오늘 가게 코인을 받았는지 (미션 진행과 같은 하루 기록에 센다)
+          set({
+            coins: state.coins + res.coins,
+            shop: res.save,
+            missions: progressMissions(state.missions, now, [['shop-claim', 1]]),
+          });
           return res.coins;
         },
 

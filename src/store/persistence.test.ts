@@ -315,6 +315,13 @@ describe('migrateSave', () => {
     expect(sanitizeSave({ missions: { date: 'bad' } }, NOW).missions.date).toBe('2026-05-05');
   });
 
+  it('미션이 아닌 하루 기록(가게 받기)도 남긴다', () => {
+    const s = sanitizeSave({ missions: { date: '2026-05-05', progress: { 'shop-claim': 2 }, claimed: ['shop-claim'] } }, NOW);
+    expect(s.missions.progress).toEqual({ 'shop-claim': 2 });
+    // 받은 미션 목록에는 미션 종류만
+    expect(s.missions.claimed).toEqual([]);
+  });
+
   it('v2 → v3: 남은 뽑기권을 장당 100코인으로 바꿔 코인에 더한다', () => {
     const s = migrateSave({ coins: 250, gachaTickets: 12 }, 2, NOW);
     expect(s.coins).toBe(250 + 12 * 100);
