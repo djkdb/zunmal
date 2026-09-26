@@ -783,3 +783,196 @@ export function shimmer(): void {
     setTimeout(() => safe(() => bus.disconnect()), (dur + 0.3) * 1000);
   });
 }
+
+// ── 반응 소리 (만지기) ─────────────────────────────────────
+
+/** 짧은 사인 글라이드 한 음 (공용) */
+function glide(
+  ctx: AudioContext,
+  out: AudioNode,
+  t: number,
+  from: number,
+  to: number,
+  dur: number,
+  gain: number,
+  type: OscillatorType = 'sine',
+) {
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(from, t);
+  osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+  envelope(env.gain, t, Math.min(0.02, dur * 0.2), gain, t + dur);
+  osc.connect(env);
+  env.connect(out);
+  osc.start(t);
+  osc.stop(t + dur + 0.03);
+}
+
+const lastReaction: Record<string, number> = {};
+
+/** 같은 반응 소리 연타 제한 */
+function gated(name: string, ctx: AudioContext, gap: number): boolean {
+  const now = ctx.currentTime;
+  if (!chimeGate(now, lastReaction[name] ?? -Infinity, gap)) return false;
+  lastReaction[name] = now;
+  return true;
+}
+
+/**
+ * 머리 쓰다듬기: 고양이 가르랑 같은 부드러운 "르르르" (폰 스피커에서도 들리게 200Hz 위 대역 노이즈를 22Hz 로 떨게 한다)
+ */
+export function purr(): void {
+  const o = output();
+  if (!o || !gated('purr', o.ctx, 0.9)) return;
+  const dur = 0.85;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const src = noiseSource(ctx, t0, dur);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'bandpass';
+    lp.frequency.value = jitter(320, 0.1, rand);
+    lp.Q.value = 1.4;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = jitter(23, 0.08, rand);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.5;
+    lfo.connect(depth);
+    depth.connect(trem.gain);
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.12, 0.35, t0 + dur);
+    src.connect(lp);
+    lp.connect(trem);
+    trem.connect(env);
+    env.connect(out);
+    lfo.start(t0);
+    lfo.stop(t0 + dur + 0.05);
+    // 기분 좋은 "음~" 허밍
+    glide(ctx, out, t0 + 0.05, jitter(330, 0.05, rand), 300, dur * 0.8, 0.035, 'triangle');
+  });
+}
+
+/** 하품: "하아암~" (올라갔다 내려오는 모음 + 숨소리) */
+export function yawn(): void {
+  const o = output();
+  if (!o || !gated('yawn', o.ctx, 2)) return;
+  const dur = 1.1;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(260, t0);
+    osc.frequency.exponentialRampToValueAtTime(420, t0 + dur * 0.35);
+    osc.frequency.exponentialRampToValueAtTime(210, t0 + dur);
+    const formant = ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.frequency.setValueAtTime(800, t0);
+    formant.frequency.exponentialRampToValueAtTime(1100, t0 + dur * 0.4);
+    formant.frequency.exponentialRampToValueAtTime(600, t0 + dur);
+    formant.Q.value = 2;
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.18, 0.16, t0 + dur);
+    osc.connect(formant);
+    formant.connect(env);
+    env.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+    // 숨소리
+    slap(ctx, out, t0 + 0.05, 0.05, 1400, dur * 0.7);
+  });
+}
+
+/** 깜짝 놀라 깰 때: "뿅!" */
+export function surprised(): void {
+  const o = output();
+  if (!o || !gated('surprised', o.ctx, 0.5)) return;
+  if (!takeVoice(0.25)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    glide(ctx, out, t0, 520, 1560, 0.12, 0.16);
+    glide(ctx, out, t0 + 0.1, 1400, 1700, 0.1, 0.08, 'triangle');
+  });
+}
+
+/** 깔깔 웃음: 짧은 웃음 두 번, 두 번째가 더 높다 */
+export function laugh(): void {
+  const o = output();
+  if (!o || !gated('laugh', o.ctx, 0.8)) return;
+  const count = 6;
+  if (!takeVoice(count * 0.08 + 0.15)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const base = jitter(820, 0.06, rand);
+    for (let n = 0; n < count; n++) {
+      const t = t0 + n * 0.075 + (n >= 3 ? 0.06 : 0);
+      const f0 = base * (n >= 3 ? 1.12 : 1) * (1 - (n % 3) * 0.05);
+      glide(ctx, out, t, f0 * 1.15, f0 * 0.85, 0.06, 0.09, 'triangle');
+    }
+  });
+}
+
+/** 빙글빙글: 내려가며 흔들리는 "삐요요요~" */
+export function dizzy(): void {
+  const o = output();
+  if (!o || !gated('dizzy', o.ctx, 1)) return;
+  const dur = 0.9;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1500, t0);
+    osc.frequency.exponentialRampToValueAtTime(500, t0 + dur);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 9;
+    const depth = ctx.createGain();
+    depth.gain.value = 120;
+    lfo.connect(depth);
+    depth.connect(osc.frequency);
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.02, 0.1, t0 + dur);
+    osc.connect(env);
+    env.connect(out);
+    osc.start(t0);
+    lfo.start(t0);
+    osc.stop(t0 + dur + 0.05);
+    lfo.stop(t0 + dur + 0.05);
+  });
+}
+
+/** 애교 점프: 위로 "뾰롱" + 착지 "퐁" */
+export function jump(): void {
+  const o = output();
+  if (!o || !gated('jump', o.ctx, 0.5)) return;
+  if (!takeVoice(0.55)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    glide(ctx, out, t0, 400, 1200, 0.18, 0.15);
+    glide(ctx, out, t0 + 0.08, 800, 2000, 0.14, 0.05, 'triangle');
+    thump(ctx, out, t0 + 0.42, 140, 0.2, 0.1);
+  });
+}
+
+/** 사진 찍기: 기계식 셔터 "찰-칵" */
+export function shutter(): void {
+  const o = output();
+  if (!o) return;
+  if (!takeVoice(0.2)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    slap(ctx, out, t0, 0.22, 3200, 0.03);
+    slap(ctx, out, t0 + 0.085, 0.3, 2200, 0.05);
+    thump(ctx, out, t0 + 0.085, 220, 0.08, 0.05);
+  });
+}

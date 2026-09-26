@@ -6,7 +6,9 @@ import {
   FX_MAX_PARTICLES,
   ambientDue,
   burstCount,
+  REACTION_STYLES,
   createFxSystem,
+  emitStyle,
   emitTouch,
   fxStylesFor,
   isFxIdle,
@@ -214,5 +216,32 @@ describe('parseHex', () => {
     expect(parseHex('#ff8000')).toEqual([255, 128, 0]);
     expect(parseHex('#fff')).toEqual([255, 255, 255]);
     expect(parseHex('nope')).toEqual([255, 255, 255]);
+  });
+});
+
+describe('reaction particles', () => {
+  it('emits hearts, z and dizzy stars; dizzy stars orbit the head', () => {
+    const sys = createFxSystem();
+    const rng = createSeededRng(9);
+    expect(emitStyle(sys, REACTION_STYLES.hearts, 3, { x: 50, y: 50 }, rng)).toBe(3);
+    expect(emitStyle(sys, REACTION_STYLES.zzz, 1, { x: 50, y: 50 }, rng)).toBe(1);
+    const head = { x: 100, y: 80 };
+    const before = sys.alive;
+    emitStyle(sys, REACTION_STYLES.dizzy, 5, head, rng, 40);
+    expect(sys.alive).toBe(before + 5);
+    const stars = sys.pool.filter((p) => p.alive && p.swirl > 0);
+    const d0 = stars.map((p) => Math.hypot(p.x - head.x, p.y - head.y));
+    stepFx(sys, 0.2);
+    const d1 = stars.map((p) => Math.hypot(p.x - head.x, p.y - head.y));
+    d0.forEach((d, i) => expect(d1[i]).toBeCloseTo(d, 3));
+    expect(emitStyle(sys, REACTION_STYLES.hearts, -2, head, rng)).toBe(0);
+  });
+
+  it('z floats up slowly and lives about two seconds', () => {
+    const sys = createFxSystem(4);
+    const p = spawnOne(sys, REACTION_STYLES.zzz, { x: 0, y: 0 }, { x: 0, y: 0 }, createSeededRng(4));
+    expect(p.life).toBeGreaterThanOrEqual(2);
+    stepFx(sys, 1);
+    expect(p.y).toBeLessThan(0);
   });
 });

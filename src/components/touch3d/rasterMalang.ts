@@ -11,7 +11,16 @@
  *  - front : 얼굴 앞 장식(왕관·리본…) 중 몸통 밖으로 나온 부분만 → 몸 앞 평평한 카드 (외곽선보다 위)
  */
 
-export type RasterPart = 'body' | 'back' | 'front';
+export type RasterPart = 'body' | 'back' | 'front' | 'full';
+
+/** 구운 그림 위에 덧그리는 모양 (그림 좌표 SVG path) — 만지기 전용 얼굴 */
+export interface RasterExtra {
+  d: string;
+  fill?: string;
+  stroke?: string;
+  width?: number;
+  opacity?: number;
+}
 
 export interface RasterRect {
   x: number;
@@ -77,6 +86,7 @@ function landmarks(group: Element, bodyPath: string): { body: number; face: numb
 }
 
 function prune(svg: SVGSVGElement, part: RasterPart, bodyPath: string, bottom: number) {
+  if (part === 'full') return;
   const group = svg.querySelector('.malang-body-group') ?? Array.from(svg.children).find((c) => c.tagName.toLowerCase() === 'g');
   if (!group) return;
   if (part === 'body') {
@@ -138,7 +148,16 @@ function loadImage(url: string): Promise<HTMLImageElement> {
  */
 export async function rasterizeMalang(
   source: SVGSVGElement,
-  opts: { part: RasterPart; rect: RasterRect; size: number; bodyPath: string; bottom: number },
+  opts: {
+    part: RasterPart;
+    rect: RasterRect;
+    size: number;
+    bodyPath: string;
+    bottom: number;
+    extras?: readonly RasterExtra[];
+    /** 세로 크기 (기본 size) */
+    height?: number;
+  },
 ): Promise<HTMLCanvasElement> {
   const { part, rect, size, bodyPath } = opts;
   const clone = source.cloneNode(true) as SVGSVGElement;
@@ -146,8 +165,9 @@ export async function rasterizeMalang(
   clone.querySelectorAll('title').forEach((t) => t.remove());
   prune(clone, part, bodyPath, opts.bottom);
   clone.setAttribute('xmlns', SVG_NS);
+  const height = opts.height ?? size;
   clone.setAttribute('width', String(size));
-  clone.setAttribute('height', String(size));
+  clone.setAttribute('height', String(height));
   clone.setAttribute('viewBox', `${rect.x} ${rect.y} ${rect.w} ${rect.h}`);
   clone.setAttribute('preserveAspectRatio', 'none');
   clone.removeAttribute('class');
@@ -159,11 +179,31 @@ export async function rasterizeMalang(
     const img = await loadImage(url);
     const canvas = document.createElement('canvas');
     canvas.width = size;
-    canvas.height = size;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('no 2d context');
-    ctx.drawImage(img, 0, 0, size, size);
-    if (part !== 'body') {
+    ctx.drawImage(img, 0, 0, size, height);
+    if (opts.extras && opts.extras.length > 0) {
+      ctx.save();
+      ctx.setTransform(size / rect.w, 0, 0, height / rect.h, (-rect.x * size) / rect.w, (-rect.y * height) / rect.h);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const e of opts.extras) {
+        const path = new Path2D(e.d);
+        ctx.globalAlpha = e.opacity ?? 1;
+        if (e.fill) {
+          ctx.fillStyle = e.fill;
+          ctx.fill(path);
+        }
+        if (e.stroke) {
+          ctx.strokeStyle = e.stroke;
+          ctx.lineWidth = e.width ?? 1.5;
+          ctx.stroke(path);
+        }
+      }
+      ctx.restore();
+    }
+    if (part === 'back' || part === 'front') {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.setTransform(size / rect.w, 0, 0, size / rect.h, (-rect.x * size) / rect.w, (-rect.y * size) / rect.h);
       ctx.fill(new Path2D(bodyPath));

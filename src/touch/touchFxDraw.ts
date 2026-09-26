@@ -211,6 +211,22 @@ function drawOne(ctx: CanvasRenderingContext2D, p: FxParticle, scale: number) {
       ctx.stroke();
       break;
     }
+    case 'z': {
+      // 졸음 z: 굵은 선 글자 (글꼴 없이 선으로)
+      const r = size;
+      ctx.rotate(-0.15);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.6, -r * 0.6);
+      ctx.lineTo(r * 0.6, -r * 0.6);
+      ctx.lineTo(-r * 0.6, r * 0.6);
+      ctx.lineTo(r * 0.6, r * 0.6);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1.6, r * 0.28);
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      break;
+    }
     case 'glow': {
       const r = size * (0.85 + 0.3 * t);
       const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);

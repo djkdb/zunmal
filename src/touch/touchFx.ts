@@ -26,7 +26,8 @@ export type FxShape =
   | 'drop'
   | 'arc'
   | 'ring'
-  | 'glow';
+  | 'glow'
+  | 'z';
 
 /** 입자가 태어나는 자리: 손가락 / 몸 가운데 / 머리 위 (후광) */
 export type FxAnchor = 'origin' | 'center' | 'head';
@@ -133,6 +134,8 @@ export interface EmitOptions {
   center: Point;
   /** 몸 반지름 (px) */
   radius: number;
+  /** 머리 꼭대기 (후광 반짝 자리). 없으면 가운데에서 반지름만큼 위 */
+  head?: Point;
   shiny?: boolean;
 }
 
@@ -330,7 +333,7 @@ export function ambientDue(acc: number, perSec: number, dt: number): { count: nu
 
 function anchorPoint(style: FxStyle, origin: Point, o: EmitOptions): Point {
   if (style.anchor === 'center') return o.center;
-  if (style.anchor === 'head') return { x: o.center.x, y: o.center.y - o.radius * 1.4 };
+  if (style.anchor === 'head') return o.head ?? { x: o.center.x, y: o.center.y - o.radius };
   return origin;
 }
 
@@ -659,4 +662,72 @@ export function fxStylesFor(
     auraColor,
     motif,
   };
+}
+
+// ── 반응 입자 (등급과 무관) ──────────────────────────────────
+
+export const REACTION_STYLES = {
+  /** 머리 쓰다듬기·애교 점프: 작은 하트가 몽글몽글 */
+  hearts: style({
+    shapes: ['heart'],
+    palette: HEART_PINKS,
+    life: [0.8, 1.2],
+    size: [5, 8.5],
+    speed: [50, 120],
+    gravity: -80,
+    drag: 2,
+    spread: Math.PI * 0.9,
+    spin: 1,
+  }),
+  /** 졸 때: z 가 오른쪽 위로 천천히 */
+  zzz: style({
+    shapes: ['z'],
+    palette: ['#6f63c9', '#4aa8e0'],
+    life: [2, 2.4],
+    size: [6, 10],
+    speed: [22, 30],
+    dir: UP + 0.55,
+    spread: 0.35,
+    gravity: -4,
+    drag: 0.3,
+    alpha: 0.9,
+    anchor: 'head',
+  }),
+  /** 빙글빙글: 머리 둘레를 도는 별 */
+  dizzy: style({
+    shapes: ['star', 'star', 'sparkle'],
+    palette: ['#ffd23f', '#ffffff', '#ffe07a'],
+    life: [1.2, 1.5],
+    size: [4.5, 7],
+    speed: [0, 0],
+    drag: 0,
+    swirl: 4.5,
+    twinkle: true,
+  }),
+} as const satisfies Record<string, FxStyle>;
+
+export type ReactionFx = keyof typeof REACTION_STYLES;
+
+/**
+ * 반응 입자 count 개. ring > 0 이면 at 둘레 납작한 고리 위에 고르게 놓고 at 를 중심으로 돈다 (빙글빙글 별).
+ * 낳은 수를 돌려준다.
+ */
+export function emitStyle(
+  sys: FxSystem,
+  st: FxStyle,
+  count: number,
+  at: Point,
+  rng: RNG,
+  ring = 0,
+): number {
+  const n = Math.max(0, Math.floor(count));
+  for (let i = 0; i < n; i++) {
+    if (ring > 0) {
+      const a = (i / n) * TAU + rng() * 0.3;
+      spawnOne(sys, st, { x: at.x + Math.cos(a) * ring, y: at.y + Math.sin(a) * ring * 0.35 }, at, rng);
+    } else {
+      spawnOne(sys, st, at, at, rng);
+    }
+  }
+  return n;
 }

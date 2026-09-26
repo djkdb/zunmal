@@ -17,6 +17,13 @@ import {
   releaseParams,
   setSquishRandom,
   shimmer,
+  purr,
+  yawn,
+  surprised,
+  laugh,
+  dizzy,
+  jump,
+  shutter,
   squelchParams,
   squishPress,
   squishRelease,
@@ -275,6 +282,10 @@ describe('squish audio graph', () => {
       vi.runAllTimers();
     }
     shimmer();
+    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter]) {
+      fn();
+      vi.runAllTimers();
+    }
     expect(problems).toEqual([]);
     expect(starts).toBeGreaterThan(20);
     expect(created).toBe(1);

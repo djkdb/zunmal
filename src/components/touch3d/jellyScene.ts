@@ -46,8 +46,9 @@ import { VIEWBOX } from '../malang/helpers';
 import { buildCardGrid, buildJellyMesh, computeNormals, flattenPath, type JellyMesh } from '../../touch/jellyMesh';
 import { createScratch, deformJelly, deformPoints, type Pose, type SoftHit, type SoftState } from '../../touch/softbody';
 import { rasterizeMalang, type RasterRect } from './rasterMalang';
+import { faceExtras, type TouchFace } from '../../touch/faceExtras';
 
-export type JellyFace = 'default' | 'happy' | 'sleepy' | 'wide';
+export type JellyFace = TouchFace;
 
 export interface JellyViewOptions {
   /** 캔버스를 붙일 상자 (무대 위를 덮는 절대 위치 요소) */
@@ -79,6 +80,10 @@ export interface JellyView {
   /** 변형해서 그린다 */
   draw(pose: Pose, soft: SoftState): void;
   setFace(face: JellyFace): void;
+  /** 얼굴을 손가락 쪽으로 (그림 좌표, 최대 몇 단위) */
+  setGaze(x: number, y: number): void;
+  /** 지금 모습을 다시 그려 2D 캔버스로 복사 (사진 찍기). 컨테이너 전체 */
+  snapshot(): HTMLCanvasElement | null;
   /** 만질 때 몸 뒤 빛과 가장자리 빛이 잠깐 부푼다 (0~1) */
   pulse(amount: number): void;
   /** 빛이 아직 부풀어 있다 → 페이지가 그리기를 계속해야 한다 */
@@ -213,6 +218,9 @@ function shadowTexture(): CanvasTexture {
 // ── 재질 ─────────────────────────────────────────────────
 
 interface JellyUniforms {
+  uGaze: { value: Vector2 };
+  uFaceUv: { value: Vector2 };
+  uFaceR: { value: Vector2 };
   uRimBoost: { value: number };
   uRimColor: { value: Color };
   uShiny: { value: number };
@@ -240,7 +248,10 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
-        /* glsl */ `uniform float uRimBoost;
+        /* glsl */ `uniform vec2 uGaze;
+      uniform vec2 uFaceUv;
+      uniform vec2 uFaceR;
+      uniform float uRimBoost;
       uniform vec3 uRimColor;
       uniform float uShiny;
       uniform float uTime;
@@ -248,6 +259,19 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
         return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
       }
       void main() {`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        /* glsl */ `
+      #ifdef USE_MAP
+        // 눈길: 얼굴 둘레만 부드럽게 끌어 손가락 쪽을 보게 한다
+        vec2 jellyUv = vMapUv;
+        {
+          float w = 1.0 - smoothstep(0.55, 1.0, length((jellyUv - uFaceUv) / uFaceR));
+          jellyUv -= uGaze * w;
+        }
+        diffuseColor *= texture2D( map, jellyUv );
+      #endif`,
       )
       .replace(
         '#include <opaque_fragment>',
@@ -335,11 +359,17 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
   const glowOpt = opts.glow && opts.glow.strength > 0 ? opts.glow : null;
   const glowColor = new Color(glowOpt?.color ?? '#ffffff');
   const uniforms: JellyUniforms = {
+    uGaze: { value: new Vector2(0, 0) },
+    uFaceUv: { value: new Vector2(0.5, 0.5) },
+    uFaceR: { value: new Vector2(0.3, 0.3) },
     uRimBoost: { value: 0 },
     uRimColor: { value: glowColor },
     uShiny: { value: Math.max(0, Math.min(1, opts.iridescence ?? 0)) },
     uTime: { value: 0 },
   };
+  // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
+  uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
+  uniforms.uFaceR.value.set((shape.eyeGap + 17) / bodyRect.w, 17 / bodyRect.h);
   const baseRim = glowOpt ? glowOpt.strength * 0.3 : 0;
   uniforms.uRimBoost.value = baseRim;
   const placeholder = new CanvasTexture(document.createElement('canvas'));
@@ -437,7 +467,14 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
     if (!p) {
       const src = opts.getSource(face);
       p = src
-        ? rasterizeMalang(src, { part: 'body', rect: bodyRect, size: TEX_SIZE, bodyPath: shape.body, bottom: mesh.bottom }).then(
+        ? rasterizeMalang(src, {
+            part: 'body',
+            rect: bodyRect,
+            size: TEX_SIZE,
+            bodyPath: shape.body,
+            bottom: mesh.bottom,
+            extras: faceExtras(face, shape),
+          }).then(
             (c) => {
               if (disposed) return null;
               const t = toTexture(c, renderer);
@@ -622,6 +659,25 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
     },
     busy() {
       return pulseNow(performance.now()) > 0.005;
+    },
+    setGaze(x, y) {
+      const gx = x / bodyRect.w;
+      const gy = -y / bodyRect.h;
+      const g = uniforms.uGaze.value;
+      if (Math.abs(g.x - gx) < 1e-4 && Math.abs(g.y - gy) < 1e-4) return;
+      g.set(gx, gy);
+    },
+    snapshot() {
+      if (disposed) return null;
+      redraw();
+      const out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const ctx = out.getContext('2d');
+      if (!ctx) return null;
+      // 그린 직후(같은 작업 안)라 preserveDrawingBuffer 없이도 읽을 수 있다
+      ctx.drawImage(canvas, 0, 0);
+      return out;
     },
     setFace(face) {
       wantFace = face;

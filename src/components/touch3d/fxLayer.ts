@@ -12,8 +12,11 @@ import {
   ambientDue,
   clearFx,
   createFxSystem,
+  emitStyle,
   emitTouch,
+  REACTION_STYLES,
   stepFx,
+  type ReactionFx,
   type FxEvent,
   type FxStyleSet,
   type Point,
@@ -26,6 +29,8 @@ export interface BodyBox {
   y: number;
   /** 몸 반지름 (px) */
   r: number;
+  /** 머리 꼭대기 y (client px) */
+  headY?: number;
 }
 
 export interface FxLayerOptions {
@@ -44,6 +49,8 @@ export interface FxLayer {
   /** 끄는 동안 손가락 위치: 등급 표의 간격마다 꼬리 입자 */
   trail(clientX: number, clientY: number): void;
   endTrail(): void;
+  /** 반응 입자: 하트(손가락/머리), 졸음 z(머리), 빙글빙글 별(머리 둘레) */
+  react(kind: ReactionFx, count: number, clientX?: number, clientY?: number): void;
   setAmbient(on: boolean): void;
   resize(): void;
   dispose(): void;
@@ -90,9 +97,13 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
     const b = opts.getBody();
     if (!b) {
       const rect = canvas.getBoundingClientRect();
-      return { center: { x: rect.width / 2, y: rect.height * 0.62 }, radius: rect.width * 0.25 };
+      const center = { x: rect.width / 2, y: rect.height * 0.62 };
+      const radius = rect.width * 0.25;
+      return { center, radius, head: { x: center.x, y: center.y - radius } };
     }
-    return { center: local(b.x, b.y), radius: b.r };
+    const center = local(b.x, b.y);
+    const head = b.headY === undefined ? { x: center.x, y: center.y - b.r } : local(b.x, b.headY);
+    return { center, radius: b.r, head };
   };
 
   const frame = (ts: number) => {
@@ -160,6 +171,21 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
     },
     endTrail() {
       trailLast = null;
+    },
+    react(kind, count, clientX, clientY) {
+      if (disposed) return;
+      const b = body();
+      const head = b.head;
+      const at = clientX === undefined || clientY === undefined ? head : local(clientX, clientY);
+      const zAt = { x: head.x + b.radius * 0.5, y: head.y };
+      const n =
+        kind === 'dizzy'
+          ? emitStyle(sys, REACTION_STYLES.dizzy, count, { x: head.x, y: head.y - 6 }, rng, b.radius * 0.6)
+          : emitStyle(sys, REACTION_STYLES[kind], count, kind === 'zzz' ? zAt : at, rng);
+      if (n > 0) {
+        burstUntil = performance.now() + BURST_MS;
+        ensure();
+      }
     },
     setAmbient(on) {
       ambientOn = on && spec.ambientPerSec > 0;
