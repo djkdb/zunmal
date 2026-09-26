@@ -3,6 +3,7 @@ import { persist, type PersistStorage, type StorageValue } from 'zustand/middlew
 import { STARTER_CHARACTER_IDS, getCharacter } from '../data/characters';
 import { collectionProgress, getCollection } from '../data/collections';
 import { MISSION_ALL_CLEAR_BONUS, SET_REWARD_COINS } from '../economy/config';
+import { checkCoupon, type CouponResult } from '../economy/coupons';
 import { seoulDateKey } from '../economy/daily';
 import {
   applyDailyReset,
@@ -53,6 +54,8 @@ export interface GameActions {
   claimMission(id: MissionKind, now?: Date): { ok: true; coins: number } | { ok: false; reason: string };
   /** 미션 3개를 모두 받은 뒤 추가 보너스 받기. 받은 코인(없으면 0)을 돌려준다. */
   claimMissionBonus(now?: Date): number;
+  /** 쿠폰 코드 입력 → 코인 지급 (저장당 한 번, 일일 상한과 무관) */
+  redeemCoupon(code: string, now?: Date): CouponResult;
   /** 모든 소리 끄기/켜기 (효과음 + 배경음악) */
   setMuted(muted: boolean): void;
   /** 효과음 켜기/끄기 */
@@ -136,6 +139,7 @@ function pickSave(state: GameState): SaveData {
     affection: state.affection,
     partnerShiny: state.partnerShiny,
     missions: state.missions,
+    redeemedCoupons: state.redeemedCoupons,
   };
 }
 
@@ -266,6 +270,15 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (!canClaimBonus(missions, generateDailyMissions(missions.date))) return 0;
           set({ coins: state.coins + MISSION_ALL_CLEAR_BONUS, missions: { ...missions, bonusClaimed: true } });
           return MISSION_ALL_CLEAR_BONUS;
+        },
+
+        redeemCoupon(code, now = new Date()) {
+          const state = get();
+          const res = checkCoupon(code, state.redeemedCoupons, now);
+          if (res.ok) {
+            set({ coins: state.coins + res.coupon.coins, redeemedCoupons: [...state.redeemedCoupons, res.coupon.id] });
+          }
+          return res;
         },
 
         setMuted(muted) {

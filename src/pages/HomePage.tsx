@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
 import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
+import { CouponBox } from '../components/CouponBox';
 import { InstallCard } from '../components/InstallCard';
 import { CapsuleIcon, CloseIcon, JoystickIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
@@ -179,6 +180,8 @@ export function HomePage() {
           {ownedCount}/{CHARACTERS.length}
         </span>
       </Link>
+
+      <CouponBox />
 
       <InstallCard slot="install" />
     </section>

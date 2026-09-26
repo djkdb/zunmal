@@ -74,8 +74,16 @@ describe('sanitizeSave', () => {
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 5', () => {
-    expect(SAVE_VERSION).toBe(5);
+  it('현재 버전은 6', () => {
+    expect(SAVE_VERSION).toBe(6);
+  });
+
+  it('v5 → v6: 받은 쿠폰 목록이 빈 채로 생기고, 알 수 없는 쿠폰 id는 버린다', () => {
+    const v5 = migrateSave({ coins: 300, settings: { sfxOn: true, musicOn: false } }, 5);
+    expect(v5.redeemedCoupons).toEqual([]);
+    expect(v5.coins).toBe(300);
+    const s = sanitizeSave({ redeemedCoupons: ['open-2026', 'open-2026', 'fake', 3] });
+    expect(s.redeemedCoupons).toEqual(['open-2026']);
   });
 
   it('v4 → v5: 음소거였으면 효과음·배경음악 모두 끔', () => {

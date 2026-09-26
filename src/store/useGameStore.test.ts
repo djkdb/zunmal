@@ -259,3 +259,24 @@ describe('일일 미션', () => {
     expect(store.getState().missions).toEqual({ date: '2026-09-25', progress: {}, claimed: [], bonusClaimed: false });
   });
 });
+
+describe('redeemCoupon', () => {
+  it('오픈 기념 쿠폰은 한 번만 1000코인을 주고 일일 획득량에는 들어가지 않는다', () => {
+    const store = makeStore();
+    const before = store.getState().coins;
+    const first = store.getState().redeemCoupon(' ZUN ');
+    expect(first.ok).toBe(true);
+    expect(store.getState().coins).toBe(before + 1000);
+    expect(store.getState().dailyEarnedCoins).toBe(0);
+    expect(store.getState().redeemedCoupons).toEqual(['open-2026']);
+    expect(store.getState().redeemCoupon('zun')).toEqual({ ok: false, reason: 'used' });
+    expect(store.getState().coins).toBe(before + 1000);
+  });
+
+  it('없는 코드는 코인을 주지 않는다', () => {
+    const store = makeStore();
+    const before = store.getState().coins;
+    expect(store.getState().redeemCoupon('hello').ok).toBe(false);
+    expect(store.getState().coins).toBe(before);
+  });
+});

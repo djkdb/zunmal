@@ -127,6 +127,13 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   - 안드로이드 Chrome은 `beforeinstallprompt`를 앱 시작 시(`app/installPrompt.ts`) 붙잡아 설치 창을 띄우고, iOS는 공유 → 홈 화면에 추가 순서를 보여 준다.
   - 이미 앱으로 열었으면(standalone) 안내하지 않는다. 설치 카드는 닫으면 7일간 숨긴다.
 
+## 쿠폰·링크 미리보기
+
+- 쿠폰: 목록은 `economy/config.ts`의 `COUPONS`(id·코드·코인·이름·기간), 확인은 순수 모듈 `economy/coupons.ts`(대소문자·공백 무시, 저장당 1회).
+  받은 쿠폰 id는 저장 v6 `redeemedCoupons`. 입력 칸은 홈 아래 `components/CouponBox.tsx`. 서버가 없어 코드는 앱 안에 있다(선물용, 보안 수단 아님).
+  현재: `zun` = 오픈 기념 1000코인.
+- 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성). 배포 주소 `https://zunmal.pages.dev`.
+
 ## 컬렉션 (`data/collections.ts`)
 
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.

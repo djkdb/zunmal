@@ -133,3 +133,25 @@ export const MISSION_REWARD_COINS = { easy: 50, normal: 80, hard: 120 } as const
 
 /** 오늘의 미션 3개를 모두 받으면 주는 추가 코인. */
 export const MISSION_ALL_CLEAR_BONUS = 150;
+
+/**
+ * 쿠폰. 코드는 대소문자·공백을 무시하고 비교한다(`economy/coupons.ts`). 한 기기(저장)당 한 번만 받는다.
+ * 서버가 없어 코드는 앱 코드 안에 들어 있다 — 이벤트용 선물이지 보안 수단이 아니다.
+ * 기간이 필요하면 startsAt/endsAt(ISO 날짜-시간, 서울 기준 +09:00)을 넣는다.
+ * 코인은 일일 상한과 무관하게 지급한다.
+ */
+export interface CouponDef {
+  /** 저장에 남는 고유 id (코드가 바뀌어도 중복 수령을 막는다) */
+  id: string;
+  code: string;
+  coins: number;
+  /** "오픈 기념" 같은 이름 — 받았을 때 문구에 쓴다 */
+  title: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
+export const COUPONS: readonly CouponDef[] = [
+  // 오픈 기념 선물: 10연 뽑기 한 번 값
+  { id: 'open-2026', code: 'zun', coins: 1000, title: '오픈 기념' },
+];

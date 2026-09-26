@@ -7,6 +7,7 @@ import { isCollectionId } from '../data/collections';
 import { MISSION_KINDS, createMissionState, type MissionKind, type MissionState } from '../missions/missions';
 import { GACHA_RULES } from '../data/rarity';
 import { LEGACY_TICKET_TO_COINS, STARTING_COINS } from '../economy/config';
+import { isCouponId } from '../economy/coupons';
 import { isValidDateKey, seoulDateKey } from '../economy/daily';
 
 /**
@@ -17,8 +18,9 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
  *  - v3: 뽑기권 폐지 — 재화는 코인 하나. 남은 뽑기권(gachaTickets)은 코인으로 환산
  *  - v4: 일일 미션 진행(missions)
  *  - v5: 소리 설정 분리 — settings { muted } → { sfxOn, musicOn } (효과음/배경음악)
+ *  - v6: 받은 쿠폰(redeemedCoupons)
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const SAVE_KEY = 'malang-gacha-save';
 
 export interface OwnedMalang {
@@ -60,6 +62,8 @@ export interface SaveData {
   partnerShiny: boolean;
   /** 오늘의 미션 진행 (서울 날짜가 바뀌면 초기화) */
   missions: MissionState;
+  /** 받은 쿠폰 id (economy/config.ts COUPONS) */
+  redeemedCoupons: string[];
 }
 
 export function createInitialSave(now: Date = new Date()): SaveData {
@@ -77,6 +81,7 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     affection: {},
     partnerShiny: false,
     missions: createMissionState(seoulDateKey(now)),
+    redeemedCoupons: [],
   };
 }
 
@@ -186,6 +191,7 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     affection: sanitizeAffection(raw.affection),
     partnerShiny: raw.partnerShiny === true,
     missions: sanitizeMissions(raw.missions, base.missions),
+    redeemedCoupons: Array.isArray(raw.redeemedCoupons) ? [...new Set(raw.redeemedCoupons.filter(isCouponId))] : [],
   };
 }
 
@@ -243,6 +249,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   if (fromVersion < 3) data = migrateV2toV3(data);
   // v3 → v4: missions는 sanitize가 오늘 날짜의 빈 진행으로 채운다.
   if (fromVersion < 5) data = migrateV4toV5(data);
-  // 향후: if (fromVersion < 6) data = migrateV5toV6(data);
+  // v5 → v6: redeemedCoupons는 sanitize가 빈 목록으로 채운다.
+  // 향후: if (fromVersion < 7) data = migrateV6toV7(data);
   return sanitizeSave(data, now);
 }
