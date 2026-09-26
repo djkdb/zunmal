@@ -20,6 +20,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  margin-top: 4px;
 }
 
 .gacha-page__actions .btn {
@@ -31,15 +32,55 @@
   line-height: 1.15;
 }
 
-.gacha-page__sale {
+/* 뽑기 버튼 두 개: 1회 = 캡슐 하나(주인공 딸기우유), 10연 = 캡슐 더미 + 위 모서리 "레어 이상 1개 보장" 레몬 딱지 */
+.gacha-pull__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gacha-pull__icon {
+  display: inline-grid;
+  place-items: center;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+/* 누르는 순간 캡슐이 톡 튄다 (버튼 자체의 눌림과 함께) */
+.gacha-pull:active:not(:disabled) .gacha-pull__icon {
+  transform: translateY(-3px) rotate(-12deg) scale(1.08);
+  transition-duration: var(--press-in);
+}
+
+.gacha-pull:disabled .gacha-pull__icon {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+.gacha-pull__promise {
   position: absolute;
-  top: -11px;
-  right: 10px;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 1px 9px;
   border-radius: var(--radius-pill);
   background: var(--lemon);
+  box-shadow: 0 2px 6px rgba(26, 64, 128, 0.14);
   color: var(--ink);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.gacha-pull:disabled .gacha-pull__promise {
+  background: var(--lemon-tint);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--sub);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gacha-pull:active:not(:disabled) .gacha-pull__icon {
+    transform: none;
+  }
 }
 
 /* 가격: 버튼 이름 아래 작은 줄 */
@@ -118,6 +159,32 @@
 
 .gacha-page__message a {
   color: var(--link);
+}
+
+/* 코인이 모자랄 때: 얼마나 더 필요한지 + 미니게임으로 */
+.gacha-page__short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 8px;
+  margin: -4px 0 0;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  word-break: keep-all;
+}
+
+.gacha-page__earn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 /* 최근 만난 말랑이 한 칸 */

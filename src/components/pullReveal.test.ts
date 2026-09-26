@@ -10,6 +10,7 @@ import {
   openSequence,
   openTiming,
   openedCount,
+  shareHighlightIndex,
   summarizePulls,
   topRarity,
   type CardPhase,
@@ -128,14 +129,14 @@ describe('openAllSchedule', () => {
 });
 
 describe('summarizePulls', () => {
-  it('새 말랑이, 반짝, 환급을 센다', () => {
+  it('새 말랑이(NEW 딱지 = 처음 만남 + 첫 반짝), 반짝, 환급을 센다', () => {
     const s = summarizePulls([
       item('common', { isNew: true }),
       item('rare', { refund: 30 }),
       item('common', { shiny: true, isNewShiny: true }),
       item('epic', { refund: 80 }),
     ]);
-    expect(s.newCount).toBe(1);
+    expect(s.newCount).toBe(2);
     expect(s.shinyCount).toBe(1);
     expect(s.refund).toBe(110);
     expect(s.bestIndex).toBe(3);
@@ -156,5 +157,32 @@ describe('summarizePulls', () => {
   it('topRarity', () => {
     expect(topRarity([])).toBe('common');
     expect(topRarity(['rare', 'secret', 'legendary'])).toBe('secret');
+  });
+});
+
+describe('shareHighlightIndex', () => {
+  it('이미 있던 일반·레어만 나왔으면 자랑하지 않는다', () => {
+    expect(shareHighlightIndex([item('common', { refund: 10 }), item('rare', { refund: 30 })])).toBe(-1);
+    expect(shareHighlightIndex([])).toBe(-1);
+  });
+
+  it('새 일반 말랑이도 자랑거리', () => {
+    expect(shareHighlightIndex([item('rare', { refund: 30 }), item('common', { isNew: true })])).toBe(1);
+  });
+
+  it('이미 있던 에픽 이상도 자랑거리, 등급이 가장 먼저', () => {
+    expect(shareHighlightIndex([item('common', { isNew: true }), item('epic', { refund: 80 })])).toBe(1);
+    expect(shareHighlightIndex([item('epic', { isNew: true, shiny: true }), item('legendary', { refund: 300 })])).toBe(1);
+  });
+
+  it('같은 등급이면 반짝 → 새 말랑이 → 앞선 것', () => {
+    const list = [item('epic', { refund: 80 }), item('epic', { isNew: true }), item('epic', { shiny: true, refund: 80 })];
+    expect(shareHighlightIndex(list)).toBe(2);
+    expect(shareHighlightIndex(list.slice(0, 2))).toBe(1);
+    expect(shareHighlightIndex([item('epic', { isNew: true }), item('epic', { isNew: true })])).toBe(0);
+  });
+
+  it('이미 있던 일반이라도 반짝이면 자랑거리', () => {
+    expect(shareHighlightIndex([item('common', { shiny: true, refund: 10 })])).toBe(0);
   });
 });

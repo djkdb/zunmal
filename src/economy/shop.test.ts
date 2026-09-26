@@ -16,9 +16,12 @@ import {
   claimShop,
   computeShopRates,
   elapsedMs,
+  malangsUntilNextSlot,
+  msUntilFull,
   nextSlotAt,
   readShop,
   settleShop,
+  shownPerHour,
   unlockedSlots,
   type ShopContext,
   type ShopSave,
@@ -209,5 +212,32 @@ describe('디저트 가게: 쌓이기와 받기', () => {
     const none = computeShopRates([], ctx());
     expect(readShop(save({ staff: [] }), none, T0 + 5 * H).coins).toBe(0);
     expect(claimShop(save({ staff: [], banked: 12 }), none, T0 + H).coins).toBe(12);
+  });
+});
+
+describe('디저트 가게: 화면 요약', () => {
+  it('보이는 시간당은 반올림 한 곳에서', () => {
+    expect(shownPerHour(49.5)).toBe(50);
+    expect(shownPerHour(-3)).toBe(0);
+    expect(shownPerHour(Number.NaN)).toBe(0);
+  });
+
+  it('가득 차기까지: 빈 가게에서 가득 참 시간, 가득 차면 0, 직원이 없으면 null', () => {
+    const rates = computeShopRates(['soda-drop'], ctx());
+    const save: ShopSave = { staff: ['soda-drop'], lastTickAt: T0, banked: 0 };
+    const full = msUntilFull(save, rates, T0) ?? -1;
+    // capCoins 는 내림이라 가득 참 시간보다 조금 짧거나 같다
+    expect(full).toBeGreaterThan((rates.capHours - 0.1) * H);
+    expect(full).toBeLessThanOrEqual(rates.capHours * H);
+    const later = msUntilFull(save, rates, T0 + 2 * H) ?? -1;
+    expect(Math.abs(full - later - 2 * H)).toBeLessThan(1000);
+    expect(msUntilFull(save, rates, T0 + 99 * H)).toBe(0);
+    expect(msUntilFull({ staff: [], lastTickAt: T0, banked: 0 }, computeShopRates([], ctx()), T0)).toBeNull();
+  });
+
+  it('다음 칸까지 모을 말랑이 수', () => {
+    expect(malangsUntilNextSlot(1)).toBe((SHOP_SLOT_UNLOCKS[1] ?? 0) - 1);
+    expect(malangsUntilNextSlot(SHOP_SLOT_UNLOCKS[1] ?? 0)).toBe((SHOP_SLOT_UNLOCKS[2] ?? 0) - (SHOP_SLOT_UNLOCKS[1] ?? 0));
+    expect(malangsUntilNextSlot(999)).toBeNull();
   });
 });

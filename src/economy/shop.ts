@@ -236,3 +236,24 @@ export function assignStaff(staff: readonly string[], slot: number, id: string |
   }
   return next;
 }
+
+// ── 화면용 요약 (가게 화면·고르기 창이 같은 값을 쓴다) ─────────────────
+
+/** 화면에 보이는 시간당 코인 (반올림). 가게 화면·고르기 창·비교 모두 이 값으로 보여 준다. */
+export function shownPerHour(perHour: number): number {
+  return Number.isFinite(perHour) ? Math.round(Math.max(0, perHour)) : 0;
+}
+
+/** 가득 차기까지 남은 시간(ms). 가득 찼으면 0, 쌓이지 않으면(직원 없음) null. */
+export function msUntilFull(save: ShopSave, rates: ShopRates, now: number): number | null {
+  if (rates.perHour <= 0 || rates.capCoins <= 0) return null;
+  const r = readShop(save, rates, now);
+  if (r.full) return 0;
+  return Math.ceil(((rates.capCoins - r.exact) / rates.perHour) * HOUR_MS);
+}
+
+/** 다음 칸이 열리기까지 더 모아야 하는 말랑이 수 (모두 열렸으면 null) */
+export function malangsUntilNextSlot(ownedCount: number): number | null {
+  const next = nextSlotAt(ownedCount);
+  return next === null ? null : next - ownedCount;
+}

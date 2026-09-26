@@ -138,7 +138,7 @@ export interface PullItemLike {
 }
 
 export interface PullSummary {
-  /** 처음 만난 말랑이 수 */
+  /** NEW 딱지 수 = 처음 만난 말랑이 + 처음 얻은 반짝 (결과 카드의 NEW 딱지와 같은 기준) */
   newCount: number;
   /** 반짝 결과 수 */
   shinyCount: number;
@@ -162,7 +162,7 @@ export function summarizePulls(items: readonly PullItemLike[]): PullSummary {
       const d = cur ? rarityRank(it.rarity) - rarityRank(cur.rarity) : 1;
       if (d > 0 || (d === 0 && cur && it.shiny && !cur.shiny)) bestNewIndex = i;
     }
-    if (it.isNew) newCount++;
+    if (it.isNew || it.isNewShiny) newCount++;
     if (it.shiny) shinyCount++;
     refund += it.refund;
     const best = items[bestIndex];
@@ -176,4 +176,24 @@ export function summarizePulls(items: readonly PullItemLike[]): PullSummary {
 /** 가장 높은 등급 (빈 배열이면 common) */
 export function topRarity(rarities: readonly Rarity[]): Rarity {
   return rarities.reduce<Rarity>((acc, r) => (rarityRank(r) > rarityRank(acc) ? r : acc), 'common');
+}
+
+/** 자랑하기를 보여 줄 만한 등급 (이 등급 이상 · 반짝 · 새 말랑이) */
+export const SHARE_MIN_RARITY: Rarity = 'epic';
+
+/**
+ * 결과 중 자랑할 한 장의 위치 (없으면 -1).
+ * 후보는 에픽 이상 · 반짝 · 처음 만난 말랑이. 등급 높은 순 → 반짝 → 새 말랑이 → 앞선 것.
+ * 이미 있던 일반·레어만 나왔으면 자랑하기를 보여 주지 않는다.
+ */
+export function shareHighlightIndex(items: readonly PullItemLike[]): number {
+  let best = -1;
+  const score = (it: PullItemLike) => rarityRank(it.rarity) * 4 + (it.shiny ? 2 : 0) + (it.isNew ? 1 : 0);
+  items.forEach((it, i) => {
+    const worthy = rarityRank(it.rarity) >= rarityRank(SHARE_MIN_RARITY) || it.shiny || it.isNew;
+    if (!worthy) return;
+    const cur = items[best];
+    if (!cur || score(it) > score(cur)) best = i;
+  });
+  return best;
 }

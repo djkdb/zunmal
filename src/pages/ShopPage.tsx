@@ -4,8 +4,15 @@ import { sfx } from '../audio/sfx';
 import { getCharacter } from '../data/characters';
 import { MATERIAL_LABELS } from '../data/materialIds';
 import { SHOP_SLOT_UNLOCKS } from '../economy/config';
-import { nextSlotAt, unlockedSlots, SHOP_MAX_SLOTS, type StaffRate } from '../economy/shop';
-import { MATERIAL_PERK_TEXT } from '../components/shop/perks';
+import {
+  malangsUntilNextSlot,
+  nextSlotAt,
+  shownPerHour,
+  unlockedSlots,
+  SHOP_MAX_SLOTS,
+  type StaffRate,
+} from '../economy/shop';
+import { MATERIAL_PERK_TEXT, formatDuration } from '../components/shop/perks';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { CoinIcon } from '../components/icons';
 import { LockIcon, PlusIcon } from '../components/shop/shopIcons';
@@ -23,7 +30,7 @@ function StaffSlot({ rate, onPick }: { rate: StaffRate; onPick(): void }) {
   const c = getCharacter(rate.id);
   const shiny = useGameStore((s) => (s.ownedMalangs[rate.id]?.shinyCount ?? 0) > 0);
   if (!c) return null;
-  const perHour = Math.round(rate.perHour);
+  const perHour = shownPerHour(rate.perHour);
   return (
     <button type="button" className="shop-slot" onClick={onPick} aria-label={`${c.name}, 시간당 ${perHour}코인, 바꾸기`}>
       <span className="shop-slot__art" aria-hidden="true">
@@ -33,7 +40,7 @@ function StaffSlot({ rate, onPick }: { rate: StaffRate; onPick(): void }) {
         <span className="shop-slot__name">
           {c.name} <RarityBadge rarity={c.rarity} compact />
         </span>
-        <BonusChips bonuses={rate.bonuses} />
+        <BonusChips bonuses={rate.bonuses} base={rate.base} />
         <span className="shop-slot__perk">
           <span>
             <b>{MATERIAL_LABELS[rate.material]}</b> {MATERIAL_PERK_TEXT[rate.material]}
@@ -52,11 +59,12 @@ function StaffSlot({ rate, onPick }: { rate: StaffRate; onPick(): void }) {
 /** 말랑 디저트 가게 화면 (/shop) */
 export function ShopPage() {
   const reduced = useReducedMotion();
-  const { rates, reading } = useShopLive(2000);
+  const { rates, reading, untilFull } = useShopLive(2000);
   const ownedMalangs = useGameStore((s) => s.ownedMalangs);
   const ownedCount = Object.keys(ownedMalangs).length;
   const slots = unlockedSlots(ownedCount);
   const next = nextSlotAt(ownedCount);
+  const moreForSlot = malangsUntilNextSlot(ownedCount);
   const claim = useShopClaim();
   const claimRef = useRef<HTMLButtonElement>(null);
   const [picking, setPicking] = useState<number | null>(null);
@@ -68,7 +76,7 @@ export function ShopPage() {
       return character ? { character, shiny: (ownedMalangs[r.id]?.shinyCount ?? 0) > 0 } : null;
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
-  const perHour = Math.round(rates.perHour);
+  const perHour = shownPerHour(rates.perHour);
   const empty = front.length === 0;
   const canClaim = reading.coins >= 1;
 
@@ -93,13 +101,18 @@ export function ShopPage() {
         )}
       </div>
 
-      {/* 계산대: 모인 코인 + 가득 참 막대 + 받기 */}
+      {/* 계산대: 모인 코인 / 가득 참 + 막대 + 받기, 그 아래 가게 요약(시간당·직원 칸·가득 참 시간)과 다음 칸 */}
       <div className={`shop__till${reading.full ? ' is-full' : ''}`}>
         <div className="shop__till-row">
           <p className="shop__amount" aria-live="polite">
             <CoinIcon size={30} />
             <span className="shop__amount-num">{reading.coins.toLocaleString()}</span>
-            <span className="visually-hidden">코인이 모였어요</span>
+            {!empty && (
+              <span className="shop__amount-cap">
+                <span className="visually-hidden">코인 모였어요, 가득 차면</span> / {rates.capCoins.toLocaleString()}
+              </span>
+            )}
+            {empty && <span className="visually-hidden">코인이 모였어요</span>}
           </p>
           <button
             ref={claimRef}
@@ -131,8 +144,35 @@ export function ShopPage() {
               ? '가게가 가득 찼어요. 받으면 다시 쌓여요'
               : claimed !== null && reading.coins < 1
                 ? `${claimed.toLocaleString()}코인을 받았어요`
-                : `시간당 ${perHour}코인, ${rates.capHours}시간이면 가득 차요`}
+                : untilFull !== null
+                  ? `${formatDuration(untilFull)} 뒤에 가득 차요`
+                  : ''}
         </p>
+        <dl className="shop-stats">
+          <div>
+            <dt>시간당</dt>
+            <dd>
+              <CoinIcon size={16} />
+              {perHour.toLocaleString()}
+            </dd>
+          </div>
+          <div>
+            <dt>일하는 말랑이</dt>
+            <dd>
+              {front.length}/{slots}칸
+            </dd>
+          </div>
+          <div>
+            <dt>가득 참</dt>
+            <dd>{rates.capHours}시간</dd>
+          </div>
+        </dl>
+        {moreForSlot !== null && (
+          <p className="shop__next">
+            <LockIcon size={18} />
+            말랑이 {moreForSlot}마리 더 모으면 한 칸 더 열려요
+          </p>
+        )}
         {rates.sets.length > 0 && (
           <p className="shop__sets">
             {rates.sets.map((s) => (

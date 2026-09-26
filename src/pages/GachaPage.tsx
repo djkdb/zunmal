@@ -9,9 +9,11 @@ import { RateTable } from '../components/RateTable';
 import { topRarity } from '../components/pullReveal';
 import { GACHA_RULES, RARITY_META, rarityRank } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
+import { coinsNeededForPull } from '../economy/economy';
 import type { ResolvedPull } from '../gacha/engine';
+import { haptic } from '../lib/haptics';
 import { useGameStore, type PullKind } from '../store/useGameStore';
-import { CoinIcon } from '../components/icons';
+import { CapsuleIcon, CapsuleStackIcon, CoinIcon } from '../components/icons';
 import { Malang } from '../components/Malang';
 import { getCharacter } from '../data/characters';
 import './GachaPage.css';
@@ -53,6 +55,7 @@ function RecentMalang() {
 }
 
 interface PendingResult {
+  kind: PullKind;
   items: ResolvedPull[];
   totalRefund: number;
 }
@@ -61,6 +64,7 @@ export function GachaPage() {
   const coins = useGameStore((s) => s.coins);
   const pityCount = useGameStore((s) => s.pityCount);
   const pull = useGameStore((s) => s.pull);
+  const ownedCount = useGameStore((s) => Object.keys(s.ownedMalangs).length);
 
   const [run, setRun] = useState<MachineRun | null>(null);
   const [pending, setPending] = useState<PendingResult | null>(null);
@@ -80,6 +84,8 @@ export function GachaPage() {
   // 같은 프레임 안에서 버튼이 여러 번 눌려도(연타) 뽑기가 한 번만 일어나도록 즉시 잠근다.
   // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다. 결과 창을 닫을 때만 풀린다.
   const lockRef = useRef(false);
+  // 결과 창의 "다시 뽑기"도 ref로 한 번만: 같은 프레임에 두 번 눌러도 reset → start 가 두 번 돌지 않게
+  const againRef = useRef(false);
   // 결과는 뽑는 순간 저장되지만, 천장 카운터나 코인(환급)이 연출 도중 바뀌면 결과를 미리 알려 버린다.
   // 결과 창의 캡슐을 다 열 때까지는 뽑기 전 천장 값을 보이고, 환급 코인은 미뤄 뒀다가(deferCoins) 그때 날린다.
   const pityBefore = useRef(pityCount);
@@ -90,7 +96,8 @@ export function GachaPage() {
   const threshold = GACHA_RULES.pityThreshold;
   const untilPity = threshold - shownPity;
   const pityLabel = RARITY_META[GACHA_RULES.pityMinRarity].label;
-  const discount = Math.round((1 - PULL_PRICE.multi / (PULL_PRICE.single * PULL_COUNT.multi)) * 100);
+  const guaranteeLabel = RARITY_META[GACHA_RULES.multiGuaranteeMinRarity].label;
+  const needSingle = coinsNeededForPull(coins, 'single');
 
   const start = (kind: PullKind) => {
     if (lockRef.current) return;
@@ -106,12 +113,14 @@ export function GachaPage() {
       return;
     }
     setMessage('');
+    haptic('tap');
     deferCoins(result.totalRefund);
     const best = topRarity(result.items.map((it) => it.rarity));
     // 신화 이상이면 머신이 흔들리는 동안 3D 연출 모듈을 받아 둔다 (평소에는 받지 않음)
     if (isEpicRarity(best)) void preloadScene3d();
-    setPending({ items: result.items, totalRefund: result.totalRefund });
+    setPending({ kind, items: result.items, totalRefund: result.totalRefund });
     setRun({ id: Date.now(), rarity: best, shiny: result.items.some((it) => it.shiny) });
+    againRef.current = true;
     // 확률 안내 쪽으로 스크롤해 있었더라도 머신 연출이 보이도록 맨 위로.
     // (부드러운 스크롤은 연출 시작과 겹치면 브라우저가 중간에 취소하는 경우가 있어 즉시 이동)
     window.scrollTo({ top: 0 });
@@ -124,6 +133,7 @@ export function GachaPage() {
     setShowEpic(false);
     setPending(null);
     setRun(null);
+    againRef.current = false;
     lockRef.current = false;
   };
 
@@ -134,6 +144,8 @@ export function GachaPage() {
 
   // 결과 창에서 바로 다시 뽑기: 창을 닫고(잠금 해제) 같은 이벤트 안에서 새로 뽑는다
   const pullAgain = (kind: PullKind) => {
+    if (!againRef.current) return;
+    againRef.current = false;
     reset();
     start(kind);
   };
@@ -172,24 +184,30 @@ export function GachaPage() {
           {(['single', 'multi'] as const).map((kind) => {
             const price = PULL_PRICE[kind];
             const enough = coins >= price;
+            const multi = kind === 'multi';
             return (
               <button
                 key={kind}
                 type="button"
-                className={`btn ${kind === 'multi' ? 'btn--secondary' : 'btn--primary'}`}
+                className={`btn gacha-pull gacha-pull--${kind} ${multi ? 'btn--secondary' : 'btn--primary'}`}
                 disabled={busy || !enough}
                 onClick={() => {
                   sfx.button();
                   start(kind);
                 }}
-                aria-label={`${kind === 'multi' ? `${PULL_COUNT.multi}연` : '1회'} 뽑기, ${price.toLocaleString()}코인${enough ? '' : ' (코인 부족)'}`}
+                aria-label={`${multi ? `${PULL_COUNT.multi}연` : '1회'} 뽑기, ${price.toLocaleString()}코인${multi ? `, ${guaranteeLabel} 이상 1개 보장` : ''}${enough ? '' : ' (코인 부족)'}`}
               >
-                {kind === 'multi' && discount > 0 && (
-                  <span className="gacha-page__sale" aria-hidden="true">
-                    {discount}% 할인
+                {multi && (
+                  <span className="gacha-pull__promise" aria-hidden="true">
+                    {guaranteeLabel} 이상 1개 보장
                   </span>
                 )}
-                {kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기'}
+                <span className="gacha-pull__name" aria-hidden="true">
+                  <span className="gacha-pull__icon">
+                    {multi ? <CapsuleStackIcon size={26} /> : <CapsuleIcon size={24} />}
+                  </span>
+                  {multi ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기'}
+                </span>
                 <span className="gacha-page__cost" aria-hidden="true">
                   <CoinIcon size={14} />
                   {price.toLocaleString()}
@@ -198,15 +216,24 @@ export function GachaPage() {
             );
           })}
         </div>
-        <p className="gacha-page__message small" role="status" aria-live="polite">
-          {message}
-          {message && (
-            <>
-              {' '}
-              <Link to="/play">미니게임에서 모아 오세요.</Link>
-            </>
-          )}
-        </p>
+        {!busy && needSingle > 0 ? (
+          <p className="gacha-page__short">
+            <span>1회 뽑기까지 {needSingle.toLocaleString()}코인 더 필요해요</span>
+            <Link to="/play" className="gacha-page__earn" onClick={() => sfx.button()}>
+              미니게임에서 코인 모으기
+            </Link>
+          </p>
+        ) : (
+          <p className="gacha-page__message small" role="status" aria-live="polite">
+            {message}
+            {message && (
+              <>
+                {' '}
+                <Link to="/play">미니게임에서 코인 모으기</Link>
+              </>
+            )}
+          </p>
+        )}
       </div>
 
       {!busy && <RecentMalang />}
@@ -227,7 +254,10 @@ export function GachaPage() {
           items={pending.items}
           totalRefund={pending.totalRefund}
           seenIndex={epicItem ? pending.items.indexOf(epicItem) : undefined}
+          kind={pending.kind}
           coins={coins}
+          ownedCount={ownedCount}
+          pityLeft={threshold - pityCount}
           onPullAgain={pullAgain}
           onRevealed={() => setRevealed(true)}
           onClose={close}

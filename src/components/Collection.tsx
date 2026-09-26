@@ -5,8 +5,11 @@ import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characte
 import { COLLECTIONS, collectionProgress, type Collection as CollectionSet } from '../data/collections';
 import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL } from '../data/rarity';
 import { PARTNER_RARITY_BONUS, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
+import { levelOf } from '../data/affection';
+import { malangShareContent } from '../lib/share';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
+import { ShareButton } from './ShareButton';
 import { Modal } from './Modal';
 import { RarityBadge } from './RarityBadge';
 import { CapsuleIcon, CoinIcon, JoystickIcon } from './icons';
@@ -335,6 +338,21 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
           <Link to={`/touch/${id}`} className="btn btn--primary" onClick={() => sfx.button()}>
             만지기
           </Link>
+          <ShareButton
+            className="btn"
+            align="start"
+            content={() =>
+              malangShareContent({
+                name: detail.name,
+                rarityLabel: detail.rarity === 'common' ? undefined : RARITY_META[detail.rarity].label,
+                shiny: showShiny,
+                level: levelOf(affection),
+                partner: isPartner,
+                owned: Object.keys(useGameStore.getState().ownedMalangs).length,
+                total: CHARACTERS.length,
+              })
+            }
+          />
           <button type="button" className="btn" onClick={onClose}>
             닫기
           </button>

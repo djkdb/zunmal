@@ -9,7 +9,7 @@ import {
   PULL_PRICE,
 } from './config';
 import { seoulDateKey, isValidDateKey } from './daily';
-import { applyDailyReset, computeReward, getGameMultiplier, normalizeScore, payForPull } from './economy';
+import { applyDailyReset, coinsNeededForPull, computeReward, getGameMultiplier, normalizeScore, payForPull } from './economy';
 
 describe('config', () => {
   it('뽑기 가격: 1회 100, 10연 1000 (할인 없음)', () => {
@@ -112,5 +112,20 @@ describe('서울 날짜 / 일일 초기화', () => {
     expect(same).toBe(state);
     const next = applyDailyReset(state, new Date('2026-03-01T15:00:00Z'));
     expect(next).toEqual({ dailyEarnedCoins: 0, lastDailyResetDate: '2026-03-02', coins: 10 });
+  });
+});
+
+describe('coinsNeededForPull', () => {
+  it('모자란 만큼, 충분하면 0', () => {
+    expect(coinsNeededForPull(40, 'single')).toBe(PULL_PRICE.single - 40);
+    expect(coinsNeededForPull(PULL_PRICE.single, 'single')).toBe(0);
+    expect(coinsNeededForPull(5000, 'multi')).toBe(0);
+    expect(coinsNeededForPull(600, 'multi')).toBe(PULL_PRICE.multi - 600);
+  });
+
+  it('이상한 값은 0코인으로 본다', () => {
+    expect(coinsNeededForPull(Number.NaN, 'single')).toBe(PULL_PRICE.single);
+    expect(coinsNeededForPull(-50, 'single')).toBe(PULL_PRICE.single);
+    expect(coinsNeededForPull(99.9, 'single')).toBe(1);
   });
 });

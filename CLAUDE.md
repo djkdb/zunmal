@@ -24,13 +24,14 @@ npm run preview    # 빌드 결과 미리보기
 src/
   app/            App(라우터), AppShell(레이아웃)
   styles/         global.css — 디자인 토큰, 공용 클래스
-  lib/            rng.ts (주입형/시드 RNG)
+  lib/            rng.ts (주입형/시드 RNG), share.ts (자랑하기 글·보내기 순서), josa.ts, couponLink.ts …
   hooks/          useReducedMotion 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
                   materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
-                  playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입), gift.ts (하루 한 번 말랑 선물)
+                  playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입),
+                  shopPreview.ts (직원 바꾸기 미리 보기, 가게 청크 전용), gift.ts (하루 한 번 말랑 선물)
   audio/          sfx.ts (합성 효과음 + 믹서), music.ts (절차적 배경음악), tuning.ts (음높이·음량 헬퍼) — 파일 없음
   store/          useGameStore.ts (Zustand+persist), persistence.ts (sanitize/migrate)
   components/     Malang, TopBar, GachaMachine(+ machine3d/ 3D 머신), PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult,
@@ -141,6 +142,14 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **결과 창**(`PullResult`): 10연 캡슐은 열기 전에도 등급이 보인다(사용자 요청). 반짝 결과에는 등급과 따로 "반짝!" 딱지(최고 카드는 "최고 반짝!"),
   "최고" 리본은 카드 위 왼쪽(환급 딱지는 안쪽 위 오른쪽). 새 말랑이가 있으면 "새 말랑이는 놀이방에서 캡슐째 기다려요" +
   "지금 만지러 가기"(가장 좋은 새 말랑이 `summarizePulls().bestNewIndex` → `/touch/:id`, 놀이방이 그 캡슐을 매트에 떨어뜨린다).
+  - 딱지는 어디서나 같은 모양: NEW(처음 만남 + 첫 반짝) · 중복 [코인]+N(좁은 10연 카드만 "중복" 글자 생략) · 반짝!. 설명 띠에도 같은 딱지.
+  - 다 열면 요약 줄(`dl`, 칸으로 나눔): 새 말랑이 N(= NEW 딱지 수) · 반짝 N · 환급 +N · 도감 N/32(도감 링크) · 전설 이상까지 N회(뽑은 뒤 천장).
+    1회는 도감과 천장만. 아래 버튼 줄은 **다시 뽑기**(방금과 같은 방식, `againRef`로 한 번만) + 자랑하기(있을 때) + 닫기.
+    코인이 모자라면 다시 뽑기는 비활성(`aria-describedby`로 이유) + "N코인 더 모으면 다시 뽑을 수 있어요" + "미니게임에서 코인 모으기"(`/play`,
+    `economy.coinsNeededForPull`).
+- **뽑기 버튼**: 1회 = 캡슐 하나 아이콘(딸기우유 주인공), 10연 = 캡슐 더미 아이콘(`CapsuleStackIcon`) + 위 모서리 레몬 딱지 "레어 이상 1개 보장"
+  (`GACHA_RULES.multiGuaranteeMinRarity`). 누르면 버튼 눌림 + 아이콘이 톡 튀고(움직임 줄이기면 없음) `haptic('tap')`.
+  1회도 못 뽑으면 버튼 아래 "1회 뽑기까지 N코인 더 필요해요" + "미니게임에서 코인 모으기".
 - **결과를 미리 알리지 않기**: 중복 환급은 뽑는 순간 저장되지만 코인 알약에는 미뤄 두고(`coinFx.deferCoins`), 캡슐을 모두 열면
   요약 줄에서 코인이 날아간다(`releaseDeferredCoins`). 천장 카운터도 같은 순간(`onRevealed`)에 바뀐다. 창을 닫거나 화면을 떠나면 바로 풀린다.
 - **등급 차별화**: 등급마다 캡슐 색, 머신 흔들림, 결과음(`playRarityFanfare`), 결과 모달 테두리가 다르다.
@@ -197,6 +206,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   라우터보다 먼저) `app/couponLink.ts`가 순수 모듈 `lib/couponLink.ts`(`parseCouponLink`, 테스트)로 코드를 꺼내고 주소에서 `c`를 지운다.
   코드는 저장이 아니라 이번 실행 동안만 들고 있고, 홈 파트너 말풍선 자리에 "선물 쿠폰이 도착했어요 + 받기"(받을 수 있을 때만, 이미 받았으면 버림),
   쿠폰 칸은 미리 채워진다. 받기는 쿠폰 칸과 같은 `redeemCoupon` — 저장당 한 번.
+- **자랑하기**(`lib/share.ts` 순수·테스트 + `components/ShareButton.tsx`): 뽑기 결과에 에픽 이상·반짝·새 말랑이가 있으면
+  (`pullReveal.shareHighlightIndex`) 결과 창에, 도감 상세에는 항상. 글 = 한 줄(“방금 신화 말랑이 은하 말랑을 뽑았어요!” / “내 파트너 말랑이를
+  소개해요!” + 이름·친밀도 Lv) + "내 말랑 도감 N/32" + "나도 말랑이 뽑기", 주소는 `SHARE_URL`(`https://zunmal.pages.dev/`, 쿠폰·추적 값 없음).
+  이모지는 공유 글에만(반짝일 때 하나) — 화면에는 없다. 보내기: Web Share(글 + 주소) → 클립보드("링크를 복사했어요" 말풍선) → 직접 복사
+  (`.selectable` 글 상자). 공유 창을 닫으면(AbortError) 조용히. 말풍선은 버튼 위(모달 안에서도 보이게 같은 층).
 - 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성 — 스카이 소다:
   하늘 바탕·머리글·제목 글꼴 Jua(`@fontsource/jua`, 본문은 `src/assets/fonts`의 NanumSquareRound가 있으면)·흰 칩·도트 매트 위 말랑이). 배포 주소 `https://zunmal.pages.dev`.
 
@@ -228,7 +242,13 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 홈: 오늘의 미션 카드 아래 `ShopCard` — CSS 차양 + 창 속 직원 얼굴, 4초마다 오르는 코인, 가득 참 막대, 받기. 카드 = `/shop` 링크.
 - `/shop`(지연 청크, 음악은 collection 곡): 제목이 곧 간판인 코드 그림 가게(`ShopFront`: 줄무늬 차양, 선반, 직원이 카운터 뒤에서 행주질·쟁반·폴짝,
   유리 진열장 디저트 — 움직임 줄이기면 정지), 계산대(모인 코인·막대·받기·세트 칩), 직원 칸(시간당·보너스 칩·특기, 빈 자리, 잠긴 칸 "말랑이 N마리 모으면 열려요"),
-  고르기 창 `StaffPicker`(이 자리에 두면 시간당 많은 순, 가게 전체 시간당 + "N시간이면 가득 차요").
+  고르기 창 `StaffPicker`.
+  - 계산대 요약: 모인 코인 "152 / 500"(가득 찬 양) + 막대 + "6시간 58분 뒤에 가득 차요"(`msUntilFull`, `formatDuration`), 세 칸(시간당 · 일하는 말랑이
+    N/M칸 · 가득 참 N시간), "말랑이 N마리 더 모으면 한 칸 더 열려요"(`malangsUntilNextSlot`). 직원 칸 칩 맨 앞은 "기본 N"(희귀도 기본값).
+  - 고르기 창: 위에 "지금 이 자리: 이름 시간당 N코인", 말랑이마다 "지금 50 [화살표] 54코인/시간"(가게 **전체**) + 변화 딱지(오름 민트·위 화살표·"+8%",
+    내림 빨강·아래 화살표, 그대로 회색 두 줄, 지금 일하는 말랑이는 "일하는 중") + 세트가 생기거나 깨지는 한 줄. 가게 전체가 가장 많이 오르는 순.
+    숫자는 `economy/shopPreview.ts`의 `previewStaffChange`(assignStaff → computeShopRates → `shownPerHour`) — 화면 합계와 같은 함수라 고른 뒤 값이 똑같다.
+    화살표는 글자(→) 대신 SVG(`ToIcon`, `TrendIcon`).
   가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)·창(`SheetDialog`, Modal 사본)은 가게 청크에만 둔다 —
   지연 청크가 `components/Modal`을 가져오면 번들러가 첫 화면 공용 모듈을 여러 조각으로 쪼개 첫 화면이 무거워진다.
 - **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 30 + 애정 단계 × 10, 최대 120(`GIFT_COINS`).
@@ -445,7 +465,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - `npm test` — Vitest, node 환경, `src/**/*.test.ts`.
 - 가챠: 10만 회 확률 검증을 서로 다른 시드 여러 개로 수행(±5σ 허용), 천장/비율/10연 보장/환급.
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계. 디저트 가게(칸·보너스·세트·특기, 쌓이기·가득 참·시계 되감기·자투리, 대표 직원 구성별 하루 수입 범위),
-  말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`).
+  말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`: 칩·남은 시간·변화 딱지·세트 한 줄),
+  가게 요약(`msUntilFull`·다음 칸)·직원 바꾸기 미리 보기(`shopPreview.test.ts`: 화면과 같은 계산, 세트 짝을 빼거나 들이면 다른 직원도 바뀜, 쭉쭉 도움, 자리 바꾸기 = 그대로),
+  다시 뽑기 모자란 코인(`coinsNeededForPull`).
+- 자랑하기: 글(조사·또·반짝 이모지 ≤2·도감 숫자 자르기), 보내기 순서(Web Share → AbortError 조용히 → 클립보드 → 직접), 공유 주소는 쿠폰 링크가 아님(`lib/share.test.ts`),
+  자랑할 결과 고르기(`pullReveal.shareHighlightIndex`).
 - 저장: 손상/구버전 데이터 migrate.
 - 홈 허브: 도감 요약·가장 가까운 세트(`data/collectionProgress.test.ts`), 첫걸음 단계 계산(`goals/firstRun.test.ts`), 목표 우선순위·문턱값·문구
   (`goals/nextGoal.test.ts`), 오늘 줄·탭 알림(`goals/today.test.ts`). 테스트 저장은 `goals/testSave.ts`(시작 말랑이를 고른 직후).
