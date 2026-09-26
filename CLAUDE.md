@@ -95,6 +95,9 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   칩은 흰 알약(`.chip`) 또는 레몬(`.chip--lemon`). 하단 탭은 흰 바(위 모서리 22) + 선택 탭 딸기우유 칸. 코인은 반투명 흰 알약.
 - **아이콘**(`components/icons.tsx`): 둥근 선 + 파스텔 채움, 선 색은 `currentColor`(코인만 금빛).
 - **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 주아 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
+- **홈 파트너**: 누르면 놀이방(`/touch`) — 링크 이름 "말랑이 만지러 가기". 아직 아무도 쓰다듬지 않았으면(`affection`이 모두 0, 저장 구조 변경 없음)
+  "꾹 눌러 봐요" 말풍선 + 톡 누르는 손가락(`TapIcon`)이 붙는다(절대 위치 — 360×640 첫 화면 규칙 유지, 움직임 줄이기면 정지).
+  코인이 `PULL_PRICE.single`보다 적으면 주인공(딸기우유) 버튼이 "미니게임으로 코인 벌기"(`/play`)가 되고 캡슐 뽑기는 보조 버튼.
 - **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
   등급이 높을수록 연출(빛·흔들림·신화 이상 전체 화면)이 화려해지는 건 그대로다.
 - **금지**: 굵은 잉크 UI 테두리·잉크색 아랫단 그림자, 흰 글자 + 잉크 외곽선(`-webkit-text-stroke`) 제목, 크림 바탕, 스프링클 무늬,
@@ -127,7 +130,12 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   (희귀도, 캐릭터, 반짝) — 테스트에서 RNG 수열을 짤 때 주의.
 - **중복**: 이미 보유(같은 10연 내 앞선 결과 포함)한 캐릭터는 희귀도별 환급 코인을 지급.
   단, 반짝 버전을 처음 얻은 경우는 새 수집으로 보고 환급하지 않는다.
-- 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다.
+- 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다. 확률 입구는 뽑기 화면 아래 "확률 안내 보기" 하나.
+- **결과 창**(`PullResult`): 10연 캡슐은 열기 전에도 등급이 보인다(사용자 요청). 반짝 결과에는 등급과 따로 "반짝!" 딱지(최고 카드는 "최고 반짝!"),
+  "최고" 리본은 카드 위 왼쪽(환급 딱지는 안쪽 위 오른쪽). 새 말랑이가 있으면 "새 말랑이는 놀이방에서 캡슐째 기다려요" +
+  "지금 만지러 가기"(가장 좋은 새 말랑이 `summarizePulls().bestNewIndex` → `/touch/:id`, 놀이방이 그 캡슐을 매트에 떨어뜨린다).
+- **결과를 미리 알리지 않기**: 중복 환급은 뽑는 순간 저장되지만 코인 알약에는 미뤄 두고(`coinFx.deferCoins`), 캡슐을 모두 열면
+  요약 줄에서 코인이 날아간다(`releaseDeferredCoins`). 천장 카운터도 같은 순간(`onRevealed`)에 바뀐다. 창을 닫거나 화면을 떠나면 바로 풀린다.
 - **등급 차별화**: 등급마다 캡슐 색, 머신 흔들림, 결과음(`playRarityFanfare`), 결과 모달 테두리가 다르다.
   시크릿은 화면이 어두워지는 예고 단계(`tease`)와 밤하늘 테마 결과 모달이 따로 있다.
 - **신화 이상 전체 화면 연출** (`components/epic/`):
@@ -152,7 +160,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 서비스 워커: 페이지는 네트워크 우선, 해시 이름 빌드 파일과 글꼴은 캐시 우선. 캐시 구조를 바꾸면 `VERSION`을 올린다.
 - 설치 안내는 `components/InstallCard.tsx`, 환경 판별은 순수 모듈 `lib/installEnv.ts`(UA 테스트 있음).
   - **인스타그램·카카오톡 등 앱 안 브라우저**(주요 유입 경로: 인스타 DM 링크)는 홈 화면 추가가 안 되고 저장 공간도 따로다.
-    → 주요 버튼 바로 아래에 "브라우저로 열기"(안드로이드 Chrome intent, iOS 17+ `x-safari-https`) + 링크 복사 + 메뉴 위치 안내.
+    → 주요 버튼 바로 아래에 두 줄 요약 + "브라우저로 열기"(안드로이드 Chrome intent, iOS 17+ `x-safari-https`, https에서만) + 링크 복사.
+    메뉴 위치 안내와 기록 코드 복사는 "자세히"에 접어 둔다(바로 여는 주소가 없으면 처음부터 펼침).
   - 안드로이드 Chrome은 `beforeinstallprompt`를 앱 시작 시(`app/installPrompt.ts`) 붙잡아 설치 창을 띄우고, iOS는 공유 → 홈 화면에 추가 순서를 보여 준다.
   - 이미 앱으로 열었으면(standalone) 안내하지 않는다. 설치 카드는 닫으면 7일간 숨긴다.
 
@@ -160,7 +169,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 
 - 쿠폰: 목록은 `economy/config.ts`의 `COUPONS`(id·코드·코인·이름·기간), 확인은 순수 모듈 `economy/coupons.ts`(대소문자·공백 무시, 저장당 1회).
   받은 쿠폰 id는 저장 v6 `redeemedCoupons`. 입력 칸은 홈 아래 `components/CouponBox.tsx`. 서버가 없어 코드는 앱 안에 있다(선물용, 보안 수단 아님).
-  현재: `zun` = 오픈 기념 1000코인.
+  현재: `zun` = 오픈 기념 1000코인. 쿠폰 칸 아래 "인스타 공지·DM에서 받은 코드를 넣어요".
+- **선물 링크**: 인스타 DM·공지에는 `https://zunmal.pages.dev/?c=zun`(HashRouter라 `#/?c=zun`도 됨)을 보낸다. 앱 시작 때(`main.tsx`,
+  라우터보다 먼저) `app/couponLink.ts`가 순수 모듈 `lib/couponLink.ts`(`parseCouponLink`, 테스트)로 코드를 꺼내고 주소에서 `c`를 지운다.
+  코드는 저장이 아니라 이번 실행 동안만 들고 있고, 홈 파트너 말풍선 자리에 "선물 쿠폰이 도착했어요 + 받기"(받을 수 있을 때만, 이미 받았으면 버림),
+  쿠폰 칸은 미리 채워진다. 받기는 쿠폰 칸과 같은 `redeemCoupon` — 저장당 한 번.
 - 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성 — 스카이 소다:
   하늘 바탕·머리글·제목 글꼴 Jua(`@fontsource/jua`, 본문은 `src/assets/fonts`의 NanumSquareRound가 있으면)·흰 칩·도트 매트 위 말랑이). 배포 주소 `https://zunmal.pages.dev`.
 
@@ -168,6 +181,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.
 - 세트를 완성하면 한 번 코인 보상(`SET_REWARD_COINS`, 등급 small~ultimate). 일일 상한과 무관.
+- 도감 상세는 반짝을 가졌으면 반짝 모습부터 연다(파트너로 원래 모습을 고른 경우만 원래 모습).
+- 첫 말랑이 고르기 화면은 도감 설명 대신 `STARTER_BLURBS`(`data/characters.ts`, 등급 이야기 없는 따뜻한 존댓말 한 줄)를 보여 준다.
 
 ## 일일 미션 (`missions/missions.ts`, `components/DailyMissions.tsx`)
 
@@ -206,8 +221,14 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   화살표만 = 그쪽으로 톡 밀기.
 - **선반**(`components/playroom/Shelf.tsx`, 순서는 `touch/shelf.ts`): 아래 흰 손잡이를 올리면 하얀 아크릴 선반(칸마다 투명 받침).
   등급 높은 순 → 최근 얻은 순. 나와 있는 칸은 빈 받침, 누르면 넣기. 매트가 꽉 차면 알림. 선반이 열려 있어도 매트 배치는 닫힌 손잡이 기준.
+  닫기는 손잡이("선반 닫기") 하나(× 없음). 봉인된 캡슐 칸 아래에는 이름 대신 등급 배지(색 + 모양 + 글자).
+  **모두 열기**: 선반의 봉인 캡슐을 선반 순서대로 0.42초마다 하나씩 연다(딸깍 + 뽁, 등급 진동, 칸이 폴짝 — 움직임 줄이기면 한꺼번에·소리 한 번),
+  각각 `unboxMalang`, 끝나면 선반을 닫고 한 줄 요약("캡슐 N개를 모두 열었어요." + 반짝이나 에픽 이상 한마디).
 - **캡슐 열기** (`touch/capsule.ts`, 순수·테스트): v7부터 새로 얻은 말랑이는 선반에 봉인된 캡슐(등급 색 + NEW 딱지).
   꺼내면 매트에 캡슐이 떨어지고 두 손가락 비틀기(70°) · 두 손가락으로 벌리기 · 톡 세 번 · 꾹 0.9초 중 아무거나로 연다.
+  톡은 금 간 단계로 쌓인다 — 앞 톡에서 2.2초(`tapWindowMs`) 안이면 이어서 센다(천천히 눌러도 열림). 첫 캡슐 머리 위에 여는 방법 딱지
+  (`CAPSULE_HINT` "톡톡톡 세 번 두드리거나 꾹 눌러요"), 캡슐을 한 번 열어 볼 때까지는 손가락 시범(`CAPSULE_DEMO`, 톡톡)이 두드려 보인다.
+  반짝이면 알림이 "반짝 ___이/가 나왔어요!".
   비틀 때 톱니 딱(`squish.capsuleTick`) → 딸깍(`capsuleClick`) + 뽁(`popOut`) → 뚜껑이 날아가고 말랑이가 폴짝 튀어나와 철퍽 착지,
   반짝이는 `TOUCH_FX.milestone`(등급별) + 등급 진동. 연 순간 `unboxMalang`으로 저장. 캡슐은 DOM(SVG)으로 3D 캔버스 위에 그린다.
   캡슐 그림(`CapsuleArt`)은 캡슐 머신과 같은 파스텔 캡슐 + 흰 이음새 + 부드러운 그림자(잉크 외곽선 없음).
@@ -352,7 +373,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 1. `src/minigames/<game-id>/logic.ts` — 순수 로직 (+ `logic.test.ts`).
 2. `src/minigames/<game-id>/index.tsx` — `MiniGame` 객체를 default export:
    ```ts
-   const game: MiniGame = { id, name, description, icon, Component };
+   const game: MiniGame = { id, name, description, icon, Component, durationMs: CONFIG.durationMs, blurb: '톡톡 누르기' };
    export default game;
    ```
    `Component` 는 `MiniGameProps`(`partner`, `partnerShiny?`, `onFinish({score, stats})`, `onExit`, `sfx`)를 받는다.
@@ -361,6 +382,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
    (`<Malang>` 하나 + 표정 반응 `react('happy'|'wow'|'oops'|'sad')`/`setBase`, 전설 이상은 오라). 캔버스 게임은
    DOM 스프라이트를 월드 좌표로 옮긴다(`capsule-catch`, `malang-jump`, `stack` 참고). 궤적 색은 `partnerTrailColor`.
    CSS 클래스 접두사는 게임마다 달라야 한다(모든 게임 CSS가 함께 로드된다).
+   로비 카드 한 줄은 `formatPlayLength(durationMs)` + `blurb`("20초 톡톡 누르기", 합쳐 11자 이내 — 테스트). 한 판도 안 한 플레이어에게는
+   `RECOMMENDED_GAME_ID`(말랑 합치기) 하나만 "처음이면 이거!"로 강조, 해 본 게임은 최고 기록 칩. 결과 통계 이름은 띄어 쓴다(`'최대 콤보'`).
 3. `src/minigames/registry.ts` 의 `MINI_GAMES` 배열에 한 줄 추가.
 4. (선택) `economy/config.ts` 의 `GAME_MULTIPLIERS` 에 배율 추가 — 없으면 기본 배율 사용.
 
