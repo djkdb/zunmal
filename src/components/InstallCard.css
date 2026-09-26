@@ -99,3 +99,27 @@
 .install__save .install__text {
   margin-top: 0;
 }
+
+/* "자세히": 글자 버튼 (눌리는 넓이는 44px) */
+.install__more {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-s);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.install__details {
+  margin-top: 10px;
+}
+
+.install__details > .install__text:first-child {
+  margin-top: 0;
+  margin-bottom: 0;
+}

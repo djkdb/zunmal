@@ -63,15 +63,15 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
         setShowSteps(true);
       }
     };
+    // 버튼으로 바로 못 여는 곳(iOS 16 이하 등은 버튼이 있어도 안 열릴 수 있다)을 위해 메뉴 순서는 "자세히"에 접어 둔다.
+    // 바로 여는 주소가 없으면 처음부터 펼친다.
+    const detailsOpen = showSteps || !openUrl;
     return (
       <aside className="install install--inapp" aria-labelledby="install-inapp-title">
         <p id="install-inapp-title" className="install__title">
           {appName} 안에서 열렸어요
         </p>
-        <p className="install__text">
-          브라우저로 열면 홈 화면에 추가해서 앱처럼 쓸 수 있어요. 여기서 모은 기록은 {appName} 안에만 남고, 지워질
-          수도 있어요.
-        </p>
+        <p className="install__text">브라우저로 열어야 기록이 안전하고 홈 화면에 추가할 수 있어요.</p>
         <div className="install__actions">
           {openUrl && (
             <a className="btn btn--primary btn--small" href={openUrl} onClick={() => sfx.button()}>
@@ -81,23 +81,44 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
           <button type="button" className="btn btn--secondary btn--small" onClick={() => void copy()}>
             {copied ? '복사했어요' : '링크 복사'}
           </button>
+          {openUrl && (
+            <button
+              type="button"
+              className="install__more"
+              aria-expanded={detailsOpen}
+              aria-controls="install-inapp-details"
+              onClick={() => {
+                sfx.button();
+                setShowSteps((v) => !v);
+              }}
+            >
+              {detailsOpen ? '접기' : '자세히'}
+            </button>
+          )}
         </div>
-        <ol className="install__steps">
-          {openInBrowserSteps(env.app, env.os).map((step, i) => (
-            <li key={step}>
-              {i === 0 && <MoreIcon size={20} />}
-              {step}
-            </li>
-          ))}
-        </ol>
-        {hasProgress && (
-          <div className="install__save">
+        {detailsOpen && (
+          <div id="install-inapp-details" className="install__details">
             <p className="install__text">
-              브라우저로 옮길 때 기록 코드를 복사해 가세요. 새 브라우저의 도감 맨 아래 '기록 옮기기'에서 불러오면 이어서 할 수 있어요.
+              버튼이 안 되면 {appName} 메뉴에서 열어요. 여기서 모은 기록은 {appName} 안에만 남고 지워질 수도 있어요.
             </p>
-            <div className="install__actions">
-              <SaveCopyButton className="btn btn--small" />
-            </div>
+            <ol className="install__steps">
+              {openInBrowserSteps(env.app, env.os).map((step, i) => (
+                <li key={step}>
+                  {i === 0 && <MoreIcon size={20} />}
+                  {step}
+                </li>
+              ))}
+            </ol>
+            {hasProgress && (
+              <div className="install__save">
+                <p className="install__text">
+                  브라우저로 옮길 때 기록 코드를 복사해 가세요. 새 브라우저의 도감 맨 아래 '기록 옮기기'에서 불러오면 이어서 할 수 있어요.
+                </p>
+                <div className="install__actions">
+                  <SaveCopyButton className="btn btn--small" />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </aside>
