@@ -246,6 +246,39 @@
   height: 100%;
 }
 
+/* 입자 캔버스: 3D 캔버스와 같은 상자, 그 위에. 2D 대체 모드에서도 같은 자리 */
+.touch-fx {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: calc(var(--jelly) * -0.55);
+  width: 100%;
+  height: calc(100% + var(--jelly) * 0.55);
+  pointer-events: none;
+}
+
+/* 애정 단계 축하: 등급이 높을수록 크고 화려한 딱지 */
+.touch__celebrate[data-rarity='legendary'] {
+  background: linear-gradient(180deg, #fff1a8, var(--rarity-legendary));
+  font-size: 1.08em;
+  padding: 6px 18px;
+}
+
+.touch__celebrate[data-rarity='mythic'] {
+  background: linear-gradient(100deg, #ffd6e6, var(--rarity-mythic), #ffd23f);
+  font-size: 1.12em;
+  padding: 6px 20px;
+}
+
+.touch__celebrate[data-rarity='secret'] {
+  background: linear-gradient(100deg, #2d1b5e, #5a3fa8, #2d1b5e);
+  color: #fff6c9;
+  font-size: 1.12em;
+  padding: 6px 20px;
+  box-shadow: 0 0 0 3px #fff6c9 inset;
+}
+
 /* 텍스처로 구울 원본 그림: 화면 밖, 애니메이션 없이 멈춘 모습 */
 .touch3d-src {
   position: fixed;

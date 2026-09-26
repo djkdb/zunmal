@@ -61,6 +61,10 @@ export interface JellyViewOptions {
   face: JellyFace;
   /** WebGL 컨텍스트를 잃었을 때 (2D 로 돌아간다) */
   onLost: () => void;
+  /** 몸 뒤 빛 (전설 이상·반짝). strength 0 이면 없음 */
+  glow?: { color: string; strength: number };
+  /** 반짝 말랑이 무지갯빛 (0~1) */
+  iridescence?: number;
 }
 
 export interface JellyView {
@@ -75,6 +79,10 @@ export interface JellyView {
   /** 변형해서 그린다 */
   draw(pose: Pose, soft: SoftState): void;
   setFace(face: JellyFace): void;
+  /** 만질 때 몸 뒤 빛과 가장자리 빛이 잠깐 부푼다 (0~1) */
+  pulse(amount: number): void;
+  /** 빛이 아직 부풀어 있다 → 페이지가 그리기를 계속해야 한다 */
+  busy(): boolean;
   dispose(): void;
 }
 
@@ -163,6 +171,26 @@ function toTexture(canvas: HTMLCanvasElement, renderer: WebGLRenderer): CanvasTe
   return tex;
 }
 
+/** 몸 뒤 빛: 가운데가 밝은 둥근 번짐 (한 번 그려 두고 색·세기는 재질로) */
+function glowTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0.14)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+  }
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+
 function shadowTexture(): CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 128;
@@ -184,7 +212,14 @@ function shadowTexture(): CanvasTexture {
 
 // ── 재질 ─────────────────────────────────────────────────
 
-function jellyMaterial(map: Texture): MeshPhysicalMaterial {
+interface JellyUniforms {
+  uRimBoost: { value: number };
+  uRimColor: { value: Color };
+  uShiny: { value: number };
+  uTime: { value: number };
+}
+
+function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): MeshPhysicalMaterial {
   const mat = new MeshPhysicalMaterial({
     map,
     roughness: 0.38,
@@ -195,21 +230,40 @@ function jellyMaterial(map: Texture): MeshPhysicalMaterial {
     sheenRoughness: 0.35,
     sheenColor: new Color('#fff4f8'),
     specularIntensity: 0.6,
+    // 반짝: 비눗방울 같은 박막 간섭 무지갯빛
+    iridescence,
+    iridescenceIOR: 1.35,
+    iridescenceThicknessRange: [180, 520],
   });
   mat.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      /* glsl */ `
+    Object.assign(shader.uniforms, u);
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'void main() {',
+        /* glsl */ `uniform float uRimBoost;
+      uniform vec3 uRimColor;
+      uniform float uShiny;
+      uniform float uTime;
+      vec3 jellyHue(float h) {
+        return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      }
+      void main() {`,
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        /* glsl */ `
       {
         float nv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
-        // 가장자리 빛: 젤리 표면을 스치는 빛
+        // 가장자리 빛: 젤리 표면을 스치는 빛 (전설 이상은 등급 색으로 더 밝게, 만지면 부푼다)
         float rim = pow(1.0 - nv, 2.4);
-        outgoingLight += vec3(1.0, 0.96, 0.98) * rim * 0.32;
+        outgoingLight += mix(vec3(1.0, 0.96, 0.98), uRimColor, min(1.0, uRimBoost * 1.5)) * rim * (0.32 + uRimBoost);
+        // 반짝: 보는 각도와 시간에 따라 도는 무지개 가장자리
+        outgoingLight += jellyHue(fract(nv * 1.3 + vViewPosition.y * 0.004 + uTime * 0.12)) * pow(1.0 - nv, 1.6) * 0.3 * uShiny;
         // 가짜 속빛: 정면일수록 본래 색이 안에서 비치듯 밝게 (그림 색을 지킨다)
         outgoingLight = mix(outgoingLight, diffuseColor.rgb * 1.04 + 0.02, 0.42 * nv * nv);
       }
       #include <opaque_fragment>`,
-    );
+      );
   };
   return mat;
 }
@@ -278,8 +332,18 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
   geo.boundingSphere = new Sphere(new Vector3(0, mesh.height / 2, 0), 400);
   geo.boundingBox = new Box3(new Vector3(-400, -400, -400), new Vector3(400, 400, 400));
 
+  const glowOpt = opts.glow && opts.glow.strength > 0 ? opts.glow : null;
+  const glowColor = new Color(glowOpt?.color ?? '#ffffff');
+  const uniforms: JellyUniforms = {
+    uRimBoost: { value: 0 },
+    uRimColor: { value: glowColor },
+    uShiny: { value: Math.max(0, Math.min(1, opts.iridescence ?? 0)) },
+    uTime: { value: 0 },
+  };
+  const baseRim = glowOpt ? glowOpt.strength * 0.3 : 0;
+  uniforms.uRimBoost.value = baseRim;
   const placeholder = new CanvasTexture(document.createElement('canvas'));
-  const bodyMat = jellyMaterial(placeholder);
+  const bodyMat = jellyMaterial(placeholder, uniforms, uniforms.uShiny.value);
   const body = new Mesh(geo, bodyMat);
   body.frustumCulled = false;
   root.add(body);
@@ -329,6 +393,36 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
   const shadowZ = -mesh.depth * 0.6 - 3;
   shadow.position.set(0, 0, shadowZ);
   root.add(shadow);
+
+  // 몸 뒤 빛 (전설 이상·반짝): 텍스처 한 장 + 보통 섞기 — 새 렌더 타깃·후처리 없음
+  let glowTex: CanvasTexture | null = null;
+  let glowMat: MeshBasicMaterial | null = null;
+  let glow: Mesh | null = null;
+  if (glowOpt) {
+    glowTex = glowTexture();
+    glowMat = new MeshBasicMaterial({
+      map: glowTex,
+      color: glowColor,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      opacity: 0,
+    });
+    glow = new Mesh(new PlaneGeometry(1, 1), glowMat);
+    glow.renderOrder = 0;
+    glow.frustumCulled = false;
+    glow.position.set(0, mesh.height * 0.5, shadowZ - 4);
+    root.add(glow);
+  }
+  // 만질 때 부푸는 양: 시각(ms) 기준으로 스스로 줄어든다
+  let pulseAmt = 0;
+  let pulseAt = 0;
+  const PULSE_MS = 650;
+  const pulseNow = (now: number) => {
+    if (pulseAmt <= 0) return 0;
+    const k = 1 - (now - pulseAt) / PULSE_MS;
+    return k > 0 ? pulseAmt * k * k : 0;
+  };
 
   // ── 텍스처 ──
   const faceTex = new Map<JellyFace, CanvasTexture>();
@@ -423,6 +517,19 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
     shadow.scale.set(w, 20 * Math.max(0.6, pose.scaleX), 1);
     shadow.position.x = pose.offsetX;
     shadowMat.opacity = 0.9 * Math.max(0.3, 1 - Math.max(0, pose.offsetY) / 20);
+    const now = performance.now();
+    const p = pulseNow(now);
+    uniforms.uRimBoost.value = baseRim + p * 0.35;
+    uniforms.uTime.value = now / 1000;
+    if (glow && glowMat && glowOpt) {
+      // 몸을 따라 움직이고 숨쉬듯 아주 조금 커졌다 작아진다
+      const breathe = 1 + 0.03 * Math.sin(now / 900);
+      const size = mesh.halfWidth * 3.3 * (breathe + p * 0.35);
+      glow.scale.set(size * pose.scaleX, size * pose.scaleY, 1);
+      glow.position.x = pose.offsetX;
+      glow.position.y = mesh.height * 0.5 * pose.scaleY + pose.offsetY;
+      glowMat.opacity = Math.min(1, glowOpt.strength * 0.75 + p * 0.5);
+    }
     renderer.render(scene, camera);
   };
 
@@ -507,6 +614,15 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
       adaptQuality();
       drawNow(pose, soft);
     },
+    pulse(amount) {
+      if (!(amount > 0)) return;
+      const now = performance.now();
+      pulseAmt = Math.min(1, pulseNow(now) + amount);
+      pulseAt = now;
+    },
+    busy() {
+      return pulseNow(performance.now()) > 0.005;
+    },
     setFace(face) {
       wantFace = face;
       void bake(face).then((t) => {
@@ -531,6 +647,8 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
       }
       shadowMat.dispose();
       shadowTex.dispose();
+      glowMat?.dispose();
+      glowTex?.dispose();
       placeholder.dispose();
       faceTex.forEach((t) => t.dispose());
       faceTex.clear();

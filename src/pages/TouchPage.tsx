@@ -21,7 +21,11 @@ import {
   markJelly3dUnsupported,
   preloadJelly3d,
 } from '../components/touch3d/loadJelly3d';
+import { createFxLayer, type FxLayer } from '../components/touch3d/fxLayer';
 import { getCharacter, type Character, type MalangEyes } from '../data/characters';
+import { SHINY_TOUCH_FX, TOUCH_FX } from '../data/rarity';
+import { haptic } from '../lib/haptics';
+import { fxStylesFor } from '../touch/touchFx';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useGameStore } from '../store/useGameStore';
 import {
@@ -223,6 +227,16 @@ function TouchPlay({ character }: { character: Character }) {
   const viewRef = useRef<JellyView | null>(null);
   const glRef = useRef<HTMLSpanElement>(null);
   const srcRef = useRef<HTMLDivElement>(null);
+  // 등급별 손맛: 입자·빛·방울 소리·진동 (data/rarity.ts 의 TOUCH_FX)
+  const fxSpec = TOUCH_FX[character.rarity];
+  const fxStyles = useMemo(() => fxStylesFor(character, fxSpec), [character, fxSpec]);
+  const fxCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fxRef = useRef<FxLayer | null>(null);
+  const shinyRef = useRef(shiny);
+  shinyRef.current = shiny;
+  const glowStrength = fxSpec.aura > 0 ? fxSpec.aura : shiny ? SHINY_TOUCH_FX.aura : 0;
+  const glowColor = fxSpec.aura > 0 ? fxStyles.auraColor : '#bff3ff';
+  const iridescence = shiny ? SHINY_TOUCH_FX.iridescence : 0;
 
   const [face, setFace] = useState<Face>('default');
   const [blink, setBlink] = useState(false);
@@ -308,13 +322,19 @@ function TouchPlay({ character }: { character: Character }) {
         const pressure = Math.min(1, held / 900);
         physRef.current = press(physRef.current, g.point, pressure);
         softRef.current = softPress(softRef.current, pressure);
+        const px = g.source === 'pointer' ? g.startX : undefined;
+        const py = g.source === 'pointer' ? g.startY : undefined;
         if (g.squishCount === 0 && held > TAP_MS) {
           g.squishCount = 1;
           squish.squishPress(0.45);
+          fxRef.current?.emit('press', px, py, 0.45);
         } else if (g.squishCount === 1 && held > 900) {
           g.squishCount = 2;
           squish.squishPress(1);
-          vibrate(10, reducedRef.current);
+          fxRef.current?.emit('press', px, py, 1);
+          squish.chime(fxSpec.chime, 1, { shiny: shinyRef.current });
+          viewRef.current?.pulse(fxSpec.auraPulse);
+          if (!reducedRef.current) haptic(fxSpec.pokeHaptic);
         }
         if (held > SLEEPY_MS) setFace((f) => (f === 'sleepy' ? f : 'sleepy'));
       }
@@ -324,7 +344,8 @@ function TouchPlay({ character }: { character: Character }) {
       const view = modeRef.current === '3d' ? viewRef.current : null;
       if (view) softRef.current = stepSoft(softRef.current, ts - last);
       // 3D 는 숨쉬기·출렁임까지 멈춰야 쉰다 → 멈추면 그리기도 멈춘다 (배터리)
-      const resting = !g && isAtRest(physRef.current) && (!view || isSoftAtRest(softRef.current));
+      const resting =
+        !g && isAtRest(physRef.current) && (!view || (isSoftAtRest(softRef.current) && !view.busy()));
       if (resting) {
         physRef.current = snapToTargets(physRef.current);
         softRef.current = snapSoft(softRef.current);
@@ -339,7 +360,7 @@ function TouchPlay({ character }: { character: Character }) {
         lastTsRef.current = null;
       }
     },
-    [applyTransform, pet],
+    [applyTransform, pet, fxSpec],
   );
 
   const ensureLoop = useCallback(() => {
@@ -392,6 +413,8 @@ function TouchPlay({ character }: { character: Character }) {
           face: 'default',
           getSource: (f) => srcRef.current?.querySelector<SVGSVGElement>(`[data-face="${f}"] svg`) ?? null,
           onLost: fallback,
+          glow: glowStrength > 0 ? { color: glowColor, strength: glowStrength } : undefined,
+          iridescence,
         });
       } catch {
         // WebGL 을 만들 수 없는 기기 → 이번 방문 동안 2D
@@ -428,7 +451,38 @@ function TouchPlay({ character }: { character: Character }) {
       if (viewRef.current === view) viewRef.current = null;
       view?.dispose();
     };
-  }, [reduced, shapeKey]);
+  }, [reduced, shapeKey, glowColor, glowStrength, iridescence]);
+
+  // 입자 캔버스 (움직임 줄이기면 없음). 3D·2D 어느 쪽이든 같은 자리에 얹는다
+  useEffect(() => {
+    const canvas = fxCanvasRef.current;
+    if (reduced || !canvas) return undefined;
+    const layer = createFxLayer({
+      canvas,
+      styles: fxStyles,
+      spec: fxSpec,
+      shiny,
+      getBody: () => {
+        const el = jellyRef.current;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        // 몸은 상자 아래쪽 60% 쯤에 앉아 있다
+        return { x: r.left + r.width / 2, y: r.top + r.height * 0.6, r: r.width * 0.36 };
+      },
+    });
+    fxRef.current = layer;
+    const onVisible = () => layer.setAmbient(!document.hidden);
+    onVisible();
+    document.addEventListener('visibilitychange', onVisible);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => layer.resize()) : null;
+    ro?.observe(canvas);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      ro?.disconnect();
+      layer.dispose();
+      if (fxRef.current === layer) fxRef.current = null;
+    };
+  }, [reduced, fxStyles, fxSpec, shiny]);
 
   // 3D 로 바뀌면 2D 변형을 지우고 첫 장면부터 숨쉬기 시작
   useEffect(() => {
@@ -479,8 +533,13 @@ function TouchPlay({ character }: { character: Character }) {
   useEffect(() => {
     if (level > prevLevelRef.current) {
       squish.happy();
+      squish.chime(fxSpec.chime, 0, { fanfare: true, shiny: shinyRef.current });
       setCelebrate(level);
-      spawnHeart(5);
+      spawnHeart(fxSpec.milestoneHearts);
+      fxRef.current?.emit('milestone');
+      viewRef.current?.pulse(1);
+      if (!reducedRef.current) haptic(fxSpec.milestoneHaptic);
+      ensureLoop();
       showFace('happy', 1400);
       const t = window.setTimeout(() => setCelebrate(null), 2200);
       prevLevelRef.current = level;
@@ -488,7 +547,7 @@ function TouchPlay({ character }: { character: Character }) {
     }
     prevLevelRef.current = level;
     return undefined;
-  }, [level, spawnHeart, showFace]);
+  }, [level, spawnHeart, showFace, fxSpec, ensureLoop]);
 
   // ── 제스처 ─────────────────────────────────────────────
 
@@ -565,7 +624,10 @@ function TouchPlay({ character }: { character: Character }) {
         physRef.current = poke(release(physRef.current), g.point, strength);
         softRef.current = softPoke(softRelease(softRef.current), g.hit, strength);
         squish.poke(strength);
-        vibrate(12, reducedRef.current);
+        squish.chime(fxSpec.chime, recent.length - 1, { shiny: shinyRef.current });
+        fxRef.current?.emit('poke', g.lastX, g.lastY, strength);
+        viewRef.current?.pulse(fxSpec.auraPulse * strength);
+        if (!reducedRef.current) haptic(fxSpec.pokeHaptic);
         showFace(recent.length >= 3 ? 'wide' : 'happy', 700);
       } else {
         const intensity = Math.max(
@@ -581,12 +643,22 @@ function TouchPlay({ character }: { character: Character }) {
           softRef.current,
           flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined,
         );
-        if (!silent) squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz() * 2);
+        fxRef.current?.endTrail();
+        if (!silent) {
+          squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz() * 2);
+          const px = g.source === 'pointer' ? g.startX : undefined;
+          const py = g.source === 'pointer' ? g.startY : undefined;
+          fxRef.current?.emit('release', px, py, intensity);
+          if (intensity > 0.5) {
+            squish.chime(fxSpec.chime, 2, { shiny: shinyRef.current });
+            viewRef.current?.pulse(fxSpec.auraPulse * intensity);
+          }
+        }
         showFace('happy', 900);
       }
       ensureLoop();
     },
-    [ensureLoop, showFace],
+    [ensureLoop, showFace, fxSpec],
   );
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
@@ -628,6 +700,7 @@ function TouchPlay({ character }: { character: Character }) {
       });
     }
     g.stretch?.update(stretchAmount(physRef.current), speed);
+    fxRef.current?.trail(e.clientX, e.clientY);
 
     // 간질이기: 빠르게 좌우로 문지르면 방향이 자주 바뀐다
     if (Math.abs(vx) > 0.35) {
@@ -641,6 +714,7 @@ function TouchPlay({ character }: { character: Character }) {
         physRef.current = tickle(physRef.current, dir);
         softRef.current = softTickle(softRef.current, dir);
         squish.giggle();
+        fxRef.current?.emit('tickle', e.clientX, e.clientY);
         showFace('happy', 900);
         spawnHeart();
         vibrate(8, reducedRef.current);
@@ -759,6 +833,7 @@ function TouchPlay({ character }: { character: Character }) {
           </span>
           {/* 3D 젤리 캔버스 (준비되면 2D 말랑이 대신 보인다). 늘어날 자리를 위해 무대 위로 넉넉하게 */}
           {mode !== '2d' && <span ref={glRef} className="touch3d" aria-hidden="true" />}
+          {!reduced && <canvas ref={fxCanvasRef} className="touch-fx" aria-hidden="true" />}
           <span className="touch__hearts" aria-hidden="true">
             {hearts.map((h) => (
               <HeartShape
@@ -771,7 +846,7 @@ function TouchPlay({ character }: { character: Character }) {
           </span>
         </button>
         {celebrate !== null && (
-          <p className="touch__celebrate" role="status">
+          <p className="touch__celebrate" data-rarity={character.rarity} role="status">
             애정이 한 단계 올랐어요. Lv.{celebrate}
           </p>
         )}
