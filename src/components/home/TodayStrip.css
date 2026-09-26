@@ -1,0 +1,144 @@
+/* ── 홈 "오늘" 줄: 하루 흐름 다섯 칸을 가는 선으로 잇는다 ─────────
+ * 한 칸 = 민트 + 체크, 지금 할 수 있는 칸 = 레몬 고리, 내일 칸 = 옅게. */
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 10px 8px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.today__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+
+.today__title {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+}
+
+.today__count {
+  padding: 1px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--sub);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.today__list {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 칸을 잇는 선 (첫 칸 가운데 ~ 마지막 칸 가운데) */
+.today__list::before {
+  content: '';
+  position: absolute;
+  top: 24px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--border);
+}
+
+.today__hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 66px;
+  padding: 4px 0 2px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+span.today__hit {
+  cursor: default;
+}
+
+a.today__hit:active,
+button.today__hit:active {
+  transform: scale(0.92);
+  transition-duration: var(--press-in);
+}
+
+.today__dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  /* 선이 동그라미에 닿지 않게 흰 틈 */
+  box-shadow: 0 0 0 3px var(--surface);
+  color: var(--sub);
+}
+
+.today__label {
+  color: var(--sub);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.today__item.is-ready .today__dot {
+  background: var(--lemon-tint);
+  box-shadow:
+    0 0 0 2px var(--lemon),
+    0 0 0 5px var(--surface);
+  color: var(--ink);
+}
+
+.today__item.is-ready .today__label {
+  color: var(--ink);
+}
+
+.today__item.is-done .today__dot {
+  background: color-mix(in srgb, var(--mint) 35%, #fff);
+  color: var(--ink);
+}
+
+.today__check {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mint-deep);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: #fff;
+}
+
+.today__item.is-later .today__dot {
+  opacity: 0.5;
+}

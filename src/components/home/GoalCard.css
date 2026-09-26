@@ -1,0 +1,215 @@
+/* ── 홈 "다음 목표" 카드 ─────────────────────────────────────
+ * 캡슐 한 알 모양: 왼쪽은 목표 종류 색의 반쪽(아이콘), 오른쪽은 흰 몸 + 딸기우유 행동 알약.
+ * 카드 전체가 누르는 곳 하나라 버튼 그림자(--shadow-btn)를 쓰고, 누르면 .btn 처럼 내려앉는다. */
+.goal-card {
+  --goal-tint: var(--sky-tint);
+  --goal-fill: var(--primary-deep);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 12px 10px 10px;
+  border: 0;
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow-btn);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform var(--press-out) var(--ease-jelly),
+    box-shadow 0.16s var(--ease-press);
+}
+
+.goal-card:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: var(--shadow-btn-press);
+  transition-duration: var(--press-in);
+  transition-timing-function: var(--ease-press);
+}
+
+.goal-card:focus-visible {
+  outline-offset: 3px;
+}
+
+.goal-card--gift,
+.goal-card--shop,
+.goal-card--pet {
+  --goal-tint: var(--primary-tint);
+}
+
+.goal-card--mission,
+.goal-card--star {
+  --goal-tint: var(--lemon-tint);
+}
+
+.goal-card--star {
+  --goal-fill: var(--gold);
+}
+
+.goal-card--book {
+  --goal-tint: var(--rarity-epic-tint);
+}
+
+.goal-card--game {
+  --goal-tint: color-mix(in srgb, var(--mint) 32%, #fff);
+}
+
+/* 캡슐의 색 반쪽: 카드 높이만큼 둥근 칸 + 흰 이음새 */
+.goal-card__icon {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  min-height: 52px;
+  border-radius: 20px 10px 10px 20px;
+  background: var(--goal-tint);
+  box-shadow: 2px 0 0 #fff;
+  color: var(--ink);
+}
+
+.goal-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.goal-card__title {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.25;
+  letter-spacing: var(--tracking-title);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.goal-card__detail {
+  color: var(--sub);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.goal-card__meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.goal-card__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.goal-card__fill {
+  display: block;
+  height: 100%;
+  min-width: 6px;
+  border-radius: inherit;
+  background: var(--goal-fill);
+}
+
+/* 첫걸음: 여섯 칸 */
+.goal-card__steps {
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+}
+
+.goal-card__step {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.goal-card__step.is-done {
+  background: var(--sky);
+  box-shadow: none;
+}
+
+.goal-card__step.is-now {
+  background: var(--primary);
+  box-shadow: none;
+}
+
+.goal-card__count {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 행동 이름 알약 (카드가 버튼이라 여기는 그림) */
+.goal-card__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background-color: var(--primary);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%);
+  box-shadow: 0 4px 10px rgba(242, 122, 154, 0.3);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+/* 목표가 바뀌면 새 캡슐이 톡 떨어지듯 */
+.goal-card.is-new {
+  animation: goal-pop 0.42s var(--ease-jelly);
+}
+
+@keyframes goal-pop {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.4;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-card.is-new {
+    animation: none;
+  }
+}
+
+/* 좁은 폰: 아이콘 칸을 줄여 제목 자리를 넓힌다 */
+@media (max-width: 340px) {
+  .goal-card {
+    gap: 10px;
+    padding-right: 10px;
+  }
+
+  .goal-card__icon {
+    width: 44px;
+  }
+
+  .goal-card__cta {
+    min-width: 48px;
+    padding: 0 12px;
+  }
+}

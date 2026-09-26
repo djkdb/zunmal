@@ -202,3 +202,36 @@ export function GiftIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** 오늘의 미션: 체크가 있는 메모지 */
+export function MissionIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="6.5" y="5.5" width="19" height="22" rx="4" fill="#fff" />
+      <path d="M12 4 h8 v4 h-8 Z" fill="#ffd66b" />
+      <path d="M11 15.5 l2.6 2.6 l5 -5.2" stroke="#4fb57d" strokeWidth={2.6} />
+      <path d="M11 22.5 h10" />
+    </Svg>
+  );
+}
+
+/** 천장: 반짝이는 별 */
+export function StarIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M16 4.5 l3.3 6.9 l7.4 1 l-5.4 5.2 l1.3 7.4 l-6.6 -3.6 l-6.6 3.6 l1.3 -7.4 l-5.4 -5.2 l7.4 -1 Z"
+        fill="#ffd66b"
+      />
+    </Svg>
+  );
+}
+
+/** 다 했어요: 동그라미 속 체크 */
+export function CheckIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 16.5 l5 5 l10 -10.5" strokeWidth={3.4} />
+    </Svg>
+  );
+}
