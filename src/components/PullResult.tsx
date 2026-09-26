@@ -128,8 +128,8 @@ function PullCard({
   const label = face
     ? describe(item)
     : phase === 'back'
-      ? `캡슐 ${index + 1} 열기`
-      : `캡슐 ${index + 1} 여는 중`;
+      ? `${RARITY_META[item.rarity].label} 캡슐 ${index + 1} 열기`
+      : `${RARITY_META[item.rarity].label} 캡슐 ${index + 1} 여는 중`;
   return (
     <li className={cls} style={{ '--pop': pop } as CSSProperties}>
       <button
@@ -142,6 +142,7 @@ function PullCard({
         <span className="pull-card__flip">
           <span className="pull-card__back">
             <CapsuleBack />
+            <RarityBadge rarity={item.rarity} compact />
           </span>
           <span className="pull-card__face" aria-hidden="true">
             <span className="pull-card__art">

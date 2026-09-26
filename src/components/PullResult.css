@@ -49,6 +49,8 @@
  */
 .modal.pull-modal--multi {
   --card-h: clamp(100px, calc((100vh - 190px) / 3), 176px);
+  /* 5칸 너비(창 너비 - 여백 40px)/5 × 1.75, 2줄이 화면 높이를 넘지 않게 */
+  --card-h-ten: clamp(104px, min(calc((min(460px, 100vw - 12px) - 40px) * 0.35), calc((100vh - 200px) / 2)), 200px);
   width: min(460px, calc(100vw - 12px));
   max-width: none; /* 브라우저 기본 dialog 최대 너비(100% - 2em)를 풀어 화면을 거의 다 쓴다 */
   max-height: calc(100vh - 16px);
@@ -57,6 +59,7 @@
 @supports (height: 100dvh) {
   .modal.pull-modal--multi {
     --card-h: clamp(100px, calc((100dvh - 190px) / 3), 176px);
+    --card-h-ten: clamp(104px, min(calc((min(460px, 100vw - 12px) - 40px) * 0.35), calc((100dvh - 200px) / 2)), 200px);
     max-height: calc(100dvh - 16px);
   }
 }
@@ -219,7 +222,7 @@
   }
 }
 
-/* ── 10연: 캡슐 카드 3-4-3 ────────────────────────────────── */
+/* ── 10연: 캡슐 카드 5-5 (열기 전에도 등급 색·딱지가 보인다) ────────────────────────────────── */
 .pull-stage {
   position: relative;
 }
@@ -234,17 +237,10 @@
   gap: 6px;
 }
 
-/* 10개는 3-4-3: 12칸 격자에서 윗줄·아랫줄은 4칸씩(넓게), 가운데 줄은 3칸씩 */
+/* 10개는 5-5: 두 줄. 카드 높이는 너비의 약 1.75배, 화면 높이를 넘지 않게 */
 .pull-grid--ten {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-}
-
-.pull-grid--ten > .pull-card {
-  grid-column: span 4;
-}
-
-.pull-grid--ten > .pull-card:nth-child(n + 4):nth-child(-n + 7) {
-  grid-column: span 3;
+  grid-auto-rows: var(--card-h-ten, 120px);
+  gap: 5px;
 }
 
 .pull-card {
@@ -337,6 +333,68 @@
     0 4px 10px rgba(26, 64, 128, 0.12);
 }
 
+/* 열기 전에도 등급은 보인다: 캡슐 윗뚜껑이 등급 색, 바탕이 등급 빛, 아래에 등급 딱지 */
+.pull-card__back {
+  gap: 6px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--r) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, #f5f9ff, var(--sky-tint));
+}
+
+.pull-card .pull-card__back .pull-capsule__top {
+  fill: var(--r);
+}
+
+.pull-card--rare .pull-card__back,
+.pull-card--epic .pull-card__back {
+  box-shadow:
+    inset 0 0 0 2.5px var(--r),
+    0 4px 10px rgba(26, 64, 128, 0.12);
+}
+
+.pull-card--legendary .pull-card__back,
+.pull-card--mythic .pull-card__back {
+  box-shadow:
+    inset 0 0 0 3px var(--r),
+    0 0 14px color-mix(in srgb, var(--r) 70%, transparent);
+}
+
+.pull-card--mythic .pull-card__back {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.9), transparent 55%),
+    linear-gradient(160deg, #ffd3e2, #fff0b3, #c9f7e6, #cfe6ff, #e6d9ff);
+}
+
+.pull-card--secret .pull-card__back {
+  background:
+    radial-gradient(circle at 20% 20%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 30%, #ffe07a 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 30% 76%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(ellipse at 50% 40%, #5a3bb0, #1b1040);
+  box-shadow:
+    inset 0 0 0 3px #b89cff,
+    0 0 16px rgba(143, 107, 255, 0.75);
+}
+
+/* 전설 이상은 닫힌 채로도 은은하게 숨 쉬는 빛 */
+.pull-card--legendary.is-back::before,
+.pull-card--mythic.is-back::before,
+.pull-card--secret.is-back::before {
+  opacity: 0.55;
+  transform: scale(0.95);
+  animation: glow-pulse 1.6s ease-in-out infinite alternate;
+}
+
+.pull-card__back .rarity-badge {
+  box-shadow: 0 1px 3px rgba(26, 64, 128, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pull-card.is-back::before {
+    animation: none;
+  }
+}
+
 .pull-capsule {
   width: min(84%, 110px);
   height: auto;
@@ -418,9 +476,12 @@
   font-family: var(--font-display);
   font-size: clamp(0.6875rem, 12.5cqi, 0.9375rem);
   letter-spacing: -0.03em;
-  line-height: 1.2;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.15;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .pull-card .rarity-badge--compact {
