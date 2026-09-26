@@ -1,0 +1,197 @@
+/* ── 도감 요약: 흰 카드 = 고리 + 큰 수 / 등급 줄 두 칸 ───────────────────── */
+.dex-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.dex-summary__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 2px;
+}
+
+.dex-summary__ring {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.dex-summary__ring-track {
+  fill: none;
+  stroke: var(--sky-tint);
+  stroke-width: 9;
+}
+
+.dex-summary__ring-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s var(--ease-enter);
+}
+
+.dex-summary__ring-text {
+  font-family: var(--font-display);
+  font-size: 17px;
+  fill: var(--ink);
+}
+
+.dex-summary__count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dex-summary__big {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-xxl);
+  line-height: 1;
+  letter-spacing: var(--tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-summary__slash {
+  font-size: var(--fs-l);
+  color: var(--sub);
+}
+
+.dex-summary__line {
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  word-break: keep-all;
+}
+
+/* 반짝 종류 수: 없으면 조용한 칸, 있으면 호일 알약 */
+.dex-summary__shiny {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 1px 10px 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--sub);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
+.dex-summary__shiny.has-shiny {
+  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffc8e6 60%, #c6ecff);
+  color: var(--ink);
+}
+
+.dex-summary__shiny.has-shiny svg {
+  color: #d99a1e;
+}
+
+/* 등급 줄: 두 칸 × 세 줄. 칸 하나 = 누르면 그 진열장으로 가는 버튼 */
+.dex-summary__rarities {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dex-rarity {
+  --dr-fill: var(--rarity-common);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 10px 8px 8px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+.dex-rarity:active {
+  transform: scale(0.96);
+  transition-duration: var(--press-in);
+}
+
+.dex-rarity__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.dex-rarity__num {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-rarity__num svg {
+  color: #3f9e6a;
+}
+
+.dex-rarity__bar {
+  position: relative;
+  display: block;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.dex-rarity__bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--dr-fill);
+}
+
+.dex-rarity--rare {
+  --dr-fill: var(--rarity-rare);
+}
+
+.dex-rarity--epic {
+  --dr-fill: var(--rarity-epic);
+}
+
+.dex-rarity--legendary {
+  --dr-fill: var(--rarity-legendary);
+}
+
+.dex-rarity--mythic {
+  --dr-fill: linear-gradient(90deg, #ff8fb5, #ffd66b, #9fe0b8, #8fc3ff, #c9b6ff);
+}
+
+.dex-rarity--secret {
+  --dr-fill: linear-gradient(90deg, #2d1b5e, #6b4bd0);
+}
+
+.dex-rarity.is-done {
+  background: color-mix(in srgb, var(--mint) 22%, #fff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dex-summary__ring-fill,
+  .dex-rarity {
+    transition: none;
+  }
+}

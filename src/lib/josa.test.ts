@@ -23,6 +23,20 @@ describe('josa', () => {
     expect(hasFinalConsonant('ABC')).toBe(false);
   });
 
+  it('숫자로 끝나면 읽는 소리로 고른다', () => {
+    expect(josa('Lv.5', '이/가')).toBe('Lv.5가');
+    expect(josa('Lv.3', '이/가')).toBe('Lv.3이');
+    expect(josa('Lv.7', '이/가')).toBe('Lv.7이');
+    expect(josa('Lv.9', '이/가')).toBe('Lv.9가');
+    expect(josa('Lv.10', '이/가')).toBe('Lv.10이');
+    expect(josa('Lv.2', '으로/로')).toBe('Lv.2로');
+    expect(josa('Lv.8', '으로/로')).toBe('Lv.8로');
+    expect(josa('1,000', '을/를')).toBe('1,000을');
+    expect(josa('300', '과/와')).toBe('300과');
+    expect(josa('0', '이/가')).toBe('0이');
+    expect(josa('24', '은/는')).toBe('24는');
+  });
+
   it('모든 말랑이 이름에 대해 동작한다', () => {
     for (const c of CHARACTERS) expect(josa(c.name, '과/와').length).toBe(c.name.length + 1);
   });

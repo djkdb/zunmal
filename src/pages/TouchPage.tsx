@@ -24,6 +24,7 @@ import {
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import * as squish from '../audio/squish';
 import { sfx } from '../audio/sfx';
+import { HeartRow, PerkChips, affectionOf } from '../components/AffectionMeter';
 import { CloseIcon, ShareIcon } from '../components/icons';
 import { VIEWBOX } from '../components/malang/helpers';
 import { SHAPES } from '../components/malang/shapes';
@@ -69,6 +70,8 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { haptic } from '../lib/haptics';
 import { josa } from '../lib/josa';
 import { useGameStore } from '../store/useGameStore';
+import { materialIdFor } from '../data/materialIds';
+import { levelUpPerks, perkLines, type PerkLine } from '../economy/affection';
 import {
   CAPSULE_HINT,
   holdProgress,
@@ -106,13 +109,7 @@ import {
   photoFileName,
 } from '../touch/photoCard';
 import { fxStylesFor } from '../touch/touchFx';
-import {
-  AFFECTION_PER_LEVEL,
-  levelOf,
-  nextUnlock,
-  unlocksAt,
-  type ReactionUnlock,
-} from '../touch/reactions';
+import { levelOf, unlocksAt, type ReactionUnlock } from '../touch/reactions';
 import { buildShelf, shelfAction, type ShelfEntry } from '../touch/shelf';
 import { REST_POSE } from '../touch/softbody';
 import {
@@ -197,6 +194,8 @@ interface Toast {
   level: number;
   rarity: Character['rarity'];
   unlocked: ReactionUnlock | null;
+  /** 이 단계에서 함께 오른 가게 보너스·선물 (반응은 unlocked) */
+  perks: PerkLine[];
 }
 
 interface Photo {
@@ -1222,8 +1221,9 @@ function Playroom() {
       if (!rec || !c) continue;
       rec.actor?.celebrate(TOUCH_FX[c.rarity].milestoneHearts);
       const opened = unlocksAt(lv)[0] ?? null;
-      setToast({ name: c.name, level: lv, rarity: c.rarity, unlocked: opened });
-      later(() => setToast(null), opened ? 5200 : 2600);
+      const perks = perkLines(levelUpPerks(lv, materialIdFor(id))).filter((l) => l.kind !== 'reaction');
+      setToast({ name: c.name, level: lv, rarity: c.rarity, unlocked: opened, perks });
+      later(() => setToast(null), opened ? 5200 : perks.length > 0 ? 3800 : 2600);
       if (opened) {
         const spec = demoFor(opened.id);
         if (spec) later(() => showDemo(spec, id), 700);
@@ -1891,9 +1891,11 @@ function Playroom() {
 
   // ── 화면 ────────────────────────────────────────────────
 
-  const level = levelOf(focusId ? (affection[focusId] ?? 0) : 0);
-  const progress = (focusId ? (affection[focusId] ?? 0) : 0) % AFFECTION_PER_LEVEL;
-  const upcoming = nextUnlock(level);
+  // 친밀도: 단계·하트·다음 단계에 받는 것 (도감 상세와 같은 값)
+  const love = affectionOf(focusId ?? '', focusId ? (affection[focusId] ?? 0) : 0);
+  const level = love.level;
+  const upcoming = love.nextReaction;
+  const nextPerks = love.next ? perkLines(love.next).filter((l) => l.kind !== 'reaction') : [];
   const closeGuide = useCallback(() => setGuideOpen(false), []);
   const endDemo = useCallback(() => setDemo(null), []);
 
@@ -1995,14 +1997,16 @@ function Playroom() {
               </p>
             )}
             <span
-              className="pr-info__bar"
+              className="pr-info__love"
               role="progressbar"
-              aria-label="다음 단계까지"
+              aria-label={`Lv.${level + 1}까지`}
               aria-valuemin={0}
-              aria-valuemax={AFFECTION_PER_LEVEL}
-              aria-valuenow={progress}
+              aria-valuemax={love.needed}
+              aria-valuenow={love.xp}
+              aria-valuetext={`${love.needed} 중 ${love.xp}`}
             >
-              <span style={{ width: `${(progress / AFFECTION_PER_LEVEL) * 100}%` }} />
+              <HeartRow fills={love.hearts} size={14} className="pr-info__hearts" />
+              <span className="pr-info__left">{love.maxed ? '가장 친한 사이' : `다음 레벨까지 ${love.toNext}`}</span>
             </span>
             <p className="pr-info__next">
               {upcoming ? (
@@ -2012,8 +2016,15 @@ function Playroom() {
                     Lv.{upcoming.level} {upcoming.label}: {upcoming.howTo}
                   </span>
                 </>
+              ) : love.next && nextPerks.length > 0 ? (
+                <>
+                  <LockShape />
+                  <span>
+                    {josa(`Lv.${love.next.level}`, '이/가')} 되면 {nextPerks.map((l) => l.text).join(', ')}
+                  </span>
+                </>
               ) : (
-                '모든 반응을 열었어요'
+                '모든 반응과 선물을 열었어요'
               )}
             </p>
           </div>
@@ -2132,9 +2143,14 @@ function Playroom() {
       )}
 
       {toast && (
-        <p className="pr-toast" data-rarity={toast.rarity} role="status">
+        <div className="pr-toast" data-rarity={toast.rarity} role="status">
+          <span className="pr-toast__burst" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <HeartShape key={i} />
+            ))}
+          </span>
           <span className="pr-toast__main">
-            {josa(toast.name, '과/와')} 애정이 올랐어요. Lv.{toast.level}
+            {josa(toast.name, '과/와')} 조금 더 친해졌어요! <b className="pr-toast__level">Lv.{toast.level}</b>
           </span>
           {toast.unlocked && (
             <span className="pr-toast__new">
@@ -2142,7 +2158,8 @@ function Playroom() {
               {toast.unlocked.howTo}
             </span>
           )}
-        </p>
+          {toast.perks.length > 0 && <PerkChips lines={toast.perks} className="pr-toast__perks" />}
+        </div>
       )}
       {notice && (
         <p className="pr-notice" role="status">

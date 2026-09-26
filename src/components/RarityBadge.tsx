@@ -30,6 +30,15 @@ function RarityShape({ rarity }: { rarity: Rarity }) {
   }
 }
 
+/** 등급 모양만 (글자는 쓰는 곳이 따로 준다 — 캡슐 구석 표시 등) */
+export function RarityMark({ rarity, size = 12 }: { rarity: Rarity; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+      <RarityShape rarity={rarity} />
+    </svg>
+  );
+}
+
 /** 희귀도 표시: 색 + 모양 + 텍스트 */
 export function RarityBadge({ rarity, compact = false }: { rarity: Rarity; compact?: boolean }) {
   const meta = RARITY_META[rarity];

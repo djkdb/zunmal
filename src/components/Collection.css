@@ -4,43 +4,9 @@
   gap: 16px;
 }
 
-.collection__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 16px;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-}
-
-.collection__progress-value {
-  font-size: var(--fs-s);
-}
-
-.collection__progress-value strong {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: var(--fs-l);
-  letter-spacing: var(--tracking-title);
-}
-
-.collection .progress {
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--sky-tint);
-  overflow: hidden;
-}
-
-.progress__fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--primary);
-  transition: width 0.4s ease;
-}
-
 /* 등급 한 칸 = 흰 선반 카드 */
 .collection__section {
+  scroll-margin-top: 64px;
   padding: 14px 12px 16px;
   border-radius: var(--radius-card);
   background: var(--surface);
@@ -121,11 +87,6 @@
   color: var(--sub);
 }
 
-.collection__card.is-locked .collection__window {
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1.5px var(--border);
-}
-
 .collection__card.is-partner .collection__window {
   box-shadow:
     0 0 0 3px #fff,
@@ -133,7 +94,7 @@
     0 4px 10px rgba(26, 64, 128, 0.12);
 }
 
-.collection__partner-tag {
+.collection__tag {
   position: absolute;
   top: -8px;
   right: 2px;
@@ -141,10 +102,19 @@
   padding: 0 8px;
   border-radius: var(--radius-pill);
   background: var(--primary);
-  box-shadow: 0 2px 6px rgba(26, 64, 128, 0.16);
+  box-shadow: 0 2px 6px rgba(26, 64, 128, 0.18);
+  color: var(--ink);
+  font-family: var(--font-ui);
   font-weight: 700;
   font-size: 0.75rem;
+  line-height: 1.35;
   white-space: nowrap;
+}
+
+/* NEW: 뽑기 결과(PullResult)·놀이방 선반과 같은 딸기우유 알약. 파트너 딱지는 흰 알약 + 딸기우유 글자 */
+.collection__tag--partner {
+  background: var(--surface);
+  color: var(--primary-text);
 }
 
 .collection__name {
@@ -211,16 +181,6 @@
   font-weight: 700;
 }
 
-.collection__shiny-count {
-  margin-left: 8px;
-  padding: 1px 10px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffc8e6 60%, #c6ecff);
-  font-weight: 700;
-  font-size: var(--fs-xs);
-  vertical-align: middle;
-}
-
 .collection__found {
   font-size: var(--fs-s);
   color: var(--sub);
@@ -269,11 +229,6 @@
   color: #e6dcff;
 }
 
-.collection__section--secret .collection__card.is-locked .collection__window {
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 224, 122, 0.45);
-}
-
 .collection__secret-hint {
   margin: -6px 4px 12px;
   font-size: var(--fs-xs);
@@ -283,134 +238,6 @@
 .collection__card--secret {
   --capsule: radial-gradient(circle at 50% 40%, #6b4bd0, #1b1040);
   color: #fff;
-}
-
-/* ── 컬렉션 세트 카드 ───────────────────────────────────────── */
-.sets {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-/* 흰 카드 위쪽에 세트 색이 옅게 물든다 */
-.set-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--radius-card);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--set-color) 30%, #fff), #fff 72%);
-  box-shadow: var(--shadow-card);
-}
-
-.set-card--ultimate {
-  color: #fff;
-  background:
-    radial-gradient(circle at 15% 25%, #fff 0 1px, transparent 1.5px),
-    radial-gradient(circle at 80% 20%, #ffe07a 0 1.3px, transparent 2px),
-    radial-gradient(ellipse at 50% 20%, #5a3bb0, #1b1040);
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 224, 122, 0.6),
-    var(--shadow-card);
-}
-
-.set-card.is-complete {
-  box-shadow:
-    inset 0 0 0 2px var(--lemon),
-    var(--shadow-card);
-}
-
-.set-card__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.set-card__name {
-  font-size: 1.1875rem;
-}
-
-.set-card__desc {
-  margin-top: 2px;
-  font-size: var(--fs-xs);
-  color: var(--sub);
-}
-
-.set-card--ultimate .set-card__desc {
-  color: #e6dcff;
-}
-
-.set-card__count {
-  flex-shrink: 0;
-  padding: 1px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--border);
-  color: var(--ink);
-  font-weight: 700;
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.set-card__members {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.set-card__member {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.12);
-  cursor: pointer;
-}
-
-.set-card__member.is-locked {
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1.5px var(--border);
-  cursor: default;
-}
-
-.set-card--ultimate .set-card__member.is-locked {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 224, 122, 0.45);
-}
-
-.set-card__reward {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.set-card__reward-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  font-size: var(--fs-s);
-}
-
-.set-card__claimed {
-  padding: 4px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--sub);
-  font-weight: 600;
-  font-size: var(--fs-s);
 }
 
 /* ── 상세 모달 ─────────────────────────────────────────────── */
@@ -439,7 +266,7 @@
 
 .collection-detail__facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   width: 100%;
   margin: 4px 0;
@@ -485,20 +312,155 @@
   }
 }
 
-/* 거의 빈 도감: 안내 한 줄 + 행동 둘 */
-.collection__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px 16px 16px;
-  border-radius: var(--radius-card);
-  background: var(--lemon-tint);
-  box-shadow: inset 4px 0 0 var(--lemon);
+.collection__section:focus-visible {
+  outline-offset: 3px;
 }
 
-.collection__empty-text {
-  font-size: var(--fs-s);
-  line-height: 1.45;
-  word-break: keep-all;
+/* 컬렉션 탭: 받을 보상이 있으면 빨간 점 (홈 탭 점과 같은 뜻) */
+.collection__tab-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--danger);
+  vertical-align: 2px;
+}
+
+/* 친밀도: 캡슐 창 오른쪽 아래 작은 하트 + 단계 (2단계부터) */
+.collection__love {
+  position: absolute;
+  top: 62px;
+  right: calc(50% - 46px);
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 5px 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(26, 64, 128, 0.16);
+  color: var(--primary-text);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  line-height: 16px;
+}
+
+.collection__love svg {
+  fill: var(--primary);
+  stroke: var(--primary-deep);
+  stroke-width: 2.4;
+}
+
+/* ── 아직 못 만난 말랑이: 등급 색 캡슐 속 실루엣 ─────────────────────
+ * 위 반쪽 = 등급 색(옅게), 아래 반쪽 = 흰색, 가운데 흰 이음새. 실루엣도 등급 색으로 물들고 "?" 가 떠 있다. */
+.mystery {
+  --mys: var(--rarity-common);
+  --mys-ink: var(--rarity-common-ink);
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1.5px), #fff calc(50% - 1.5px) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(180deg, color-mix(in srgb, var(--mys) 55%, #fff) 50%, var(--surface) 50%);
+  box-shadow:
+    inset 0 -4px 10px rgba(26, 64, 128, 0.06),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--mys) 45%, #fff),
+    0 3px 8px rgba(26, 64, 128, 0.08);
+  --malang-silhouette: color-mix(in srgb, var(--mys) 38%, #fff);
+  --malang-question: #fff;
+  --malang-question-line: var(--mys-ink);
+}
+
+.mystery .malang {
+  opacity: 0.9;
+}
+
+.mystery .malang path[stroke] {
+  stroke: color-mix(in srgb, var(--mys-ink) 55%, transparent);
+}
+
+.mystery__mark {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  display: grid;
+  place-items: center;
+  width: 28%;
+  height: 28%;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(26, 64, 128, 0.18);
+  color: var(--mys-ink);
+}
+
+.mystery--rare {
+  --mys: var(--rarity-rare);
+  --mys-ink: var(--rarity-rare-ink);
+}
+
+.mystery--epic {
+  --mys: var(--rarity-epic);
+  --mys-ink: var(--rarity-epic-ink);
+}
+
+.mystery--legendary {
+  --mys: var(--rarity-legendary);
+  --mys-ink: var(--rarity-legendary-ink);
+}
+
+.mystery--mythic {
+  --mys: var(--rarity-mythic);
+  --mys-ink: var(--rarity-mythic-ink);
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1.5px), #fff calc(50% - 1.5px) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(180deg, transparent 50%, var(--surface) 50%),
+    conic-gradient(from 200deg, #ffd6e1, #fff3c4, #d9f5d4, #d9ecff, #ebe2ff, #ffd6e1);
+}
+
+.mystery--secret {
+  --mys: #6b4bd0;
+  --mys-ink: #4b2a8f;
+  background:
+    linear-gradient(180deg, transparent calc(50% - 1.5px), #ffe07a calc(50% - 1.5px) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    radial-gradient(circle at 30% 22%, #fff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 70% 34%, #ffe07a 0 1px, transparent 1.6px),
+    linear-gradient(180deg, #2d1b5e 50%, #3b2878 50%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 224, 122, 0.55),
+    0 3px 8px rgba(26, 64, 128, 0.12);
+  --malang-silhouette: #4b3690;
+  --malang-question: #ffe07a;
+  --malang-question-line: #1b1040;
+}
+
+.mystery--secret .malang path[stroke] {
+  stroke: rgba(255, 224, 122, 0.5);
+}
+
+.mystery--secret .mystery__mark {
+  background: #1b1040;
+  color: #ffe07a;
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 122, 0.6);
+}
+
+/* 진열장의 잠긴 칸: 캡슐이 창을 대신한다 */
+.collection__card.is-locked .collection__window {
+  background: none;
+  box-shadow: none;
+}
+
+.collection__card.is-locked .collection__name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--sub);
+}
+
+.collection__section--secret .collection__card.is-locked .collection__name {
+  color: #ffe07a;
 }

@@ -1,0 +1,212 @@
+/* ── 컬렉션 세트 카드 ───────────────────────────────────────── */
+.sets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 흰 카드 위쪽에 세트 색이 옅게 물든다 */
+.set-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--set-color) 30%, #fff), #fff 72%);
+  box-shadow: var(--shadow-card);
+}
+
+.set-card--ultimate {
+  color: #fff;
+  background:
+    radial-gradient(circle at 15% 25%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 20%, #ffe07a 0 1.3px, transparent 2px),
+    radial-gradient(ellipse at 50% 20%, #5a3bb0, #1b1040);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 224, 122, 0.6),
+    var(--shadow-card);
+}
+
+/* 받을 수 있음: 레몬 고리 */
+.set-card.is-claimable {
+  box-shadow:
+    inset 0 0 0 2px var(--lemon),
+    var(--shadow-card);
+}
+
+.set-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.set-card__titles {
+  min-width: 0;
+}
+
+.set-card__name {
+  font-size: 1.1875rem;
+}
+
+.set-card__desc {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.set-card--ultimate .set-card__desc {
+  color: #e6dcff;
+}
+
+/* 보상 칩: 흰 알약 + 코인 */
+.set-card__reward {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 10px 2px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(26, 64, 128, 0.12);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-card__meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.set-card__bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.set-card__bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.set-card.is-claimable .set-card__bar > span,
+.set-card.is-claimed .set-card__bar > span {
+  background: var(--mint);
+}
+
+.set-card--ultimate .set-card__bar {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+
+.set-card__count {
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-card__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.set-card__member {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.12);
+  cursor: pointer;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+/* 50px 동그라미 + 주변 여백까지 눌리는 곳 44px 이상 */
+button.set-card__member:active {
+  transform: scale(0.92);
+  transition-duration: var(--press-in);
+}
+
+.set-card__member.is-locked {
+  background: none;
+  box-shadow: none;
+  cursor: default;
+}
+
+.set-card__foot {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.set-card__claim {
+  width: 100%;
+}
+
+.set-card__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 12px 3px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--mint) 30%, #fff);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+}
+
+.set-card__done svg {
+  color: #3f9e6a;
+}
+
+.set-card__left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  width: 100%;
+  font-weight: 700;
+  font-size: var(--fs-s);
+}
+
+.set-card__hardest {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 400;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.set-card--ultimate .set-card__hardest {
+  color: #e6dcff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-card__member {
+    transition: none;
+  }
+}

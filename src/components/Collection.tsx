@@ -1,18 +1,23 @@
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characters';
-import { COLLECTIONS, collectionProgress, type Collection as CollectionSet } from '../data/collections';
-import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL } from '../data/rarity';
-import { PARTNER_RARITY_BONUS, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
+import { isNewInCollection, summarizeCollection } from '../data/collectionProgress';
 import { levelOf } from '../data/affection';
+import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL, type Rarity } from '../data/rarity';
+import { PARTNER_RARITY_BONUS } from '../economy/config';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { malangShareContent } from '../lib/share';
 import { useGameStore } from '../store/useGameStore';
+import { AffectionMeter } from './AffectionMeter';
+import { CollectionGoal } from './collection/CollectionGoal';
+import { CollectionSummary } from './collection/CollectionSummary';
+import { MysteryMalang } from './collection/MysteryMalang';
+import { SetList } from './collection/SetList';
 import { Malang } from './Malang';
 import { ShareButton } from './ShareButton';
 import { Modal } from './Modal';
 import { RarityBadge } from './RarityBadge';
-import { CapsuleIcon, CoinIcon, JoystickIcon } from './icons';
 import './Collection.css';
 
 type Tab = 'book' | 'sets';
@@ -22,58 +27,50 @@ function initialTab(state: unknown): Tab {
   return typeof state === 'object' && state !== null && (state as { tab?: unknown }).tab === 'sets' ? 'sets' : 'book';
 }
 
-/** 이 수 이하로 모았으면 "선반이 비어 있어요" 안내를 보여 준다 (시작 말랑이 1마리) */
-const FEW_OWNED = 1;
-
-/** 거의 빈 도감: 무엇을 하면 선반이 채워지는지 한 가지 행동으로 안내 */
-function EmptyShelfNote() {
-  const coins = useGameStore((s) => s.coins);
-  const canPull = coins >= PULL_PRICE.single;
-  return (
-    <div className="collection__empty">
-      <p className="collection__empty-text">
-        아직 선반이 거의 비어 있어요. 캡슐을 뽑을 때마다 새 말랑이가 한 칸씩 채워져요.
-      </p>
-      {canPull ? (
-        <Link to="/gacha" className="btn btn--small btn--primary" onClick={() => sfx.button()}>
-          <CapsuleIcon size={22} />
-          캡슐 뽑기
-        </Link>
-      ) : (
-        <Link to="/play" className="btn btn--small btn--mint" onClick={() => sfx.button()}>
-          <JoystickIcon size={22} />
-          게임하기
-        </Link>
-      )}
-    </div>
-  );
-}
-
 function formatBonus(rate: number): string {
   return `+${Math.round(rate * 100)}%`;
 }
 
-/** 도감: 등급별 진열장 + 테마 컬렉션 세트 */
+const shelfId = (rarity: Rarity) => `dex-shelf-${rarity}`;
+
+/** 도감: 요약 → 탭(등급별 진열장 + 다음 목표 / 테마 컬렉션 세트) */
 export function Collection() {
   const location = useLocation();
+  const reduced = useReducedMotion();
   const [tab, setTab] = useState<Tab>(() => initialTab(location.state));
   const owned = useGameStore((s) => s.ownedMalangs);
+  const claimedSets = useGameStore((s) => s.claimedSets);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const ownedCount = CHARACTERS.filter((c) => owned[c.id]).length;
-  const shinyCount = CHARACTERS.filter((c) => (owned[c.id]?.shinyCount ?? 0) > 0).length;
+  const summary = useMemo(() => summarizeCollection({ owned, claimedSets }), [owned, claimedSets]);
+
+  const pickTab = (next: Tab) => {
+    sfx.button();
+    setTab(next);
+  };
+
+  // 등급 줄을 누르면 그 진열장으로 (세트 탭이면 도감 탭으로 바꾼 뒤)
+  const jump = (rarity: Rarity) => {
+    sfx.button();
+    setTab('book');
+    window.requestAnimationFrame(() => {
+      const el = document.getElementById(shelfId(rarity));
+      if (!el) return;
+      el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+      el.focus({ preventScroll: true });
+    });
+  };
 
   return (
     <div className="collection">
+      <CollectionSummary summary={summary} onJump={jump} />
+
       <div className="collection__tabs" role="tablist" aria-label="도감 보기 방식">
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'book'}
           className={`collection__tab${tab === 'book' ? ' is-active' : ''}`}
-          onClick={() => {
-            sfx.button();
-            setTab('book');
-          }}
+          onClick={() => pickTab('book')}
         >
           말랑 도감
         </button>
@@ -82,49 +79,26 @@ export function Collection() {
           role="tab"
           aria-selected={tab === 'sets'}
           className={`collection__tab${tab === 'sets' ? ' is-active' : ''}`}
-          onClick={() => {
-            sfx.button();
-            setTab('sets');
-          }}
+          onClick={() => pickTab('sets')}
         >
           컬렉션
+          {summary.claimableSets.length > 0 && (
+            <span className="collection__tab-dot">
+              <span className="visually-hidden">, 받을 보상 있음</span>
+            </span>
+          )}
         </button>
       </div>
 
       {tab === 'book' ? (
         <>
-          <div className="collection__progress">
-            <p className="collection__progress-value">
-              <strong>{ownedCount}</strong>마리 만났어요 <span className="muted">/ {CHARACTERS.length}</span>
-              {/* 스크린리더가 "32반짝 1"로 붙여 읽지 않게 끊어 준다 */}
-              <span className="visually-hidden">마리 중, </span>
-              <span className="collection__shiny-count">
-                반짝 {shinyCount}
-                <span className="visually-hidden">마리</span>
-              </span>
-            </p>
-            <div
-              className="progress"
-              role="progressbar"
-              aria-label="도감 수집률"
-              aria-valuemin={0}
-              aria-valuemax={CHARACTERS.length}
-              aria-valuenow={ownedCount}
-            >
-              <div className="progress__fill" style={{ width: `${(ownedCount / CHARACTERS.length) * 100}%` }} />
-            </div>
-          </div>
-          {ownedCount <= FEW_OWNED && <EmptyShelfNote />}
+          <CollectionGoal summary={summary} />
           {RARITIES.map((rarity) => (
             <RarityShelf key={rarity} rarity={rarity} onOpen={setDetailId} />
           ))}
         </>
       ) : (
-        <ul className="sets">
-          {COLLECTIONS.map((set) => (
-            <SetCard key={set.id} set={set} onOpen={setDetailId} />
-          ))}
-        </ul>
+        <SetList summary={summary} onOpen={setDetailId} />
       )}
 
       {detailId && <DetailModal id={detailId} onClose={() => setDetailId(null)} />}
@@ -132,13 +106,22 @@ export function Collection() {
   );
 }
 
-function RarityShelf({ rarity, onOpen }: { rarity: (typeof RARITIES)[number]; onOpen(id: string): void }) {
+function RarityShelf({ rarity, onOpen }: { rarity: Rarity; onOpen(id: string): void }) {
   const owned = useGameStore((s) => s.ownedMalangs);
   const partnerId = useGameStore((s) => s.partnerId);
+  const unboxed = useGameStore((s) => s.unboxed);
+  const affection = useGameStore((s) => s.affection);
+  const [now] = useState(() => Date.now());
   const pool = CHARACTERS_BY_RARITY[rarity];
   const found = pool.filter((c) => owned[c.id]).length;
+  const label = RARITY_META[rarity].label;
   return (
-    <section className={`collection__section collection__section--${rarity}`} aria-label={`${RARITY_META[rarity].label} 말랑이`}>
+    <section
+      id={shelfId(rarity)}
+      tabIndex={-1}
+      className={`collection__section collection__section--${rarity}`}
+      aria-label={`${label} 말랑이`}
+    >
       <h2 className="collection__heading">
         <RarityBadge rarity={rarity} />
         <span className="collection__found">
@@ -154,109 +137,72 @@ function RarityShelf({ rarity, onOpen }: { rarity: (typeof RARITIES)[number]; on
       <ul className="collection__grid">
         {pool.map((c) => {
           const entry = owned[c.id];
+          if (!entry) {
+            return (
+              <li key={c.id}>
+                <div className={`collection__card collection__card--${rarity} is-locked`} role="img" aria-label={`아직 못 만난 ${label} 말랑이`}>
+                  <span className="collection__window">
+                    <MysteryMalang character={c} size={86} />
+                  </span>
+                  <span className="collection__name" aria-hidden="true">
+                    ???
+                  </span>
+                </div>
+              </li>
+            );
+          }
           const isPartner = partnerId === c.id;
-          const shiny = (entry?.shinyCount ?? 0) > 0;
+          const shiny = entry.shinyCount > 0;
+          const sealed = !unboxed.includes(c.id);
+          const isNew = isNewInCollection(entry, sealed, now);
+          const level = levelOf(affection[c.id] ?? 0);
           return (
             <li key={c.id}>
-              {entry ? (
-                <button
-                  type="button"
-                  className={`collection__card collection__card--${rarity}${isPartner ? ' is-partner' : ''}${shiny ? ' is-shiny' : ''}`}
-                  onClick={() => {
-                    sfx.button();
-                    onOpen(c.id);
-                  }}
-                  aria-label={`${c.name}, ${entry.count}마리${shiny ? `, 반짝 ${entry.shinyCount}마리` : ''}${isPartner ? ', 현재 파트너' : ''}. 자세히 보기`}
-                >
-                  {isPartner && <span className="collection__partner-tag">파트너</span>}
-                  <span className="collection__window">
-                    <Malang character={c} size={74} animation="none" decorative />
+              <button
+                type="button"
+                className={`collection__card collection__card--${rarity}${isPartner ? ' is-partner' : ''}${shiny ? ' is-shiny' : ''}`}
+                onClick={() => {
+                  sfx.button();
+                  onOpen(c.id);
+                }}
+                aria-label={[
+                  isNew ? '새 말랑이' : '',
+                  c.name,
+                  `${entry.count}마리`,
+                  shiny ? `반짝 ${entry.shinyCount}마리` : '',
+                  sealed ? '아직 캡슐 속' : '',
+                  level > 1 ? `친밀도 Lv.${level}` : '',
+                  isPartner ? '현재 파트너' : '',
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+                  .concat('. 자세히 보기')}
+              >
+                {isPartner ? (
+                  <span className="collection__tag collection__tag--partner">파트너</span>
+                ) : (
+                  isNew && <span className="collection__tag collection__tag--new">NEW</span>
+                )}
+                <span className="collection__window">
+                  <Malang character={c} size={74} animation="none" decorative />
+                </span>
+                {shiny && <span className="collection__shiny-mark" aria-hidden="true" />}
+                {level > 1 && (
+                  <span className="collection__love" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" width={12} height={12} focusable="false">
+                      <path d="M16 27.5 C10 22.5 3.5 18 3.5 11.5 C3.5 7.4 6.6 4.6 10.3 4.6 C12.9 4.6 14.8 6 16 8.1 C17.2 6 19.1 4.6 21.7 4.6 C25.4 4.6 28.5 7.4 28.5 11.5 C28.5 18 22 22.5 16 27.5 Z" />
+                    </svg>
+                    {level}
                   </span>
-                  {shiny && <span className="collection__shiny-mark" aria-hidden="true" />}
-                  <span className="collection__name">{c.name}</span>
-                  {entry.count > 1 && <span className="collection__count">{entry.count}마리</span>}
-                </button>
-              ) : (
-                <div className={`collection__card collection__card--${rarity} is-locked`} aria-label="아직 만나지 못한 말랑이">
-                  <span className="collection__window">
-                    <Malang character={c} size={74} animation="none" silhouette decorative />
-                  </span>
-                  <span className="collection__name" aria-hidden="true" />
-                </div>
-              )}
+                )}
+                <span className="collection__name">{c.name}</span>
+                {entry.count > 1 && <span className="collection__count">{entry.count}마리</span>}
+              </button>
             </li>
           );
         })}
       </ul>
     </section>
-  );
-}
-
-function SetCard({ set, onOpen }: { set: CollectionSet; onOpen(id: string): void }) {
-  const owned = useGameStore((s) => s.ownedMalangs);
-  const claimed = useGameStore((s) => s.claimedSets.includes(set.id));
-  const claimSet = useGameStore((s) => s.claimSet);
-  const progress = collectionProgress(set, new Set(Object.keys(owned)));
-  const reward = SET_REWARD_COINS[set.tier];
-
-  return (
-    <li
-      className={`set-card set-card--${set.tier}${progress.complete ? ' is-complete' : ''}`}
-      style={{ '--set-color': set.color } as CSSProperties}
-    >
-      <div className="set-card__head">
-        <div>
-          <h2 className="set-card__name">{set.name}</h2>
-          <p className="set-card__desc">{set.description}</p>
-        </div>
-        <span className="set-card__count">
-          {progress.owned}/{progress.total}
-        </span>
-      </div>
-      <ul className="set-card__members">
-        {set.memberIds.map((id) => {
-          const c = getCharacter(id);
-          if (!c) return null;
-          const has = !!owned[id];
-          return (
-            <li key={id}>
-              {has ? (
-                <button type="button" className="set-card__member" aria-label={c.name} onClick={() => onOpen(id)}>
-                  <Malang character={c} size={48} animation="none" decorative />
-                </button>
-              ) : (
-                <span className="set-card__member is-locked" aria-label="아직 못 만남">
-                  <Malang character={c} size={48} animation="none" silhouette decorative />
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <div className="set-card__reward">
-        <span className="set-card__reward-label">
-          <CoinIcon size={22} /> {reward.toLocaleString()}코인
-        </span>
-        {claimed ? (
-          <span className="set-card__claimed">받았어요</span>
-        ) : (
-          <button
-            type="button"
-            className={`btn btn--small ${progress.complete ? 'btn--primary' : ''}`}
-            disabled={!progress.complete}
-            onClick={() => {
-              const res = claimSet(set.id);
-              if (res.ok) {
-                sfx.coin();
-                sfx.success();
-              }
-            }}
-          >
-            {progress.complete ? '보상 받기' : `${progress.total - progress.owned}마리 더`}
-          </button>
-        )}
-      </div>
-    </li>
   );
 }
 
@@ -299,14 +245,11 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
             <dd>{entry.shinyCount}마리</dd>
           </div>
           <div>
-            <dt>친밀도</dt>
-            <dd>{affection.toLocaleString()}</dd>
-          </div>
-          <div>
             <dt>코인 보너스</dt>
             <dd>{formatBonus(PARTNER_RARITY_BONUS[detail.rarity])}</dd>
           </div>
         </dl>
+        <AffectionMeter characterId={id} value={affection} />
         {hasShiny && (
           <button
             type="button"

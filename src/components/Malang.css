@@ -15,10 +15,15 @@
 .malang-question {
   font-family: var(--font-display);
   font-size: 34px;
-  fill: #fffdf8;
-  stroke: var(--ink);
+  fill: var(--malang-question, #fffdf8);
+  stroke: var(--malang-question-line, var(--ink));
   stroke-width: 1.5px;
   paint-order: stroke;
+}
+
+/* 실루엣 몸 색: 쓰는 곳이 --malang-silhouette 로 등급 색을 입힌다 (없으면 예전 색) */
+.malang-silhouette {
+  fill: var(--malang-silhouette, #d9cfc0);
 }
 
 .malang-mouth {
