@@ -8,8 +8,8 @@ const RING_R = 30;
 const RING_C = 2 * Math.PI * RING_R;
 
 /**
- * 도감 맨 위 요약: 모은 비율 고리 + 큰 "17 / 32" + 반짝 종류 수 + 등급별 줄(색 + 모양 + 글자 + 수).
- * 등급 줄을 누르면 그 등급 진열장으로 간다.
+ * 도감 맨 위 요약: 모은 비율 고리 + 큰 "17 / 32" + 반짝 종류 수 + 등급 칸 3×2(색 + 모양 + 글자 + 수 + 막대).
+ * 360×640에서도 아래 "다음 목표" 카드가 첫 화면에 걸리도록 낮게 둔다. 등급 칸을 누르면 그 등급 진열장으로 간다.
  */
 export function CollectionSummary({ summary, onJump }: { summary: Summary; onJump(rarity: Rarity): void }) {
   const { owned, total, percent, shinySpecies, byRarity } = summary;
@@ -17,7 +17,7 @@ export function CollectionSummary({ summary, onJump }: { summary: Summary; onJum
   return (
     <section className="dex-summary" aria-labelledby="dex-summary-title">
       <div className="dex-summary__top">
-        <svg className="dex-summary__ring" viewBox="0 0 76 76" width={76} height={76} aria-hidden="true" focusable="false">
+        <svg className="dex-summary__ring" viewBox="0 0 76 76" width={64} height={64} aria-hidden="true" focusable="false">
           <circle cx={38} cy={38} r={RING_R} className="dex-summary__ring-track" />
           {percent > 0 && (
             <circle
@@ -62,15 +62,15 @@ export function CollectionSummary({ summary, onJump }: { summary: Summary; onJum
                 onClick={() => onJump(r.rarity)}
                 aria-label={`${label} ${r.total}마리 중 ${r.owned}마리${done ? ', 다 모았어요' : ''}. 진열장으로 가기`}
               >
-                <span className="dex-rarity__head">
-                  <RarityBadge rarity={r.rarity} compact />
+                <RarityBadge rarity={r.rarity} compact />
+                <span className="dex-rarity__foot">
                   <span className="dex-rarity__num">
                     {done && <CheckIcon size={14} />}
                     {r.owned}/{r.total}
                   </span>
-                </span>
-                <span className="dex-rarity__bar" aria-hidden="true">
-                  <span style={{ width: `${r.total > 0 ? (r.owned / r.total) * 100 : 0}%` }} />
+                  <span className="dex-rarity__bar" aria-hidden="true">
+                    <span style={{ width: `${r.total > 0 ? (r.owned / r.total) * 100 : 0}%` }} />
+                  </span>
                 </span>
               </button>
             </li>

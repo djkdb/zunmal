@@ -42,6 +42,20 @@ export function Collection() {
   const claimedSets = useGameStore((s) => s.claimedSets);
   const [detailId, setDetailId] = useState<string | null>(null);
   const summary = useMemo(() => summarizeCollection({ owned, claimedSets }), [owned, claimedSets]);
+  // 세트 보상을 그 자리에서 받으면 버튼이 사라지므로 화면 읽기에 한 줄 알린다
+  const [claimNote, setClaimNote] = useState('');
+  const announceClaim = (setId: string, coins: number) => {
+    const name = summary.sets.find((s) => s.set.id === setId)?.set.name ?? '세트';
+    setClaimNote(`${name} 세트 보상 ${coins.toLocaleString()}코인을 받았어요`);
+    // 누른 버튼이 사라져 초점이 문서 처음으로 떨어지면: 그 세트의 "보상을 받았어요" 줄(세트 탭) 또는 지금 탭으로
+    window.requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const target =
+        document.querySelector<HTMLElement>(`[data-set-done="${setId}"]`) ??
+        document.querySelector<HTMLElement>('.collection__tab.is-active');
+      target?.focus({ preventScroll: true });
+    });
+  };
 
   const pickTab = (next: Tab) => {
     sfx.button();
@@ -92,14 +106,18 @@ export function Collection() {
 
       {tab === 'book' ? (
         <>
-          <CollectionGoal summary={summary} />
+          <CollectionGoal summary={summary} onClaimed={announceClaim} />
           {RARITIES.map((rarity) => (
             <RarityShelf key={rarity} rarity={rarity} onOpen={setDetailId} />
           ))}
         </>
       ) : (
-        <SetList summary={summary} onOpen={setDetailId} />
+        <SetList summary={summary} onOpen={setDetailId} onClaimed={announceClaim} />
       )}
+
+      <p className="visually-hidden" role="status">
+        {claimNote}
+      </p>
 
       {detailId && <DetailModal id={detailId} onClose={() => setDetailId(null)} />}
     </div>

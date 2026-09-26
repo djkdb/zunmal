@@ -178,7 +178,7 @@ button.set-card__member:active {
 }
 
 .set-card__done svg {
-  color: #3f9e6a;
+  color: var(--good-ink);
 }
 
 .set-card__left {

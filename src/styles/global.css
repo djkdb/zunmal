@@ -47,7 +47,13 @@
   --mint-deep: #4fb57d;
   --grape: #c9b6ff;
   --peach: #ffc2a0;
-  --danger: #f0506e;
+  --danger: #f0506e; /* 채움·선 (글자에는 --bad-ink) */
+  /* 좋아짐/나빠짐 글자 — 색만으로 말하지 않게 늘 화살표·체크 모양이나 글자와 함께 쓴다 */
+  --good-ink: #1c6b3e; /* 오름·완료 글자·체크 (흰 바탕 6.5:1, --good-tint 위 5.7:1) */
+  --good-tint: #dff6e8;
+  --bad-ink: #b3203f; /* 내림·모자람 글자 (흰 바탕 6.6:1, --bad-tint 위 5.4:1) */
+  --bad-tint: #ffe3e8;
+  --lemon-ink: #7a5200; /* 레몬 칩·영수증 금빛 글자 (--lemon-tint 위 6.3:1) */
   --gold: #f2c14e; /* 천장 막대·코인 */
 
   /* ── 면 ── */

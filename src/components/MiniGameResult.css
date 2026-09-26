@@ -204,7 +204,7 @@
   font-weight: 400;
   font-size: 1.875rem;
   letter-spacing: var(--tracking-title);
-  color: #9a6400;
+  color: var(--lemon-ink);
 }
 
 .mg-result__note {

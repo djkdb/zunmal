@@ -24,9 +24,15 @@ const SHOW_MISSING = 4;
  * 아니면 가장 가까운 미완성 세트(summarizeCollection().nearestSet) — 남은 말랑이 캡슐 + 등급 + 대략 뽑기 수 + 캡슐 뽑기.
  * 모든 세트를 다 받았으면 그리지 않는다.
  */
-export function CollectionGoal({ summary }: { summary: CollectionSummary }) {
+export function CollectionGoal({
+  summary,
+  onClaimed,
+}: {
+  summary: CollectionSummary;
+  onClaimed?(setId: string, coins: number): void;
+}) {
   const claimable = summary.claimableSets[0];
-  if (claimable) return <ClaimGoal progress={claimable} />;
+  if (claimable) return <ClaimGoal progress={claimable} onClaimed={onClaimed} />;
   const nearest = summary.nearestSet;
   if (!nearest) return null;
   return <NearGoal progress={nearest} />;
@@ -36,8 +42,8 @@ function goalStyle(p: SetProgress): CSSProperties {
   return { '--set-color': p.set.color } as CSSProperties;
 }
 
-function ClaimGoal({ progress }: { progress: SetProgress }) {
-  const claim = useSetClaim();
+function ClaimGoal({ progress, onClaimed }: { progress: SetProgress; onClaimed?(setId: string, coins: number): void }) {
+  const claim = useSetClaim(onClaimed);
   const reward = SET_REWARD_COINS[progress.set.tier];
   return (
     <section className="dex-goal dex-goal--claim" style={goalStyle(progress)} aria-labelledby="dex-goal-title">

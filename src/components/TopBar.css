@@ -33,11 +33,11 @@
 
 /* 코인이 모자랄 때 잠깐 붉게 (nudgeInsufficient) */
 .hud__pill.is-short {
-  background: #ffe1e7;
+  background: var(--bad-tint);
 }
 
 .hud__pill.is-short .hud__value {
-  color: var(--danger);
+  color: var(--bad-ink);
 }
 
 .hud__icon {

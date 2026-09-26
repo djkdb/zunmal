@@ -14,22 +14,38 @@ import './SetList.css';
  * 세트 탭: 받을 수 있음 → 가까운 세트 → 시작 안 한 세트 → 받은 세트 (`orderSetsForDisplay`).
  * 순서는 탭을 열 때 한 번 정한다 — 받자마자 카드가 맨 뒤로 튀지 않게.
  */
-export function SetList({ summary, onOpen }: { summary: CollectionSummary; onOpen(id: string): void }) {
+export function SetList({
+  summary,
+  onOpen,
+  onClaimed,
+}: {
+  summary: CollectionSummary;
+  onOpen(id: string): void;
+  onClaimed?(setId: string, coins: number): void;
+}) {
   const [order] = useState(() => orderSetsForDisplay(summary.sets).map((s) => s.set.id));
   const byId = new Map(summary.sets.map((s) => [s.set.id, s]));
   return (
     <ul className="sets">
       {order.map((id) => {
         const p = byId.get(id);
-        return p ? <SetCard key={id} progress={p} onOpen={onOpen} /> : null;
+        return p ? <SetCard key={id} progress={p} onOpen={onOpen} onClaimed={onClaimed} /> : null;
       })}
     </ul>
   );
 }
 
-function SetCard({ progress, onOpen }: { progress: SetProgress; onOpen(id: string): void }) {
+function SetCard({
+  progress,
+  onOpen,
+  onClaimed,
+}: {
+  progress: SetProgress;
+  onOpen(id: string): void;
+  onClaimed?(setId: string, coins: number): void;
+}) {
   const { set } = progress;
-  const claim = useSetClaim();
+  const claim = useSetClaim(onClaimed);
   const reward = SET_REWARD_COINS[set.tier];
   const missing = new Set(progress.missingIds);
   const state = progress.claimable ? 'claimable' : progress.claimed ? 'claimed' : 'open';
@@ -98,7 +114,7 @@ function SetCard({ progress, onOpen }: { progress: SetProgress; onOpen(id: strin
           </button>
         )}
         {state === 'claimed' && (
-          <p className="set-card__done">
+          <p className="set-card__done" data-set-done={set.id} tabIndex={-1}>
             <CheckIcon size={18} />
             보상을 받았어요
           </p>

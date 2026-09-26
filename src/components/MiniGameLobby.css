@@ -268,7 +268,7 @@
   padding: 3px 10px 3px 5px;
   border-radius: var(--radius-pill);
   background: var(--lemon-tint);
-  color: #7a5200;
+  color: var(--lemon-ink);
   font-family: var(--font-ui);
   font-weight: var(--fw-ui);
   font-size: 0.8125rem;

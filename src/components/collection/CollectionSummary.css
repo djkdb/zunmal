@@ -2,8 +2,8 @@
 .dex-summary {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 14px 12px;
+  gap: 10px;
+  padding: 12px 12px 12px;
   border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--shadow-card);
@@ -52,14 +52,14 @@
 .dex-summary__big {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: var(--fs-xxl);
+  font-size: var(--fs-xl);
   line-height: 1;
   letter-spacing: var(--tracking-title);
   font-variant-numeric: tabular-nums;
 }
 
 .dex-summary__slash {
-  font-size: var(--fs-l);
+  font-size: var(--fs-m);
   color: var(--sub);
 }
 
@@ -94,10 +94,10 @@
   color: #d99a1e;
 }
 
-/* 등급 줄: 두 칸 × 세 줄. 칸 하나 = 누르면 그 진열장으로 가는 버튼 */
+/* 등급 칸: 세 칸 × 두 줄. 칸 하나 = 배지 / 수 + 막대, 누르면 그 진열장으로 가는 버튼 */
 .dex-summary__rarities {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin: 0;
   padding: 0;
@@ -108,11 +108,12 @@
   --dr-fill: var(--rarity-common);
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   width: 100%;
   min-height: 48px;
-  padding: 6px 10px 8px 8px;
+  padding: 6px 7px 7px;
   border: 0;
   border-radius: var(--radius-s);
   background: var(--surface-2);
@@ -128,29 +129,36 @@
   transition-duration: var(--press-in);
 }
 
-.dex-rarity__head {
+.dex-rarity .rarity-badge {
+  max-width: 100%;
+}
+
+.dex-rarity__foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 5px;
+  width: 100%;
 }
 
 .dex-rarity__num {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 2px;
   font-family: var(--font-ui);
   font-weight: var(--fw-ui);
   font-size: var(--fs-xs);
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .dex-rarity__num svg {
-  color: #3f9e6a;
+  color: var(--good-ink);
 }
 
 .dex-rarity__bar {
   position: relative;
+  flex: 1;
   display: block;
   height: 5px;
   border-radius: var(--radius-pill);

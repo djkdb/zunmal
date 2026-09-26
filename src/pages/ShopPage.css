@@ -723,7 +723,7 @@ button.shop-slot:active {
 }
 
 .staff-option__set.is-down {
-  color: #b3203f;
+  color: var(--bad-ink);
 }
 
 /* 변화 딱지: 색 + 화살표 모양 + 글자 */
@@ -743,13 +743,13 @@ button.shop-slot:active {
 }
 
 .staff-trend--up {
-  background: #dff6e8;
-  color: #1c6b3e;
+  background: var(--good-tint);
+  color: var(--good-ink);
 }
 
 .staff-trend--down {
-  background: #ffe3e8;
-  color: #b3203f;
+  background: var(--bad-tint);
+  color: var(--bad-ink);
 }
 
 .staff-trend--same {
