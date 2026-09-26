@@ -5,6 +5,8 @@ import { darken, isDark, lighten } from '../../lib/color';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
+import { hasPartnerFlair, partnerTrailColor } from '../shared/partner';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -70,6 +72,14 @@ interface Burst {
   y: number;
   age: number;
 }
+
+/** 칼날 자국 모양: 파트너 색, 전설 이상이면 칼끝에 반짝 별 (장식만) */
+interface BladeStyle {
+  color: string;
+  sparkle: boolean;
+}
+
+const DEFAULT_BLADE: BladeStyle = { color: '#ff7aa2', sparkle: false };
 
 interface TrailPoint {
   x: number;
@@ -292,7 +302,7 @@ function fillTaper(ctx: CanvasRenderingContext2D, pts: TrailPoint[], widths: num
   ctx.fill();
 }
 
-function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailPoint[], now: number) {
+function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailPoint[], now: number, blade: BladeStyle) {
   // 스트로크별로 나눈다
   const strokes: TrailPoint[][] = [];
   for (const p of trail) {
@@ -305,7 +315,7 @@ function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailPoint[], now: numb
     const n = pts.length;
     // 오래된 점일수록, 꼬리 쪽일수록 가늘게
     const k = pts.map((p, i) => Math.max(0, 1 - (now - p.t) / TRAIL_MS) * (0.15 + (0.85 * i) / (n - 1)));
-    ctx.fillStyle = '#ff7aa2';
+    ctx.fillStyle = blade.color;
     fillTaper(
       ctx,
       pts,
@@ -317,10 +327,29 @@ function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailPoint[], now: numb
       pts,
       k.map((v) => v * 6),
     );
+    if (blade.sparkle) {
+      const head = pts[n - 1]!;
+      const life = k[n - 1] ?? 0;
+      if (life > 0.2) {
+        ctx.fillStyle = GOLD;
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.5;
+        starPath(ctx, head.x, head.y, 5 + life * 4);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
   }
 }
 
-function drawScene(ctx: CanvasRenderingContext2D, state: SliceState, fx: Fx, trail: TrailPoint[], now: number) {
+function drawScene(
+  ctx: CanvasRenderingContext2D,
+  state: SliceState,
+  fx: Fx,
+  trail: TrailPoint[],
+  now: number,
+  blade: BladeStyle = DEFAULT_BLADE,
+) {
   ctx.clearRect(0, 0, WORLD.width, WORLD.height);
   // 즙 방울 (뒤)
   for (const d of fx.drops) {
@@ -354,7 +383,7 @@ function drawScene(ctx: CanvasRenderingContext2D, state: SliceState, fx: Fx, tra
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  drawTrail(ctx, trail, now);
+  drawTrail(ctx, trail, now, blade);
   ctx.textAlign = 'center';
   ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
   for (const p of fx.popups) {
@@ -419,11 +448,14 @@ function LivesMeter({ lives }: { lives: number }) {
   );
 }
 
-function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
+function JellySliceGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
+  const bladeColor = partnerTrailColor(partner);
+  const bladeSparkle = hasPartnerFlair(partner.rarity);
   const stateRef = useRef<SliceState>(createSliceState());
   const segmentsRef = useRef<SwipeSegment[]>([]);
   const trailRef = useRef<TrailPoint[]>([]);
@@ -469,6 +501,7 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
     let hudAcc = 0;
     let fx: Fx = { halves: [], drops: [], popups: [], bursts: [] };
     let comboShown = 0;
+    const blade: BladeStyle = { color: bladeColor, sparkle: bladeSparkle };
 
     const splash = (x: number, y: number, color: string, n: number) => {
       for (let i = 0; i < n; i++) {
@@ -515,8 +548,10 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
           fx.popups.push({ x: f.x, y: f.y - f.r - 4, text, color: ev.kind === 'gold' ? '#c47a00' : '#e8527f', age: 0 });
           if (ev.combo >= 3) sfx.pickup();
           comboShown = ev.combo;
+          buddyRef.current?.react(ev.combo >= 3 || ev.kind === 'gold' ? 'wow' : 'happy', 600);
         } else if (ev.type === 'bomb') {
           sfx.hit();
+          buddyRef.current?.react('oops', 900);
           fx.bursts.push({ x: ev.flyer.x, y: ev.flyer.y, age: 0 });
           splash(ev.flyer.x, ev.flyer.y, INK, reduced ? 3 : 10);
           fx.popups.push({
@@ -553,7 +588,7 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
       handleEvents(out.events);
       fx = stepFx(fx, Math.min(dt, 50));
       trailRef.current = trailRef.current.filter((p) => t - p.t < TRAIL_MS);
-      drawScene(ctx, out.state, fx, trailRef.current, t);
+      drawScene(ctx, out.state, fx, trailRef.current, t, blade);
 
       hudAcc += dt;
       if (hudAcc > 100 || out.events.some((e) => e.type === 'bomb') || out.state.finished) {
@@ -572,7 +607,7 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
           const d2 = t2 - last;
           last = t2;
           fx = stepFx(fx, Math.min(d2, 50));
-          drawScene(ctx, out.state, fx, [], t2);
+          drawScene(ctx, out.state, fx, [], t2, blade);
           if (fx.halves.length + fx.drops.length + fx.bursts.length > 0) raf = requestAnimationFrame(tail);
         };
         raf = requestAnimationFrame(tail);
@@ -582,13 +617,14 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [started, reduced, sfx]);
+  }, [started, reduced, sfx, bladeColor, bladeSparkle]);
 
   // 종료 처리 (onFinish는 정확히 한 번)
   useEffect(() => {
     if (!finished) return;
     if (finished === 'out') sfx.fail();
     else sfx.success();
+    buddyRef.current?.setBase(finished === 'out' ? 'sad' : 'happy');
     const id = window.setTimeout(
       () => {
         if (reported.current) return;
@@ -669,6 +705,7 @@ function JellySliceGame({ onFinish, onExit, sfx }: MiniGameProps) {
         </p>
       </div>
       <div ref={wrapRef} className="js__stage">
+        <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={64} className="js__buddy" />
         <canvas
           ref={canvasRef}
           className="js__canvas"

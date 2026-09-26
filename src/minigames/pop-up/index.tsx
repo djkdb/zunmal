@@ -5,6 +5,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -77,12 +78,12 @@ function SpikyMalang({ size }: { size: number }) {
   );
 }
 
-function PopFace({ pop, partner }: { pop: Pop; partner: Character }) {
+function PopFace({ pop, partner, shiny }: { pop: Pop; partner: Character; shiny: boolean }) {
   if (pop.kind === 'spiky') return <SpikyMalang size={POP_SIZE} />;
   if (pop.kind === 'gold') {
     return (
       <span className="pu__gold">
-        <Malang character={partner} size={POP_SIZE} animation="none" decorative />
+        <Malang character={partner} size={POP_SIZE} animation="none" shiny={shiny} decorative />
       </span>
     );
   }
@@ -98,7 +99,7 @@ function cupLabel(index: number, pop: Pop | null): string {
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function PopUpGame({ partner, partnerShiny = false, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const stateRef = useRef<PopUpState>(createPopUpState());
@@ -108,6 +109,7 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
   const gridRef = useRef<HTMLDivElement>(null);
   const cupRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const floaterId = useRef(0);
   const reported = useRef(false);
 
@@ -145,6 +147,7 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   useEffect(() => {
     if (!finished) return;
     sfx.success();
+    buddyRef.current?.setBase('happy');
     const id = window.setTimeout(() => {
       if (reported.current) return;
       reported.current = true;
@@ -176,6 +179,7 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
 
       if (out.event.type === 'spiky') {
         sfx.hit();
+        buddyRef.current?.react('oops', 700);
         addFloater(cell, out.event.points < 0 ? `${out.event.points}` : '앗!', 'bad');
         if (!reduced) {
           gridRef.current?.animate(
@@ -194,6 +198,8 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
 
       if (out.event.kind === 'gold') sfx.coin();
       else sfx.tap(Math.min(12, out.event.combo));
+      // 황금(=파트너 자신)이면 반짝 눈, 콤보가 이어지면 웃는 눈
+      buddyRef.current?.react(out.event.kind === 'gold' ? 'wow' : 'happy', out.event.kind === 'gold' ? 900 : 450);
       addFloater(cell, `+${out.event.points}`, out.event.kind === 'gold' ? 'gold' : 'good');
       if (!reduced && pop) {
         const ghost: Ghost = { cell, pop };
@@ -250,6 +256,7 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         )}
       </p>
       <div className="pu__tray">
+        <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={52} className="pu__buddy" />
         <div ref={gridRef} className="pu__grid">
           {Array.from({ length: CELL_COUNT }, (_, i) => {
             const pop = view.cells[i] ?? null;
@@ -272,12 +279,12 @@ function PopUpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
                 <span className="pu__hole" aria-hidden="true">
                   {pop && (
                     <span key={pop.id} className={`pu__pop pu__pop--${pop.kind}`}>
-                      <PopFace pop={pop} partner={partner} />
+                      <PopFace pop={pop} partner={partner} shiny={partnerShiny} />
                     </span>
                   )}
                   {!pop && ghost && (
                     <span key={`g${ghost.pop.id}`} className="pu__pop pu__pop--out">
-                      <PopFace pop={ghost.pop} partner={partner} />
+                      <PopFace pop={ghost.pop} partner={partner} shiny={partnerShiny} />
                     </span>
                   )}
                 </span>

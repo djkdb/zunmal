@@ -1,0 +1,67 @@
+/* 게임 속 파트너 말랑이: 장식이라 입력을 가로채지 않는다 */
+.buddy {
+  position: relative;
+  width: var(--buddy-size);
+  height: var(--buddy-size);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.buddy > .malang {
+  display: block;
+  overflow: visible;
+}
+
+.buddy__emote {
+  position: absolute;
+  top: -4%;
+  right: -10%;
+  width: max(16px, calc(var(--buddy-size) * 0.3));
+  height: max(16px, calc(var(--buddy-size) * 0.3));
+  overflow: visible;
+}
+
+.buddy__emote--sad {
+  top: -14%;
+  right: 50%;
+  translate: 50% 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .buddy__emote {
+    animation: buddy-emote 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  /* 잘하면 폴짝, 맞으면 움찔 — 몸 전체(바깥 요소 안쪽 svg)만 움직여 위치 transform과 겹치지 않는다 */
+  .buddy--happy > .malang,
+  .buddy--wow > .malang {
+    animation: buddy-hop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+
+  .buddy--oops > .malang {
+    animation: buddy-flinch 0.36s ease-out;
+  }
+}
+
+@keyframes buddy-emote {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.3);
+  }
+}
+
+@keyframes buddy-hop {
+  40% {
+    transform: translateY(-14%);
+  }
+}
+
+@keyframes buddy-flinch {
+  25% {
+    transform: translateX(-6%) rotate(-6deg);
+  }
+  60% {
+    transform: translateX(5%) rotate(4deg);
+  }
+}

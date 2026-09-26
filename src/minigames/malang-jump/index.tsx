@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Sfx } from '../../audio/sfx';
-import type { Character } from '../../data/characters';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
-import { darken, isDark, lighten } from '../../lib/color';
+import { lighten } from '../../lib/color';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
+import type { PartnerMood } from '../shared/partner';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -163,69 +164,14 @@ function drawCandy(ctx: CanvasRenderingContext2D, c: Candy, cameraY: number, t: 
   ctx.restore();
 }
 
-function drawPlayer(
-  ctx: CanvasRenderingContext2D,
-  s: JumpState,
-  partner: Character,
-  squash: number,
-  x: number,
-) {
-  const r = CONFIG.playerRadius;
-  const footY = toScreenY(s.y, s.cameraY);
-  // 착지 직후 납작, 빠르게 오를 때 살짝 길쭉
-  const stretch = Math.max(-0.12, Math.min(0.12, s.vy / 6000));
-  const sx = 1 + squash * 0.25 - stretch * 0.5;
-  const sy = 1 - squash * 0.25 + stretch;
-  ctx.save();
-  ctx.translate(x, footY);
-  ctx.scale(sx, sy);
-  const grad = ctx.createRadialGradient(-r * 0.4, -r * 1.4, 2, 0, -r, r * 1.4);
-  grad.addColorStop(0, lighten(partner.color, 0.5));
-  grad.addColorStop(0.55, partner.color);
-  grad.addColorStop(1, darken(partner.color, 0.2));
-  ctx.fillStyle = grad;
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 3;
-  // 말랑한 물방울 몸통 (바닥이 평평)
-  ctx.beginPath();
-  ctx.moveTo(-r, -2);
-  ctx.bezierCurveTo(-r * 1.15, -r * 1.6, -r * 0.5, -r * 2.2, 0, -r * 2.2);
-  ctx.bezierCurveTo(r * 0.5, -r * 2.2, r * 1.15, -r * 1.6, r, -2);
-  ctx.quadraticCurveTo(0, 3, -r, -2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // 얼굴 (바라보는 방향으로 살짝)
-  const fx = s.facing * 3;
-  const feature = isDark(partner.color) ? PAPER : INK;
-  ctx.fillStyle = feature;
-  for (const ex of [-6, 6]) {
-    ctx.beginPath();
-    ctx.arc(ex + fx, -r * 1.05, 2.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = feature;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  if (s.vy > 0) ctx.arc(fx, -r * 0.8, 3, 0.1 * Math.PI, 0.9 * Math.PI);
-  else ctx.arc(fx, -r * 0.55, 2.5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(255,122,156,0.55)';
-  ctx.beginPath();
-  ctx.ellipse(-11 + fx, -r * 0.75, 3.5, 2.2, 0, 0, Math.PI * 2);
-  ctx.ellipse(11 + fx, -r * 0.75, 3.5, 2.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
+/**
+ * 파트너 말랑이 스프라이트 (월드 단위). 몸통 폭이 약 44가 되게 그리고,
+ * 몸통 아랫변(viewBox y=108)이 발 위치에 오도록 위로 올린다.
+ */
+const SPRITE_WORLD = 71;
+const SPRITE_FOOT = 60;
 
-function drawScene(
-  ctx: CanvasRenderingContext2D,
-  s: JumpState,
-  partner: Character,
-  popups: Popup[],
-  squash: number,
-) {
+function drawScene(ctx: CanvasRenderingContext2D, s: JumpState, popups: Popup[]) {
   ctx.clearRect(0, 0, WORLD.width, WORLD.height);
   // 높이 눈금: 100점마다 점선 + 숫자
   const step = CONFIG.heightPerPoint * 100;
@@ -252,11 +198,7 @@ function drawScene(
   for (const p of s.platforms) drawPlatform(ctx, p, s.cameraY);
   for (const c of s.candies) drawCandy(ctx, c, s.cameraY, s.elapsedMs);
 
-  // 말랑이 (좌우 끝에 걸치면 반대편에도 그린다)
-  const r = CONFIG.playerRadius * 1.3;
-  drawPlayer(ctx, s, partner, squash, s.x);
-  if (s.x < r) drawPlayer(ctx, s, partner, squash, s.x + WORLD.width);
-  else if (s.x > WORLD.width - r) drawPlayer(ctx, s, partner, squash, s.x - WORLD.width);
+  // 말랑이는 캔버스 위 DOM(SVG) 스프라이트로 그린다 (placeSprites)
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
@@ -275,11 +217,17 @@ function drawScene(
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function MalangJumpGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  /** [본체, 화면 반대편 끝에 걸친 복사본] */
+  const spriteRefs = useRef<(HTMLDivElement | null)[]>([null, null]);
+  const buddyRefs = useRef<(PartnerBuddyHandle | null)[]>([null, null]);
+  /** CSS px / 월드 단위 */
+  const scaleRef = useRef(1);
+  const [spritePx, setSpritePx] = useState(60);
   const stateRef = useRef<JumpState | null>(null);
   if (stateRef.current === null) stateRef.current = createJumpState(defaultRng);
   /** 입력 원천: 키보드 좌/우, 캔버스 터치(포인터별 방향), 화면 버튼 */
@@ -295,6 +243,39 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     return d === 0 ? 0 : d < 0 ? -1 : 1;
   };
 
+  const react = (mood: PartnerMood, ms?: number) => {
+    for (const b of buddyRefs.current) b?.react(mood, ms, false);
+  };
+  const setBase = (mood: PartnerMood) => {
+    for (const b of buddyRefs.current) b?.setBase(mood);
+  };
+
+  /** 말랑이 스프라이트를 발 위치로 (좌우 끝에 걸치면 반대편에도). 리렌더 없이 transform만 바꾼다. */
+  const placeSprites = (s: JumpState, squash: number) => {
+    const k = scaleRef.current;
+    const size = SPRITE_WORLD * k;
+    // 착지 직후 납작, 빠르게 오를 때 살짝 길쭉
+    const stretch = Math.max(-0.12, Math.min(0.12, s.vy / 6000));
+    const sx = 1 + squash * 0.25 - stretch * 0.5;
+    const sy = 1 - squash * 0.25 + stretch;
+    const tilt = s.facing * Math.min(8, Math.abs(s.vy) / 200);
+    const top = (toScreenY(s.y, s.cameraY) - SPRITE_FOOT) * k;
+    const edge = SPRITE_WORLD / 2;
+    const mirrorX = s.x < edge ? s.x + WORLD.width : s.x > WORLD.width - edge ? s.x - WORLD.width : null;
+    const xs = [s.x, mirrorX];
+    for (let i = 0; i < xs.length; i++) {
+      const el = spriteRefs.current[i];
+      const x = xs[i];
+      if (!el) continue;
+      if (x === null || x === undefined) {
+        el.style.visibility = 'hidden';
+        continue;
+      }
+      el.style.visibility = 'visible';
+      el.style.transform = `translate(${(x * k - size / 2).toFixed(1)}px, ${top.toFixed(1)}px) rotate(${tilt.toFixed(1)}deg) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
+    }
+  };
+
   // 캔버스 해상도: 논리 월드를 devicePixelRatio에 맞춰 선명하게
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -302,12 +283,16 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cssW = canvas.clientWidth;
+      if (cssW <= 0) return;
+      scaleRef.current = cssW / WORLD.width;
+      setSpritePx(Math.round(SPRITE_WORLD * scaleRef.current));
+      if (stateRef.current) placeSprites(stateRef.current, 0);
       const scale = (cssW / WORLD.width) * dpr;
       canvas.width = Math.round(WORLD.width * scale);
       canvas.height = Math.round(WORLD.height * scale);
       const ctx = canvas.getContext('2d');
       ctx?.setTransform(scale, 0, 0, scale, 0, 0);
-      if (ctx && stateRef.current) drawScene(ctx, stateRef.current, partner, [], 0);
+      if (ctx && stateRef.current) drawScene(ctx, stateRef.current, []);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -356,13 +341,18 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       for (const ev of events) {
         if (ev.type === 'bounce') {
           playJump(sfx);
-          if (ev.kind === 'spring') sfx.tap(8);
+          if (ev.kind === 'spring') {
+            sfx.tap(8);
+            react('wow', 700);
+          }
           squash = 1;
         } else if (ev.type === 'candy') {
           sfx.pickup();
+          react('happy', 500);
           popups.push({ x: ev.x, y: ev.y + 10, text: `+${ev.points}`, age: 0 });
         } else if (ev.type === 'fall') {
           sfx.fail();
+          setBase('sad');
           if (!reduced) {
             wrapRef.current?.animate(
               [
@@ -377,6 +367,7 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           }
         } else {
           sfx.success();
+          setBase('happy');
         }
       }
     };
@@ -390,7 +381,8 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       handleEvents(out.events);
       popups = popups.map((p) => ({ ...p, age: p.age + dt })).filter((p) => p.age < 700);
       squash = Math.max(0, squash - dt / 140);
-      drawScene(ctx, out.state, partner, reduced ? [] : popups, reduced ? 0 : squash);
+      drawScene(ctx, out.state, reduced ? [] : popups);
+      placeSprites(out.state, reduced ? 0 : squash);
 
       hudAcc += dt;
       if (hudAcc > 100 || out.state.finished) {
@@ -498,6 +490,27 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         {statusText}
       </p>
       <div ref={wrapRef} className="mj__stage">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            ref={(el) => {
+              spriteRefs.current[i] = el;
+            }}
+            className="mj__partner"
+            style={{ width: spritePx, height: spritePx, visibility: i === 0 ? undefined : 'hidden' }}
+          >
+            <PartnerBuddy
+              ref={(h) => {
+                buddyRefs.current[i] = h;
+              }}
+              partner={partner}
+              shiny={partnerShiny}
+              size={spritePx}
+              animation="none"
+              emote={i === 0}
+            />
+          </div>
+        ))}
         <canvas
           ref={canvasRef}
           className="mj__canvas"

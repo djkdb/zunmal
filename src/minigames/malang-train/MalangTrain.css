@@ -1,4 +1,4 @@
-.mt {
+.trn {
   --mt-n: 13; /* logic.ts GRID와 같아야 한다 */
   display: flex;
   flex-direction: column;
@@ -6,7 +6,7 @@
 }
 
 /* ── 사탕 수 / 안내 / 속도 줄 ─────────────────────────────── */
-.mt__status {
+.trn__status {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -14,29 +14,29 @@
   min-height: 30px;
 }
 
-.mt__count,
-.mt__speed {
+.trn__count,
+.trn__speed {
   font-variant-numeric: tabular-nums;
 }
 
-.mt__count-icon {
+.trn__count-icon {
   display: inline-block;
   width: 20px;
   height: 20px;
   margin-left: -4px;
 }
 
-.mt__count-icon svg {
+.trn__count-icon svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.mt__speed {
+.trn__speed {
   background: var(--soda);
 }
 
-.mt__msg {
+.trn__msg {
   margin: 0;
   min-width: 0;
   text-align: center;
@@ -46,13 +46,13 @@
   color: var(--ink-soft);
 }
 
-.mt__msg.is-speed {
+.trn__msg.is-speed {
   font-size: var(--fs-s);
   color: var(--berry-deep);
 }
 
 /* ── 판: 체크무늬 식탁보 위 기찻길 (평평한 패널) ─────────────── */
-.mt__board {
+.trn__board {
   position: relative;
   /* 360×640에서도 방향 버튼까지 한 화면에 들어오도록 높이에 맞춰 줄인다 */
   width: min(100%, 360px, calc(100dvh - 312px));
@@ -60,7 +60,7 @@
   margin: 0 auto;
 }
 
-.mt__field {
+.trn__field {
   position: relative;
   aspect-ratio: 1;
   border: var(--line) solid var(--ink);
@@ -77,7 +77,7 @@
 }
 
 /* 한 칸 크기의 스프라이트. JS가 translate(칸×100%)로 옮긴다 */
-.mt__seg {
+.trn__seg {
   position: absolute;
   left: 0;
   top: 0;
@@ -87,21 +87,21 @@
   pointer-events: none;
 }
 
-.mt__baby {
+.trn__baby {
   position: absolute;
   inset: -6%;
   transform-origin: 50% 90%;
-  animation: mt-bob 0.66s ease-in-out infinite;
+  animation: trn-bob 0.66s ease-in-out infinite;
 }
 
-.mt__baby-svg,
-.mt__candy-svg {
+.trn__baby-svg,
+.trn__candy-svg {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-@keyframes mt-bob {
+@keyframes trn-bob {
   0%,
   100% {
     transform: translateY(0) rotate(-6deg) scale(1, 1);
@@ -118,11 +118,11 @@
 }
 
 /* 머리 = 파트너 말랑이. 칸보다 크게, 조금 위로 */
-.mt__seg--head {
+.trn__seg--head {
   z-index: 2;
 }
 
-.mt__head {
+.trn__head {
   position: absolute;
   left: -38%;
   top: -60%;
@@ -131,61 +131,66 @@
   transform-origin: 50% 85%;
 }
 
-.mt__head .malang {
+.trn__head .buddy {
+  width: 100%;
+  height: 100%;
+}
+
+.trn__head .malang {
   width: 100%;
   height: 100%;
   transform-origin: 50% 85%;
   transition: transform 0.12s ease-out;
 }
 
-.mt__seg--head.is-left .malang {
+.trn__seg--head.is-left .malang {
   transform: rotate(-10deg);
 }
 
-.mt__seg--head.is-right .malang {
+.trn__seg--head.is-right .malang {
   transform: rotate(10deg);
 }
 
-.mt__seg--head.is-up .malang {
+.trn__seg--head.is-up .malang {
   transform: translateY(-6%) scale(0.96, 1.04);
 }
 
-.mt__seg--head.is-down .malang {
+.trn__seg--head.is-down .malang {
   transform: translateY(4%) scale(1.04, 0.96);
 }
 
 /* 사탕 */
-.mt__item {
+.trn__item {
   position: absolute;
   width: calc(100% / var(--mt-n));
   height: calc(100% / var(--mt-n));
   transform: translate(-50%, -50%);
   pointer-events: none;
-  animation: mt-candy-in 0.22s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  animation: trn-candy-in 0.22s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
 
-.mt__item--golden {
+.trn__item--golden {
   width: calc(130% / var(--mt-n));
   height: calc(130% / var(--mt-n));
 }
 
-.mt__item--golden.is-blink {
-  animation: mt-blink 0.3s steps(2, jump-none) infinite;
+.trn__item--golden.is-blink {
+  animation: trn-blink 0.3s steps(2, jump-none) infinite;
 }
 
-@keyframes mt-candy-in {
+@keyframes trn-candy-in {
   from {
     transform: translate(-50%, -50%) scale(0);
   }
 }
 
-@keyframes mt-blink {
+@keyframes trn-blink {
   50% {
     opacity: 0.25;
   }
 }
 
-.mt__floater {
+.trn__floater {
   position: absolute;
   z-index: 3;
   pointer-events: none;
@@ -200,20 +205,20 @@
     -2px -2px 0 var(--paper),
     2px -2px 0 var(--paper),
     -2px 2px 0 var(--paper);
-  animation: mt-float 0.7s ease-out forwards;
+  animation: trn-float 0.7s ease-out forwards;
 }
 
-.mt__floater--gold {
+.trn__floater--gold {
   color: #c77f00;
   font-size: 1.5rem;
 }
 
-.mt__floater--bad {
+.trn__floater--bad {
   color: var(--ink);
   font-size: 1.5rem;
 }
 
-@keyframes mt-float {
+@keyframes trn-float {
   to {
     transform: translate(-50%, -220%);
     opacity: 0;
@@ -221,7 +226,7 @@
 }
 
 /* ── 방향 버튼: 뒤집힌 T 모양 젤리 키 ────────────────────── */
-.mt__pad {
+.trn__pad {
   display: grid;
   grid-template-columns: repeat(3, 64px);
   grid-template-rows: repeat(2, 46px);
@@ -229,7 +234,7 @@
   justify-content: center;
 }
 
-.mt__key {
+.trn__key {
   display: grid;
   place-items: center;
   min-width: 44px;
@@ -249,58 +254,58 @@
     box-shadow 0.06s ease;
 }
 
-.mt__key:active {
+.trn__key:active {
   transform: translateY(3px) scale(1.04, 0.94);
   box-shadow: 0 0 0 var(--ink);
 }
 
-.mt__key:focus-visible {
+.trn__key:focus-visible {
   outline: 3px solid var(--soda);
   outline-offset: 2px;
 }
 
-.mt__key--up {
+.trn__key--up {
   grid-column: 2;
   grid-row: 1;
 }
-.mt__key--left {
+.trn__key--left {
   grid-column: 1;
   grid-row: 2;
 }
-.mt__key--down {
+.trn__key--down {
   grid-column: 2;
   grid-row: 2;
 }
-.mt__key--right {
+.trn__key--right {
   grid-column: 3;
   grid-row: 2;
 }
 
 /* ── 움직임 줄이기: 통통 튀기·깜빡임·떠오르는 글자 없음 ──────── */
-.mt--reduced .mt__baby,
-.mt--reduced .mt__item,
-.mt--reduced .mt__floater {
+.trn--reduced .trn__baby,
+.trn--reduced .trn__item,
+.trn--reduced .trn__floater {
   animation: none;
 }
 
-.mt--reduced .mt__item--golden.is-blink {
+.trn--reduced .trn__item--golden.is-blink {
   animation: none;
   outline: 3px dashed var(--ink);
   outline-offset: -2px;
   border-radius: 50%;
 }
 
-.mt--reduced .mt__head .malang,
-.mt--reduced .mt__key {
+.trn--reduced .trn__head .malang,
+.trn--reduced .trn__key {
   transition: none;
 }
 
-.mt--reduced .mt__end span {
+.trn--reduced .trn__end span {
   animation: none;
 }
 
 /* 끝 안내는 카운트다운 숫자보다 글자가 길어 작게 */
-.mt__end {
+.trn__end {
   font-size: 3rem;
   text-align: center;
   border-radius: var(--radius-s);

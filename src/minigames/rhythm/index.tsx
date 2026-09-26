@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Malang } from '../../components/Malang';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -40,7 +40,7 @@ function eventTime(timeStamp: number): number {
   return timeStamp > 0 && Math.abs(now - timeStamp) < 1000 ? timeStamp : now;
 }
 
-function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function RhythmGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const stateRef = useRef<RhythmState | null>(null);
@@ -50,6 +50,7 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   const [flash, setFlash] = useState<Flash | null>(null);
   const [finished, setFinished] = useState(false);
   const malangRef = useRef<HTMLButtonElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const flashId = useRef(0);
   const reportedRef = useRef(false);
@@ -95,6 +96,7 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       if (swept.missed.length > 0) {
         stateRef.current = swept.state;
         showFlash('miss');
+        buddyRef.current?.react('oops', 500, false);
       }
       setElapsed(now);
       if (isFinished(swept.state, now)) {
@@ -113,6 +115,7 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     const s = stateRef.current;
     if (!s) return;
     sfx.success();
+    buddyRef.current?.setBase(s.miss <= s.perfect ? 'happy' : 'idle');
     const id = window.setTimeout(() => {
       if (reportedRef.current) return;
       reportedRef.current = true;
@@ -135,8 +138,11 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       showFlash(out.judgement);
       if (out.judgement === 'miss') {
         sfx.hit();
+        buddyRef.current?.react('oops', 500, false);
         return;
       }
+      // 퍼펙트는 반짝 눈, 좋아요는 웃는 눈 (몸은 아래에서 따로 눌린다)
+      buddyRef.current?.react(out.judgement === 'perfect' ? 'wow' : 'happy', 380, false);
       sfx.tap(Math.min(12, Math.floor(out.state.combo / 5)));
       if (!reduced) {
         malangRef.current?.animate(
@@ -229,7 +235,7 @@ function RhythmGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           // 포인터/키보드는 위 핸들러가 처리하므로 click은 무시(중복 방지)
           onClick={(e) => e.preventDefault()}
         >
-          <Malang character={partner} size={156} animation="none" decorative />
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={150} animation="none" />
         </button>
         {flash && (
           <span

@@ -24,6 +24,8 @@
 }
 
 .cc__canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   aspect-ratio: 320 / 480;
@@ -31,6 +33,16 @@
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
+}
+
+/* 파트너 말랑이: 캔버스 뒤에 있어서 캔버스의 그릇 앞면과 캡슐이 그 위에 그려진다 */
+.cc__partner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  transform-origin: 50% 85%;
+  will-change: transform;
 }
 
 .cc__controls {

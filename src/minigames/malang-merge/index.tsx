@@ -12,6 +12,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -95,7 +96,7 @@ function playMergeSound(sfx: MiniGameProps['sfx'], events: readonly MergeEvent[]
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
+function MalangMergeGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
 
@@ -105,6 +106,8 @@ function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
   const heldRef = useRef<HTMLDivElement>(null);
   const guideRef = useRef<HTMLDivElement>(null);
   const dropBtnRef = useRef<HTMLButtonElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
+  const dangerRef = useRef(false);
   const bodyEls = useRef(new Map<number, HTMLDivElement>());
   const squashEls = useRef(new Map<number, HTMLDivElement>());
   const startedRef = useRef(false);
@@ -184,6 +187,7 @@ function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
     if (next === prev) return;
     stateRef.current = next;
     sfx.tap(0);
+    buddyRef.current?.poke();
     setBodies(bodyViews(next, bornAt.current, performance.now()));
     setHeld({ current: next.current, next: next.next });
     paint(next);
@@ -291,10 +295,26 @@ function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
         if (changed) {
           setBodies(bodyViews(s, bornAt.current, t));
           playMergeSound(sfx, events);
+          // 파트너 반응: 큰 말랑이가 태어날수록 신난다
+          let top = -1;
+          let vanished = false;
+          for (const e of events) {
+            if (e.kind === 'merge') top = Math.max(top, e.tier);
+            if (e.kind === 'vanish') vanished = true;
+          }
+          if (vanished || top >= 6) buddyRef.current?.react('wow', 1000);
+          else if (top >= 3) buddyRef.current?.react('happy', 600);
         }
       }
 
       paint(s);
+
+      // 넘칠 것 같으면 파트너가 식은땀
+      const danger = s.dangerMs > 0;
+      if (danger !== dangerRef.current) {
+        dangerRef.current = danger;
+        buddyRef.current?.setBase(danger ? 'oops' : 'idle');
+      }
 
       hudAcc += dt;
       if (hudAcc > 100 || s.finished) {
@@ -310,6 +330,7 @@ function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
       if (s.finished) {
         if (s.endReason === 'overflow') sfx.fail();
         else sfx.success();
+        buddyRef.current?.setBase(s.endReason === 'overflow' ? 'sad' : 'happy');
         setEnded(s.endReason ?? 'time');
         return;
       }
@@ -416,11 +437,11 @@ function MalangMergeGame({ onFinish, onExit, sfx }: MiniGameProps) {
           ))}
         </ol>
         <div className="mm__next" aria-label={`다음 말랑이: ${nextCharacter.name}`}>
-          <span className="mm__next-label" aria-hidden="true">
-            다음
-          </span>
+          {/* 파트너가 다음 말랑이 방울을 들고 기다린다 */}
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={46} className="mm__buddy" />
           <span className="mm__next-bubble" aria-hidden="true">
             <Malang character={nextCharacter} size={34} animation="none" decorative />
+            <span className="mm__next-label">다음</span>
           </span>
         </div>
       </div>

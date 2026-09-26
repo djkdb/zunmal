@@ -8,11 +8,11 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Malang } from '../../components/Malang';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -67,7 +67,7 @@ const pct = (v: number) => `${((v + 0.5) / GRID) * 100}%`;
 /** 기차에 붙는 아기 말랑이: 작은 젤리 한 알 */
 const BabyMalang = memo(function BabyMalang({ color }: { color: string }) {
   return (
-    <svg className="mt__baby-svg" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+    <svg className="trn__baby-svg" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
       <path
         d="M6 27 C6 15 12 8 20 8 C28 8 34 15 34 27 C34 33 28 35 20 35 C12 35 6 33 6 27 Z"
         fill={color}
@@ -88,7 +88,7 @@ const Candy = memo(function Candy({ golden }: { golden: boolean }) {
   const body = golden ? '#ffc02e' : '#ff7aa2';
   const wrap = golden ? '#fff1a8' : '#5cc8ff';
   return (
-    <svg className="mt__candy-svg" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+    <svg className="trn__candy-svg" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
       {golden && (
         <path
           d="M20 1 v6 M20 33 v6 M1 20 h5 M34 20 h5 M6 6 l4 4 M34 6 l-4 4"
@@ -123,7 +123,7 @@ function ArrowGlyph({ dir }: { dir: Dir }) {
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function MalangTrainGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const stateRef = useRef<TrainState | null>(null);
@@ -135,7 +135,7 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   const [moved, setMoved] = useState(false);
   const fieldRef = useRef<HTMLDivElement>(null);
   const segRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const headRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
   const floaterId = useRef(0);
   const reported = useRef(false);
   const swipeRef = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -169,14 +169,6 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     window.setTimeout(() => setFloaters((f) => f.filter((it) => it.id !== id)), 700);
   }, []);
 
-  const squishHead = useCallback(() => {
-    if (reduced) return;
-    headRef.current?.animate(
-      [{ transform: 'scale(1,1)' }, { transform: 'scale(1.25,0.8)' }, { transform: 'scale(0.92,1.08)' }, { transform: 'scale(1,1)' }],
-      { duration: 260, easing: 'ease-out' },
-    );
-  }, [reduced]);
-
   const handleEvents = useCallback(
     (events: TrainEvent[]) => {
       for (const e of events) {
@@ -184,12 +176,15 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           if (e.kind === 'golden') sfx.coin();
           else sfx.pickup();
           addFloater(e.cell, `+${e.points}`, e.kind === 'golden' ? 'gold' : 'good');
-          squishHead();
+          // 맨 앞 파트너가 냠: 찌그러지며 웃고, 황금 사탕이면 반짝 눈
+          buddyRef.current?.react(e.kind === 'golden' ? 'wow' : 'happy', e.kind === 'golden' ? 900 : 500);
         } else if (e.type === 'speedUp') {
           sfx.beat(true);
           setSpeedToast(e.level);
         } else if (e.type === 'crash') {
           sfx.hit();
+          buddyRef.current?.setBase('sad');
+          buddyRef.current?.react('oops', 700);
           const head = stateRef.current?.snake[0];
           if (head) addFloater(head, '쿵!', 'bad');
           if (!reduced) {
@@ -207,7 +202,7 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         }
       }
     },
-    [addFloater, reduced, sfx, squishHead],
+    [addFloater, reduced, sfx],
   );
 
   // 게임 루프
@@ -251,8 +246,10 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   useEffect(() => {
     if (!finished) return;
     const s = stateRef.current;
-    if (s?.endReason === 'time' || s?.endReason === 'full') sfx.success();
-    else sfx.fail();
+    if (s?.endReason === 'time' || s?.endReason === 'full') {
+      sfx.success();
+      buddyRef.current?.setBase('happy');
+    } else sfx.fail();
     const id = window.setTimeout(() => {
       if (reported.current || !s) return;
       reported.current = true;
@@ -334,28 +331,28 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
   else message = '';
 
   return (
-    <div className={`mt${reduced ? ' mt--reduced' : ''}`}>
+    <div className={`trn${reduced ? ' trn--reduced' : ''}`}>
       <GameHud timeLeft={timeLeft} totalTime={CONFIG.durationMs / 1000} score={view.score} onExit={onExit} />
 
-      <div className="mt__status">
-        <span className="chip mt__count" aria-label={`먹은 사탕 ${view.eaten}개`}>
-          <span className="mt__count-icon" aria-hidden="true">
+      <div className="trn__status">
+        <span className="chip trn__count" aria-label={`먹은 사탕 ${view.eaten}개`}>
+          <span className="trn__count-icon" aria-hidden="true">
             <Candy golden={false} />
           </span>
           {view.eaten}
         </span>
-        <p className={`mt__msg${speedToast > 0 ? ' is-speed' : ''}`} aria-live="polite">
+        <p className={`trn__msg${speedToast > 0 ? ' is-speed' : ''}`} aria-live="polite">
           {message}
         </p>
-        <span className="chip mt__speed" aria-label={`속도 ${level + 1}단계`}>
+        <span className="chip trn__speed" aria-label={`속도 ${level + 1}단계`}>
           <span aria-hidden="true">속도 {level + 1}</span>
         </span>
       </div>
 
-      <div className="mt__board">
+      <div className="trn__board">
         <div
           ref={fieldRef}
-          className="mt__field"
+          className="trn__field"
           role="img"
           aria-label={`말랑 기차 판. 기차 길이 ${view.snake.length}칸`}
           onPointerDown={onFieldDown}
@@ -364,14 +361,14 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           onPointerCancel={onFieldUp}
         >
           {view.candy && (
-            <div className="mt__item" style={{ left: pct(view.candy.x), top: pct(view.candy.y) }}>
+            <div className="trn__item" style={{ left: pct(view.candy.x), top: pct(view.candy.y) }}>
               <Candy golden={false} />
             </div>
           )}
           {golden && (
             <div
               key={`g${golden.expiresAt}`}
-              className={`mt__item mt__item--golden${goldenBlink ? ' is-blink' : ''}`}
+              className={`trn__item trn__item--golden${goldenBlink ? ' is-blink' : ''}`}
               style={{ left: pct(golden.cell.x), top: pct(golden.cell.y) }}
             >
               <Candy golden />
@@ -388,14 +385,14 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
                 ref={(el) => {
                   segRefs.current[i] = el;
                 }}
-                className={i === 0 ? `mt__seg mt__seg--head is-${view.dir}` : 'mt__seg'}
+                className={i === 0 ? `trn__seg trn__seg--head is-${view.dir}` : 'trn__seg'}
               >
                 {i === 0 ? (
-                  <div ref={headRef} className="mt__head">
-                    <Malang character={partner} size={48} animation="none" decorative />
+                  <div className="trn__head">
+                    <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={48} animation="none" />
                   </div>
                 ) : (
-                  <div className="mt__baby" style={{ animationDelay: `${-i * 0.11}s` }}>
+                  <div className="trn__baby" style={{ animationDelay: `${-i * 0.11}s` }}>
                     <BabyMalang color={BABY_COLORS[(i - 1) % BABY_COLORS.length] ?? BABY_COLORS[0]} />
                   </div>
                 )}
@@ -405,7 +402,7 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
           {floaters.map((f) => (
             <span
               key={f.id}
-              className={`mt__floater mt__floater--${f.tone}`}
+              className={`trn__floater trn__floater--${f.tone}`}
               style={{ left: pct(f.cell.x), top: pct(f.cell.y) }}
               aria-hidden="true"
             >
@@ -415,18 +412,18 @@ function MalangTrainGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         </div>
         <Countdown count={count} />
         {finished && (
-          <div className="countdown mt__end" role="status">
+          <div className="countdown trn__end" role="status">
             <span>{endText}</span>
           </div>
         )}
       </div>
 
-      <div className="mt__pad" role="group" aria-label="방향 버튼">
+      <div className="trn__pad" role="group" aria-label="방향 버튼">
         {(['up', 'left', 'down', 'right'] as const).map((dir) => (
           <button
             key={dir}
             type="button"
-            className={`mt__key mt__key--${dir}`}
+            className={`trn__key trn__key--${dir}`}
             aria-label={DIR_LABEL[dir]}
             aria-disabled={!playing}
             onPointerDown={onPadDown(dir)}

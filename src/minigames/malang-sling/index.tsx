@@ -5,6 +5,8 @@ import { darken, lighten } from '../../lib/color';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
+import { PartnerBuddy, type PartnerBuddyHandle } from '../shared/PartnerBuddy';
+import { hasPartnerFlair, partnerTrailColor } from '../shared/partner';
 import { useCountdown } from '../shared/useCountdown';
 import type { MiniGame, MiniGameProps } from '../types';
 import {
@@ -321,6 +323,22 @@ interface View {
   aimPull: Vec | null;
   malang: Vec;
   loaded: boolean;
+  /** 비행 꼬리 색 (파트너 색) */
+  trailColor: string;
+  /** 전설 이상 파트너: 꼬리에 작은 별이 섞인다 (장식만) */
+  sparkle: boolean;
+}
+
+/** 네 갈래 반짝 별 */
+function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  const p = r * 0.25;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x + p, y - p, x + r, y);
+  ctx.quadraticCurveTo(x + p, y + p, x, y + r);
+  ctx.quadraticCurveTo(x - p, y + p, x - r, y);
+  ctx.quadraticCurveTo(x - p, y - p, x, y - r);
+  ctx.fill();
 }
 
 function drawScene(ctx: CanvasRenderingContext2D, s: SlingState, view: View, fx: Fx, t: number, reduced: boolean) {
@@ -394,13 +412,22 @@ function drawScene(ctx: CanvasRenderingContext2D, s: SlingState, view: View, fx:
 
   // 비행 궤적 잔상
   if (fx.trail.length > 1) {
-    ctx.fillStyle = 'rgba(43,34,51,0.25)';
+    const n = fx.trail.length;
+    ctx.fillStyle = view.trailColor;
     fx.trail.forEach((p, i) => {
       if (i % 2) return;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = 0.25 + (0.45 * i) / n;
+      if (view.sparkle && i % 6 === 0) {
+        ctx.fillStyle = '#ffd23f';
+        sparkle(ctx, p.x, p.y, 4.5);
+        ctx.fillStyle = view.trailColor;
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.6 + (1.4 * i) / n, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
+    ctx.globalAlpha = 1;
   }
 
   for (const b of s.bodies) {
@@ -454,12 +481,15 @@ function burst(fx: Fx, x: number, y: number, colors: readonly string[], n: numbe
 
 // ── 게임 컴포넌트 ───────────────────────────────────────────
 
-function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
+function MalangSlingGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGameProps) {
   const reduced = useReducedMotion();
   const { count, done: started } = useCountdown(sfx, { reduced });
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const malangRef = useRef<HTMLDivElement>(null);
+  const buddyRef = useRef<PartnerBuddyHandle>(null);
+  const trailColor = partnerTrailColor(partner);
+  const flair = hasPartnerFlair(partner.rarity);
   const frontBandRef = useRef<SVGLineElement>(null);
   const frontBandInkRef = useRef<SVGLineElement>(null);
   const fireBtnRef = useRef<HTMLButtonElement>(null);
@@ -530,6 +560,7 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         switch (e.type) {
           case 'launch':
             sfx.jump();
+            buddyRef.current?.react('wow', 900, false);
             fx.trail = [];
             fx.fade = 0;
             hudDirty = true;
@@ -543,7 +574,10 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
             if (now - fx.lastImpactSound > 90 && e.strength > 0.2) {
               fx.lastImpactSound = now;
               if (e.target === 'ground') sfx.beat(false);
-              else if (e.strength > 0.75) sfx.hit();
+              else if (e.strength > 0.75) {
+                sfx.hit();
+                buddyRef.current?.react('oops', 500, false);
+              }
               else sfx.beat(true);
             }
             break;
@@ -556,6 +590,7 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
             break;
           case 'pop':
             sfx.pickup();
+            buddyRef.current?.react('happy', 800, false);
             if (!reduced) {
               burst(fx, e.x, e.y, ['#ff7aa2', '#ffd23f', '#5cc8ff', '#7ed957', '#b98cff'], 14);
               navigator.vibrate?.(18);
@@ -574,16 +609,19 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
             break;
           case 'stageClear':
             sfx.success();
+            buddyRef.current?.setBase('happy');
             showBanner('클리어!', e.leftover > 0 ? `남은 발사 ${e.leftover}번 보너스 +${e.bonus}` : `+${e.bonus}`);
             hudDirty = true;
             break;
           case 'stageFail':
             sfx.fail();
+            buddyRef.current?.setBase('sad');
             showBanner('아쉬워요', '다음 스테이지로 가요');
             hudDirty = true;
             break;
           case 'nextStage':
             fxRef.current = newFx();
+            buddyRef.current?.setBase('idle');
             showBanner(`스테이지 ${e.stageIndex + 1}`);
             hudDirty = true;
             break;
@@ -709,7 +747,7 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
         fx.spin = 0;
       }
 
-      drawScene(ctx, s, { aimPull, malang, loaded: aiming && !!aimPull }, fx, now, reduced);
+      drawScene(ctx, s, { aimPull, malang, loaded: aiming && !!aimPull, trailColor, sparkle: flair }, fx, now, reduced);
 
       // DOM 말랑이 (캔버스 위)
       const el = malangRef.current;
@@ -741,7 +779,7 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [started, reduced, handleEvents, showBanner, syncHud]);
+  }, [started, reduced, handleEvents, showBanner, syncHud, trailColor, flair]);
 
   // 종료 처리: onFinish는 한 번만
   useEffect(() => {
@@ -841,11 +879,11 @@ function MalangSlingGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
             style={{ left: `${((SLING.x - 36 - i * 27) / WORLD.width) * 100}%`, top: `${((GROUND_Y - 13) / WORLD.height) * 100}%` }}
             aria-hidden="true"
           >
-            <Malang character={partner} size={Math.round(malangPx * 0.62)} animation="none" decorative />
+            <Malang character={partner} size={Math.round(malangPx * 0.62)} animation="none" shiny={partnerShiny} decorative />
           </div>
         ))}
         <div ref={malangRef} className="sl__malang" aria-hidden="true">
-          <Malang character={partner} size={malangPx} animation="none" decorative />
+          <PartnerBuddy ref={buddyRef} partner={partner} shiny={partnerShiny} size={malangPx} animation="none" emote={false} />
         </div>
         <svg className="sl__front" viewBox={`0 0 ${WORLD.width} ${WORLD.height}`} aria-hidden="true">
           <line ref={frontBandInkRef} x1={PRONG_FRONT.x} y1={PRONG_FRONT.y} x2={PRONG_BACK.x} y2={PRONG_BACK.y} stroke={INK} strokeWidth={7} strokeLinecap="round" />
