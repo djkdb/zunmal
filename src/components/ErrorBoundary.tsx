@@ -9,11 +9,11 @@ import './ErrorBoundary.css';
  * 저장소는 읽기만 한다 — 기록을 지우거나 덮지 않는다.
  * (React 오류 경계는 클래스로만 만들 수 있어 이 파일만 예외로 클래스를 쓴다.)
  */
-export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean; offline: boolean }> {
+  state = { failed: false, offline: false };
 
-  static getDerivedStateFromError(): { failed: boolean } {
-    return { failed: true };
+  static getDerivedStateFromError(error: unknown): { failed: boolean; offline: boolean } {
+    return { failed: true, offline: isChunkLoadError(error) };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
@@ -21,8 +21,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
   }
 
   render() {
-    return this.state.failed ? <CrashScreen /> : this.props.children;
+    return this.state.failed ? <CrashScreen offline={this.state.offline} /> : this.props.children;
   }
+}
+
+/** 화면 청크(지연 로딩)를 못 받은 오류 — 연결이 끊겼거나 새 버전이 올라와 옛 파일이 사라졌을 때 */
+function isChunkLoadError(error: unknown): boolean {
+  const msg = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  return /dynamically imported module|Importing a module script failed|error loading dynamically|Failed to fetch|ChunkLoadError/i.test(msg);
 }
 
 /** 스토어를 거치지 않고 저장 문자열(원본 → 백업 순)에서 기록 코드를 만든다 */
@@ -41,7 +47,7 @@ function codeFromStorage(): string | null {
   );
 }
 
-function CrashScreen() {
+function CrashScreen({ offline }: { offline: boolean }) {
   const [code, setCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const reload = (home: boolean) => {
@@ -68,9 +74,13 @@ function CrashScreen() {
         <circle cx="46" cy="44" r="6" fill="#fff" opacity="0.8" />
       </svg>
       <h1 id="crash-title" className="crash__title">
-        화면을 그리다 멈췄어요
+        {offline ? '화면을 받지 못했어요' : '화면을 그리다 멈췄어요'}
       </h1>
-      <p className="crash__text">기록은 이 기기에 그대로 있어요. 다시 불러오면 이어서 할 수 있어요.</p>
+      <p className="crash__text">
+        {offline
+          ? '인터넷 연결을 확인하고 다시 불러와 주세요. 기록은 이 기기에 그대로 있어요.'
+          : '기록은 이 기기에 그대로 있어요. 다시 불러오면 이어서 할 수 있어요.'}
+      </p>
       <div className="crash__actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => reload(false)}>
           다시 불러오기

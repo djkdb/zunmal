@@ -8,6 +8,7 @@ import { StarterPicker } from '../components/StarterPicker';
 import { TopBar } from '../components/TopBar';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useGameStore } from '../store/useGameStore';
+import { prefetchRoute, prefetchWhenIdle } from './routeChunks';
 
 /** 화면 전환: 새 화면이 살짝 아래에서 떠오르며 나타난다. transform/opacity만 쓰고, 끝나면 흔적을 남기지 않는다. */
 const ROUTE_ENTER: Keyframe[] = [
@@ -50,6 +51,23 @@ export function AppShell() {
     const noop = () => undefined;
     document.addEventListener('touchstart', noop, { passive: true });
     return () => document.removeEventListener('touchstart', noop);
+  }, []);
+
+  // 화면 청크 미리 받기: 한가할 때 자주 가는 뽑기·도감(작은 청크)을, 링크에 손가락·마우스·초점이 닿으면 그 화면을.
+  // 누르기(pointerdown)부터 클릭까지의 짧은 틈에도 받기 시작하므로 무거운 놀이방·미니게임도 거의 기다리지 않는다.
+  useEffect(() => {
+    const cancelIdle = prefetchWhenIdle(['/gacha', '/collection']);
+    const onIntent = (e: Event) => {
+      const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+      const href = link?.getAttribute('href');
+      if (href) prefetchRoute(href);
+    };
+    const events = ['pointerdown', 'mouseover', 'focusin'] as const;
+    for (const ev of events) document.addEventListener(ev, onIntent, { passive: true, capture: true });
+    return () => {
+      cancelIdle();
+      for (const ev of events) document.removeEventListener(ev, onIntent, { capture: true });
+    };
   }, []);
 
   // 첫 사용자 입력 이후에만 AudioContext 생성 (iOS 중단 뒤 재개·화면 숨김 처리 포함)

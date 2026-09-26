@@ -14,10 +14,11 @@
 import { createSeededRng, type RNG } from '../lib/rng';
 import { sfx as defaultEngine, type SfxEngine } from './sfx';
 import { MAJOR_PENTATONIC, midiToFreq } from './tuning';
+import type { TrackId } from './tracks';
 
 // ── 곡 정의 (순수 데이터) ────────────────────────────────────
 
-export type TrackId = 'home' | 'collection' | 'touch' | 'gacha' | 'minigame';
+export type { TrackId } from './tracks';
 export type VoiceId = 'marimba' | 'musicBox' | 'bell' | 'kalimba' | 'pad' | 'bass' | 'shaker' | 'click';
 
 export type ChordQuality = 'maj' | 'min' | 'maj7' | 'min7' | 'dom7' | 'sus2' | 'add9';
@@ -337,23 +338,8 @@ export function bucketPhrase(events: readonly NoteEvent[]): NoteEvent[][] {
   return buckets;
 }
 
-/** 경로 → 곡. 박자 게임(리듬)은 음악과 박자가 부딪히므로 조용히 둔다. */
-export const QUIET_GAME_IDS: readonly string[] = ['rhythm'];
-
-export function trackForPath(pathname: string): TrackId | null {
-  const path = pathname.replace(/\/+$/, '') || '/';
-  if (path === '/') return 'home';
-  if (path.startsWith('/play')) {
-    const gameId = path.split('/')[2];
-    return gameId && QUIET_GAME_IDS.includes(gameId) ? null : 'minigame';
-  }
-  if (path.startsWith('/gacha')) return 'gacha';
-  if (path.startsWith('/collection')) return 'collection';
-  // 디저트 가게: 도감과 같은 느긋한 곡
-  if (path.startsWith('/shop')) return 'collection';
-  if (path.startsWith('/touch')) return 'touch';
-  return 'home';
-}
+/** 경로 → 곡은 첫 화면용 작은 모듈(tracks.ts)에 있다 — 테스트·기존 import 호환으로 다시 내보낸다 */
+export { QUIET_GAME_IDS, trackForPath } from './tracks';
 
 // ── 박자 계산 (순수) ─────────────────────────────────────────
 

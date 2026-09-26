@@ -5,7 +5,7 @@ import { computeShopRates, shownPerHour, type ShopContext } from '../../economy/
 import { previewStaffChange } from '../../economy/shopPreview';
 import { useGameStore } from '../../store/useGameStore';
 import { Malang } from '../Malang';
-import { SheetDialog } from './SheetDialog';
+import { Modal } from '../Modal';
 import { RarityBadge } from '../RarityBadge';
 import { BonusChips } from './BonusChips';
 import { setChangeText, trendText } from './perks';
@@ -52,7 +52,7 @@ export function StaffPicker({ slot, slots, onClose }: StaffPickerProps) {
   };
 
   return (
-    <SheetDialog labelledBy={titleId} onClose={onClose} className="staff-sheet">
+    <Modal labelledBy={titleId} onClose={onClose} className="staff-sheet">
       <h2 id={titleId} className="staff-sheet__title">
         일할 말랑이 고르기
       </h2>
@@ -144,6 +144,6 @@ export function StaffPicker({ slot, slots, onClose }: StaffPickerProps) {
           닫기
         </button>
       </div>
-    </SheetDialog>
+    </Modal>
   );
 }

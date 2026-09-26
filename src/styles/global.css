@@ -777,10 +777,51 @@ strong {
   }
 }
 
-/* 지연 로딩 화면(미니게임·놀이방) — 잠깐 보이는 안내 */
+/* 지연 로딩 화면(뽑기·도감·미니게임·가게·놀이방, components/PageLoading.tsx) — 빨리 받으면 보이지 않게 잠깐 뒤에 나타난다 */
 .page-loading {
-  margin: 40vh 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 28vh 0 0;
   text-align: center;
   color: var(--sub);
   font-size: var(--fs-s);
+  font-weight: var(--fw-ui);
+  opacity: 0;
+  animation: page-loading-in 200ms var(--ease-enter) 250ms forwards;
+}
+
+.page-loading__capsule {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  animation: page-loading-hop 700ms var(--ease-press) infinite alternate;
+}
+
+@keyframes page-loading-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-loading-hop {
+  to {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loading {
+    opacity: 1;
+    animation: none;
+  }
+
+  .page-loading__capsule {
+    animation: none;
+  }
 }
