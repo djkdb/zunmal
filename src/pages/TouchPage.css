@@ -114,6 +114,57 @@
   z-index: 4;
 }
 
+/* ── 꾸미기 소품 (3D 에서는 3D 캔버스 아래 층) ───────────────── */
+
+.playroom__props {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pr-prop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.pr-prop__art {
+  position: absolute;
+  display: block;
+  transform-origin: 50% 100%;
+  transition: transform 0.26s var(--ease-jelly);
+}
+
+.pr-prop__art svg {
+  display: block;
+  overflow: visible;
+}
+
+.pr-prop__shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: calc(var(--pr-sprite) * 0.12);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(26 64 128 / 0.2), rgb(26 64 128 / 0));
+  transform: translate(-50%, -50%);
+}
+
+/* 끌고 있는 소품: 살짝 들린다 */
+.pr-prop.is-held .pr-prop__art {
+  transform: translateY(-6px) scale(1.06);
+  transition-duration: 0.12s;
+}
+
+.playroom[data-dark-mat] .pr-body__shadow,
+.playroom[data-dark-mat] .pr-prop__shadow {
+  background: radial-gradient(closest-side, rgb(10 16 48 / 0.4), rgb(10 16 48 / 0));
+}
+
 /* ── 매트 위 말랑이 ─────────────────────────────────────────── */
 
 .pr-body,
@@ -1007,6 +1058,164 @@
   cursor: pointer;
 }
 
+/* ── 꾸미기 시트 ─────────────────────────────────────────── */
+
+.pr-decor__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 8px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-s);
+  letter-spacing: var(--tracking-title);
+}
+
+.pr-decor__count {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.pr-decor__mats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-decor__mat {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 6px 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+.pr-decor__mat:active {
+  transform: scale(0.96);
+  transition-duration: var(--press-in);
+}
+
+.pr-decor__mat.is-on {
+  box-shadow:
+    0 0 0 3px var(--primary-deep),
+    var(--shadow-card);
+}
+
+.pr-decor__swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 52px;
+  border-radius: 11px;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(26 64 128 / 0.08);
+}
+
+.pr-decor__check {
+  filter: drop-shadow(0 2px 3px rgb(26 64 128 / 0.2));
+}
+
+.pr-decor__name {
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.pr-decor__props {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-decor__prop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px 8px 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--press-out) var(--ease-jelly);
+}
+
+.pr-decor__prop:active:not([aria-disabled='true']) {
+  transform: scale(0.96);
+  transition-duration: var(--press-in);
+}
+
+.pr-decor__prop.is-on {
+  background: var(--primary-tint);
+}
+
+.pr-decor__prop[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pr-decor__prop-art {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: end center;
+  width: 46px;
+  height: 48px;
+}
+
+.pr-decor__prop-art svg {
+  overflow: visible;
+}
+
+.pr-decor__prop-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pr-decor__prop-text .pr-decor__name {
+  text-align: left;
+  font-size: var(--fs-s);
+}
+
+.pr-decor__state {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--sub);
+}
+
+.pr-decor__prop.is-on .pr-decor__state {
+  color: var(--primary-text);
+}
+
+.pr-decor__hint {
+  margin: 10px 0 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--sub);
+}
+
 /* ── 손가락 시범 ──────────────────────────────────────────── */
 
 .pr-ghost {
@@ -1375,7 +1584,10 @@
   .pr-capsule__art .cap-bottom,
   .pr-info__bar > span,
   .pr-round,
-  .pr-shelf__slot {
+  .pr-shelf__slot,
+  .pr-prop__art,
+  .pr-decor__mat,
+  .pr-decor__prop {
     transition: none;
   }
   .pr-burst__top,

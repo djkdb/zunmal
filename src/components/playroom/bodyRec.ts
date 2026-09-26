@@ -1,14 +1,30 @@
 /**
- * 놀이방 매트 위 물건 하나(말랑이 또는 봉인된 캡슐)의 화면 쪽 기록.
- * 물리 위치는 world.ts 의 같은 key 몸, 반응은 MalangActor, 그림은 DOM(2D·캡슐) 또는 3D 무대의 몸.
- * 3단계(꾸미기 소품)도 같은 기록에 kind 를 더해 매트 위에 올리면 된다.
+ * 놀이방 매트 위 물건의 화면 쪽 기록.
+ *  - 말랑이·봉인된 캡슐(BodyRec): 물리 위치는 world.ts 의 같은 key 몸, 반응은 MalangActor, 그림은 DOM(2D·캡슐) 또는 3D 무대의 몸.
+ *  - 꾸미기 소품(PropRec): 물리는 world.ts 의 움직이지 않는 장애물(같은 key), 그림은 DOM(PropArt). 반응·입자는 없다.
+ *    3D 에서는 3D 캔버스 아래 층에, 2D 에서는 말랑이와 같은 층에 깊이 순서로 그린다.
  */
 import type { Character } from '../../data/characters';
+import type { PropId } from '../../data/playroomDecor';
 import type { FxSource } from '../touch3d/fxLayer';
 import type { JellyBodyView } from '../touch3d/jellyScene';
 import type { MalangActor } from './malangActor';
 
 export type MatKind = 'malang' | 'capsule';
+
+/** 손가락이 잡은 것의 종류 (소품은 세계의 몸이 아니라 장애물) */
+export type GrabKind = MatKind | 'prop';
+
+export interface PropRec {
+  /** world 장애물 id = propKey(id) */
+  key: string;
+  id: PropId;
+  el: HTMLDivElement | null;
+}
+
+export function propKey(id: PropId): string {
+  return `prop:${id}`;
+}
 
 export interface BodyEls {
   wrap: HTMLDivElement | null;
