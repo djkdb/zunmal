@@ -1,0 +1,307 @@
+.mt {
+  --mt-n: 13; /* logic.ts GRID와 같아야 한다 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── 사탕 수 / 안내 / 속도 줄 ─────────────────────────────── */
+.mt__status {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.mt__count,
+.mt__speed {
+  font-variant-numeric: tabular-nums;
+}
+
+.mt__count-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-left: -4px;
+}
+
+.mt__count-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mt__speed {
+  background: var(--soda);
+}
+
+.mt__msg {
+  margin: 0;
+  min-width: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  color: var(--ink-soft);
+}
+
+.mt__msg.is-speed {
+  font-size: var(--fs-s);
+  color: var(--berry-deep);
+}
+
+/* ── 판: 체크무늬 식탁보 위 기찻길 (평평한 패널) ─────────────── */
+.mt__board {
+  position: relative;
+  /* 360×640에서도 방향 버튼까지 한 화면에 들어오도록 높이에 맞춰 줄인다 */
+  width: min(100%, 360px, calc(100dvh - 312px));
+  min-width: 240px;
+  margin: 0 auto;
+}
+
+.mt__field {
+  position: relative;
+  aspect-ratio: 1;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-s);
+  background:
+    linear-gradient(90deg, rgba(255, 122, 162, 0.16) 50%, transparent 0) 0 0 / calc(200% / var(--mt-n)) 100%,
+    linear-gradient(0deg, rgba(255, 122, 162, 0.16) 50%, transparent 0) 0 0 / 100% calc(200% / var(--mt-n)),
+    var(--paper);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+
+/* 한 칸 크기의 스프라이트. JS가 translate(칸×100%)로 옮긴다 */
+.mt__seg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% / var(--mt-n));
+  height: calc(100% / var(--mt-n));
+  will-change: transform;
+  pointer-events: none;
+}
+
+.mt__baby {
+  position: absolute;
+  inset: -6%;
+  transform-origin: 50% 90%;
+  animation: mt-bob 0.66s ease-in-out infinite;
+}
+
+.mt__baby-svg,
+.mt__candy-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes mt-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg) scale(1, 1);
+  }
+  25% {
+    transform: translateY(-10%) rotate(0deg) scale(0.94, 1.06);
+  }
+  50% {
+    transform: translateY(0) rotate(6deg) scale(1.06, 0.94);
+  }
+  75% {
+    transform: translateY(-6%) rotate(0deg) scale(1, 1);
+  }
+}
+
+/* 머리 = 파트너 말랑이. 칸보다 크게, 조금 위로 */
+.mt__seg--head {
+  z-index: 2;
+}
+
+.mt__head {
+  position: absolute;
+  left: -38%;
+  top: -60%;
+  width: 176%;
+  height: 176%;
+  transform-origin: 50% 85%;
+}
+
+.mt__head .malang {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 85%;
+  transition: transform 0.12s ease-out;
+}
+
+.mt__seg--head.is-left .malang {
+  transform: rotate(-10deg);
+}
+
+.mt__seg--head.is-right .malang {
+  transform: rotate(10deg);
+}
+
+.mt__seg--head.is-up .malang {
+  transform: translateY(-6%) scale(0.96, 1.04);
+}
+
+.mt__seg--head.is-down .malang {
+  transform: translateY(4%) scale(1.04, 0.96);
+}
+
+/* 사탕 */
+.mt__item {
+  position: absolute;
+  width: calc(100% / var(--mt-n));
+  height: calc(100% / var(--mt-n));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: mt-candy-in 0.22s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mt__item--golden {
+  width: calc(130% / var(--mt-n));
+  height: calc(130% / var(--mt-n));
+}
+
+.mt__item--golden.is-blink {
+  animation: mt-blink 0.3s steps(2, jump-none) infinite;
+}
+
+@keyframes mt-candy-in {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+
+@keyframes mt-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.mt__floater {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--berry-deep);
+  text-shadow:
+    2px 2px 0 var(--paper),
+    -2px -2px 0 var(--paper),
+    2px -2px 0 var(--paper),
+    -2px 2px 0 var(--paper);
+  animation: mt-float 0.7s ease-out forwards;
+}
+
+.mt__floater--gold {
+  color: #c77f00;
+  font-size: 1.5rem;
+}
+
+.mt__floater--bad {
+  color: var(--ink);
+  font-size: 1.5rem;
+}
+
+@keyframes mt-float {
+  to {
+    transform: translate(-50%, -220%);
+    opacity: 0;
+  }
+}
+
+/* ── 방향 버튼: 뒤집힌 T 모양 젤리 키 ────────────────────── */
+.mt__pad {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 46px);
+  gap: 6px 8px;
+  justify-content: center;
+}
+
+.mt__key {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-s);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0 30%, transparent 31%) 50% 4px / 70% 100% no-repeat,
+    var(--berry);
+  box-shadow: var(--keycap-s);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.06s ease;
+}
+
+.mt__key:active {
+  transform: translateY(3px) scale(1.04, 0.94);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.mt__key:focus-visible {
+  outline: 3px solid var(--soda);
+  outline-offset: 2px;
+}
+
+.mt__key--up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.mt__key--left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.mt__key--down {
+  grid-column: 2;
+  grid-row: 2;
+}
+.mt__key--right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+/* ── 움직임 줄이기: 통통 튀기·깜빡임·떠오르는 글자 없음 ──────── */
+.mt--reduced .mt__baby,
+.mt--reduced .mt__item,
+.mt--reduced .mt__floater {
+  animation: none;
+}
+
+.mt--reduced .mt__item--golden.is-blink {
+  animation: none;
+  outline: 3px dashed var(--ink);
+  outline-offset: -2px;
+  border-radius: 50%;
+}
+
+.mt--reduced .mt__head .malang,
+.mt--reduced .mt__key {
+  transition: none;
+}
+
+.mt--reduced .mt__end span {
+  animation: none;
+}
+
+/* 끝 안내는 카운트다운 숫자보다 글자가 길어 작게 */
+.mt__end {
+  font-size: 3rem;
+  text-align: center;
+  border-radius: var(--radius-s);
+}
