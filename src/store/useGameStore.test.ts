@@ -402,6 +402,15 @@ describe('디저트 가게 / 말랑 선물', () => {
     expect(store.getState().claimShop(at(100))).toBe(90);
   });
 
+  it('가게 코인을 받으면 오늘 하루 기록에 센다 (홈 "오늘" 줄), 못 받으면 세지 않는다', () => {
+    const store = makeStore();
+    store.getState().chooseStarter('peach-mochi', T0);
+    store.getState().claimShop(T0);
+    expect(store.getState().missions.progress['shop-claim']).toBeUndefined();
+    store.getState().claimShop(at(2));
+    expect(store.getState().missions.progress['shop-claim']).toBe(1);
+  });
+
   it('가게 수입은 미니게임 일일 상한과 무관하다', () => {
     const store = makeStore();
     store.getState().chooseStarter('peach-mochi', T0);

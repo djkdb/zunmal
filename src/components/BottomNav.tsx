@@ -1,8 +1,7 @@
 import type { ComponentType } from 'react';
 import { NavLink } from 'react-router-dom';
-import { seoulDateKey } from '../economy/daily';
-import { generateDailyMissions, hasClaimable, rollMissions } from '../missions/missions';
-import { useGameStore } from '../store/useGameStore';
+import { homeAlerts } from '../goals/alerts';
+import { useHub } from './home/useHub';
 import { BookIcon, CapsuleIcon, JoystickIcon, PetIcon, ShopIcon } from './icons';
 
 const NAV_ITEMS: { to: string; label: string; Icon: ComponentType<{ size?: number }>; end: boolean }[] = [
@@ -13,26 +12,21 @@ const NAV_ITEMS: { to: string; label: string; Icon: ComponentType<{ size?: numbe
   { to: '/collection', label: '도감', Icon: BookIcon, end: false },
 ];
 
-/** 받을 수 있는 미션 보상이 있는가 → 홈 탭에 알림 점 */
-function useMissionAlert(): boolean {
-  const missions = useGameStore((s) => s.missions);
-  const state = rollMissions(missions, seoulDateKey());
-  return hasClaimable(state, generateDailyMissions(state.date));
-}
-
+/** 홈 탭 알림 점: 받을 선물·미션·세트 보상, 가득 찬 가게, 열지 않은 캡슐 (goals/alerts.ts) */
 export function BottomNav() {
-  const missionAlert = useMissionAlert();
+  const alerts = homeAlerts(useHub(30_000));
+  const homeAlert = alerts.any;
   return (
     <nav className="bottom-nav" aria-label="주요 메뉴">
       {NAV_ITEMS.map(({ to, label, Icon, end }) => (
         <NavLink key={to} to={to} end={end} className={({ isActive }) => `bottom-nav__item${isActive ? ' is-active' : ''}`}>
           <span className="bottom-nav__icon">
             <Icon size={22} />
-            {to === '/' && missionAlert && <span className="bottom-nav__dot" />}
+            {to === '/' && homeAlert && <span className="bottom-nav__dot" />}
           </span>
           <span>
             {label}
-            {to === '/' && missionAlert && <span className="visually-hidden">, 받을 미션 보상 있음</span>}
+            {to === '/' && homeAlert && <span className="visually-hidden">, {alerts.label}</span>}
           </span>
         </NavLink>
       ))}

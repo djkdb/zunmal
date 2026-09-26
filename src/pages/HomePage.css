@@ -52,7 +52,8 @@
 .home__partner {
   position: relative;
   z-index: 1;
-  margin-top: 6px;
+  /* 말랑이 그림 위쪽은 장식 자리라 비어 있다 — 말풍선 쪽으로 살짝 당긴다 */
+  margin-top: -6px;
   border-radius: 50%;
 }
 
@@ -100,159 +101,12 @@
   height: auto;
 }
 
-/* 도감 진행: 등급색 점 32칸 */
-.home__jar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  color: var(--ink);
-  text-decoration: none;
-  transition: transform var(--press-out) var(--ease-jelly);
-}
-
-.home__jar:active {
-  transform: scale(0.98);
-  transition-duration: var(--press-in);
-}
-
-.home__slots {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  gap: 4px;
-}
-
-.home__slot {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.home__slot.is-filled {
-  box-shadow: none;
-}
-
-.home__jar-count {
-  font-weight: 700;
-  font-size: var(--fs-s);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 다음 목표 말풍선 ─────────────────────────────────────────
- * 파트너 말풍선 자리를 그대로 쓴다(높이를 더하지 않아 주요 버튼이 첫 화면에 남는다).
- * 누를 수 있어서 알약 모양 + 조금 더 짙은 그림자. */
-.home__goal {
-  display: flex;
-  align-items: center;
-  max-width: min(100%, 330px);
-  padding: 0;
-  box-shadow: var(--shadow-btn);
-}
-
-.home__goal-link {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 6px 4px 7px 16px;
-  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
-  color: var(--ink);
-  text-decoration: none;
-  word-break: keep-all;
-}
-
-.home__goal-link:active {
-  transform: translateY(1px);
-}
-
-.home__goal-text {
-  text-align: left;
-}
-
-.home__goal-steps {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 3px;
-  flex-shrink: 0;
-}
-
-.home__goal-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--sky-tint);
-}
-
-.home__goal-dot.is-done {
-  background: var(--sky);
-}
-
-.home__goal-dot.is-now {
-  background: var(--primary-deep);
-}
-
-.home__goal-close {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  border-left: 1px solid var(--border);
-  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
-  background: none;
-  color: var(--sub);
-  cursor: pointer;
-}
-
-/* 안내 중인 버튼에 붙는 스티커 (절대 위치라 높이를 더하지 않는다) */
-.home__sticker {
-  position: absolute;
-  top: -11px;
-  right: 2px;
-  padding: 2px 10px 3px;
-  border-radius: var(--radius-pill);
-  background: var(--lemon);
-  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.16);
-  color: var(--ink);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.3;
-  white-space: nowrap;
-  animation: home-sticker 1.6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes home-sticker {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home__sticker {
-    animation: none;
-  }
-}
-
-/* 코인이 모자랄 때의 주인공 버튼: 두 줄이라 글자를 조금 줄인다 */
+/* 코인이 모자랄 때의 주인공 버튼: 좁으면 두 줄이라 글자를 조금 줄인다 */
 .home__action--earn {
   font-size: 1.0625rem;
   line-height: 1.2;
   text-align: center;
+  word-break: keep-all;
 }
 
 /* ── 파트너를 누를 수 있다는 표시 ─────────────────────────────
@@ -348,8 +202,10 @@
 }
 
 .home__gift-btn {
+  flex-shrink: 0;
   min-height: 44px;
   padding-inline: 16px;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -433,5 +289,12 @@
   .home__daily-gift-box,
   .home__daily-gift.is-opening .home__daily-gift-box {
     animation: none;
+  }
+}
+
+/* 아주 좁은 폰: 두 줄짜리 "코인 벌기" 버튼은 아이콘을 빼고 글자에 자리를 준다 */
+@media (max-width: 359px) {
+  .home__action--earn svg {
+    display: none;
   }
 }
