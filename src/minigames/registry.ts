@@ -5,6 +5,7 @@ import rhythm from './rhythm';
 import malangJump from './malang-jump';
 import popUp from './pop-up';
 import stack from './stack';
+import balloonFloat from './balloon-float';
 import type { MiniGame } from './types';
 
 /**
@@ -19,6 +20,7 @@ export const MINI_GAMES: readonly MiniGame[] = [
   malangJump,
   popUp,
   stack,
+  balloonFloat,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
