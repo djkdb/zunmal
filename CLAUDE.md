@@ -169,7 +169,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 
 - 쿠폰: 목록은 `economy/config.ts`의 `COUPONS`(id·코드·코인·이름·기간), 확인은 순수 모듈 `economy/coupons.ts`(대소문자·공백 무시, 저장당 1회).
   받은 쿠폰 id는 저장 v6 `redeemedCoupons`. 입력 칸은 홈 아래 `components/CouponBox.tsx`. 서버가 없어 코드는 앱 안에 있다(선물용, 보안 수단 아님).
-  현재: `zun` = 오픈 기념 1000코인. 쿠폰 칸 아래 "인스타 공지·DM에서 받은 코드를 넣어요".
+  현재: `zun` = 오픈 기념 1000코인. 쿠폰 칸 아래 "인스타 공지나 DM에서 받은 코드를 넣어요".
 - **선물 링크**: 인스타 DM·공지에는 `https://zunmal.pages.dev/?c=zun`(HashRouter라 `#/?c=zun`도 됨)을 보낸다. 앱 시작 때(`main.tsx`,
   라우터보다 먼저) `app/couponLink.ts`가 순수 모듈 `lib/couponLink.ts`(`parseCouponLink`, 테스트)로 코드를 꺼내고 주소에서 `c`를 지운다.
   코드는 저장이 아니라 이번 실행 동안만 들고 있고, 홈 파트너 말풍선 자리에 "선물 쿠폰이 도착했어요 + 받기"(받을 수 있을 때만, 이미 받았으면 버림),

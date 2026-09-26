@@ -66,7 +66,7 @@ export function CouponBox() {
           받기
         </button>
       </div>
-      <p className="coupon__hint">인스타 공지·DM에서 받은 코드를 넣어요</p>
+      <p className="coupon__hint">인스타 공지나 DM에서 받은 코드를 넣어요</p>
       {message && (
         <p className={`coupon__msg${message.ok ? ' is-ok' : ''}`} role="status">
           {message.text}
