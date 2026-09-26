@@ -40,6 +40,8 @@ export interface PhotoInput {
   rarity: Rarity;
   shiny: boolean;
   level: number;
+  /** 여럿이 함께 찍었을 때 애정 단계 대신 쓰는 한 줄 (3단계 단체 사진 틀이 이 자리를 키운다) */
+  caption?: string;
   /** 말랑이 상자 (client 좌표) — 사진 칸을 여기에 맞춘다 */
   jelly: Rect;
   /** 잘라낼 수 있는 범위 (client 좌표, 무대) */
@@ -275,9 +277,9 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   // 이름 (풍선 글씨)
   balloonText(ctx, input.name, L.name.x, L.name.y, L.name.size);
 
-  // 애정 단계: 하트 + 글자
+  // 애정 단계(또는 단체 사진 한 줄): 하트 + 글자
   ctx.font = `${L.level.size}px ${FONT}`;
-  const levelText = `애정 Lv.${input.level}`;
+  const levelText = input.caption ?? `애정 Lv.${input.level}`;
   const lw = ctx.measureText(levelText).width;
   const hx = L.level.x - lw / 2 - 30;
   heart(ctx, hx, L.level.y, 24);

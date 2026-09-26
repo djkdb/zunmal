@@ -976,3 +976,77 @@ export function shutter(): void {
     thump(ctx, out, t0 + 0.085, 220, 0.08, 0.05);
   });
 }
+
+// ── 놀이방: 착지·부딪힘·캡슐 ─────────────────────────────────
+
+/** 매트에 떨어져 철퍽 내려앉는 소리. strength 0..1 (떨어진 속도) */
+export function land(strength = 0.6): void {
+  const o = output();
+  if (!o || !gated('land', o.ctx, 0.07)) return;
+  if (!takeVoice(0.2)) return;
+  const s = clamp01(strength);
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.003;
+    thump(ctx, out, t0, jitter(170 + 60 * s, 0.1, rand), 0.1 + 0.16 * s, 0.12);
+    slap(ctx, out, t0, 0.05 + 0.12 * s, jitter(850, 0.15, rand), 0.06 + 0.03 * s);
+  });
+}
+
+/** 말랑이끼리 툭 부딪힘: 작고 높은 "뽀용" */
+export function bump(strength = 0.5): void {
+  const o = output();
+  if (!o || !gated('bump', o.ctx, 0.09)) return;
+  if (!takeVoice(0.16)) return;
+  const s = clamp01(strength);
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.003;
+    const f = jitter(520 + 200 * s, 0.12, rand);
+    glide(ctx, out, t0, f, f * 1.35, 0.07, 0.05 + 0.08 * s);
+    slap(ctx, out, t0, 0.03 + 0.05 * s, 1400, 0.03);
+  });
+}
+
+/** 캡슐을 비틀 때 톱니 "딱" (작게) */
+export function capsuleTick(): void {
+  const o = output();
+  if (!o || !gated('capTick', o.ctx, 0.05)) return;
+  if (!takeVoice(0.06)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    slap(ctx, out, ctx.currentTime + 0.002, 0.1, jitter(3600, 0.1, rand), 0.018);
+  });
+}
+
+/** 캡슐 반쪽이 풀리는 플라스틱 "딸깍" */
+export function capsuleClick(): void {
+  const o = output();
+  if (!o) return;
+  if (!takeVoice(0.15)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.003;
+    slap(ctx, out, t0, 0.24, 3000, 0.025);
+    slap(ctx, out, t0 + 0.05, 0.3, 2100, 0.035);
+    glide(ctx, out, t0 + 0.05, 1900, 1500, 0.05, 0.08, 'triangle');
+  });
+}
+
+/** 캡슐이 열리며 말랑이가 튀어나오는 "뽁!" (공기 빠지는 소리 + 높아지는 방울) */
+export function popOut(): void {
+  const o = output();
+  if (!o) return;
+  if (!takeVoice(0.4)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.004;
+    glide(ctx, out, t0, 280, 1300, 0.07, 0.3);
+    glide(ctx, out, t0 + 0.06, 1300, 1000, 0.08, 0.14);
+    slap(ctx, out, t0, 0.14, 2400, 0.03);
+    for (let i = 0; i < 3; i++) {
+      const f = jitter(1200 + i * 300, 0.1, rand);
+      glide(ctx, out, t0 + 0.1 + i * 0.05, f, f * 1.4, 0.06, 0.06);
+    }
+  });
+}

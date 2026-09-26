@@ -1,5 +1,6 @@
 /**
- * 말랑 만지기 입자 캔버스 — 3D 캔버스 위(2D 대체 모드에서도 같은 자리)에 얹는 Canvas 2D 한 장.
+ * 놀이방 입자 캔버스 — 3D 캔버스 위(2D 대체 모드에서도 같은 자리)에 얹는 Canvas 2D 한 장.
+ * 매트 위 말랑이마다 입자 출처(source)를 하나씩 붙이고, 입자 풀과 그리기 루프는 함께 쓴다.
  * 움직임은 순수 모듈 `touch/touchFx.ts`, 그리기는 `touch/touchFxDraw.ts`.
  *
  * - 자체 requestAnimationFrame 루프: 입자가 있거나 떠다니는 입자(시크릿)가 켜져 있을 때만 돈다.
@@ -33,17 +34,21 @@ export interface BodyBox {
   headY?: number;
 }
 
-export interface FxLayerOptions {
-  canvas: HTMLCanvasElement;
+/** 한 말랑이의 입자 출처 (등급별 모양·색·수) */
+export interface FxSourceOptions {
   styles: FxStyleSet;
   spec: TouchFxSpec;
   shiny: boolean;
   /** 몸 위치 (client 좌표) */
   getBody: () => BodyBox | null;
+}
+
+export interface FxLayerOptions {
+  canvas: HTMLCanvasElement;
   rng?: RNG;
 }
 
-export interface FxLayer {
+export interface FxSource {
   /** client 좌표에서 입자를 뿜는다. 좌표가 없으면 몸 가운데 */
   emit(event: FxEvent, clientX?: number, clientY?: number, strength?: number): void;
   /** 끄는 동안 손가락 위치: 등급 표의 간격마다 꼬리 입자 */
@@ -52,6 +57,12 @@ export interface FxLayer {
   /** 반응 입자: 하트(손가락/머리), 졸음 z(머리), 빙글빙글 별(머리 둘레) */
   react(kind: ReactionFx, count: number, clientX?: number, clientY?: number): void;
   setAmbient(on: boolean): void;
+  dispose(): void;
+}
+
+/** 캔버스 한 장 + 입자 풀 하나를 여러 말랑이(출처)가 함께 쓴다 */
+export interface FxLayer {
+  source(opts: FxSourceOptions): FxSource;
   resize(): void;
   dispose(): void;
 }
@@ -60,20 +71,24 @@ const MAX_DPR = 2;
 const AMBIENT_FRAME_MS = 33;
 const BURST_MS = 1800;
 
+interface SourceInternal {
+  opts: FxSourceOptions;
+  ambient: boolean;
+  acc: number;
+}
+
 export function createFxLayer(opts: FxLayerOptions): FxLayer {
-  const { canvas, styles, spec, shiny } = opts;
+  const { canvas } = opts;
   const rng = opts.rng ?? Math.random;
   const ctx = canvas.getContext('2d');
   const sys = createFxSystem();
+  const sources = new Set<SourceInternal>();
   let dpr = 1;
   let w = 1;
   let h = 1;
   let raf: number | null = null;
   let lastTs: number | null = null;
   let lastDraw = 0;
-  let ambientOn = false;
-  let ambientAcc = 0;
-  let trailLast: Point | null = null;
   let disposed = false;
   /** 손짓 입자가 사라질 때까지는 60fps (가장 긴 수명보다 넉넉히) */
   let burstUntil = 0;
@@ -93,8 +108,8 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  const body = () => {
-    const b = opts.getBody();
+  const bodyOf = (src: SourceInternal) => {
+    const b = src.opts.getBody();
     if (!b) {
       const rect = canvas.getBoundingClientRect();
       const center = { x: rect.width / 2, y: rect.height * 0.62 };
@@ -106,20 +121,29 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
     return { center, radius: b.r, head };
   };
 
+  const anyAmbient = () => {
+    for (const src of sources) if (src.ambient) return true;
+    return false;
+  };
+
   const frame = (ts: number) => {
     raf = null;
     if (disposed || !ctx) return;
     const dt = lastTs === null ? 1 / 60 : (ts - lastTs) / 1000;
     lastTs = ts;
-    if (ambientOn) {
-      const due = ambientDue(ambientAcc, spec.ambientPerSec, dt);
-      ambientAcc = due.acc;
+    for (const src of sources) {
+      if (!src.ambient) continue;
+      const due = ambientDue(src.acc, src.opts.spec.ambientPerSec, dt);
+      src.acc = due.acc;
       if (due.count > 0) {
-        const b = body();
-        for (let i = 0; i < due.count; i++) emitTouch(sys, styles, spec, 'ambient', b.center, rng, { ...b, shiny });
+        const b = bodyOf(src);
+        for (let i = 0; i < due.count; i++) {
+          emitTouch(sys, src.opts.styles, src.opts.spec, 'ambient', b.center, rng, { ...b, shiny: src.opts.shiny });
+        }
       }
     }
     const alive = stepFx(sys, dt);
+    const ambientOn = anyAmbient();
     // 떠다니는 입자만 있으면 30fps 로 충분하다 (배터리)
     const onlyAmbient = ambientOn && ts > burstUntil;
     if (!onlyAmbient || ts - lastDraw >= AMBIENT_FRAME_MS || alive === 0) {
@@ -137,59 +161,69 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
     }
   };
 
+  const burst = () => {
+    burstUntil = performance.now() + BURST_MS;
+    ensure();
+  };
+
   return {
-    emit(event, clientX, clientY, strength = 1) {
-      if (disposed) return;
-      const b = body();
-      const at = clientX === undefined || clientY === undefined ? b.center : local(clientX, clientY);
-      const n = emitTouch(sys, styles, spec, event, at, rng, { ...b, strength, shiny });
-      if (n > 0) {
-        burstUntil = performance.now() + BURST_MS;
-        ensure();
-      }
-    },
-    trail(clientX, clientY) {
-      if (disposed || spec.trailPx <= 0) return;
-      const p = local(clientX, clientY);
-      if (!trailLast) {
-        trailLast = p;
-        return;
-      }
-      const dist = Math.hypot(p.x - trailLast.x, p.y - trailLast.y);
-      if (dist < spec.trailPx) return;
-      // 빠르게 끌어도 한 번에 최대 3개 (간격을 채운다)
-      const steps = Math.min(3, Math.floor(dist / spec.trailPx));
-      const b = body();
-      for (let i = 1; i <= steps; i++) {
-        const k = i / steps;
-        const at = { x: trailLast.x + (p.x - trailLast.x) * k, y: trailLast.y + (p.y - trailLast.y) * k };
-        emitTouch(sys, styles, spec, 'pull', at, rng, { ...b, shiny });
-      }
-      trailLast = p;
-      burstUntil = performance.now() + BURST_MS;
-      ensure();
-    },
-    endTrail() {
-      trailLast = null;
-    },
-    react(kind, count, clientX, clientY) {
-      if (disposed) return;
-      const b = body();
-      const head = b.head;
-      const at = clientX === undefined || clientY === undefined ? head : local(clientX, clientY);
-      const zAt = { x: head.x + b.radius * 0.5, y: head.y };
-      const n =
-        kind === 'dizzy'
-          ? emitStyle(sys, REACTION_STYLES.dizzy, count, { x: head.x, y: head.y - 6 }, rng, b.radius * 0.6)
-          : emitStyle(sys, REACTION_STYLES[kind], count, kind === 'zzz' ? zAt : at, rng);
-      if (n > 0) {
-        burstUntil = performance.now() + BURST_MS;
-        ensure();
-      }
-    },
-    setAmbient(on) {
-      ambientOn = on && spec.ambientPerSec > 0;
-      if (ambientOn) ensure();
+    source(so) {
+      const src: SourceInternal = { opts: so, ambient: false, acc: 0 };
+      sources.add(src);
+      let trailLast: Point | null = null;
+      let gone = false;
+      return {
+        emit(event, clientX, clientY, strength = 1) {
+          if (disposed || gone) return;
+          const b = bodyOf(src);
+          const at = clientX === undefined || clientY === undefined ? b.center : local(clientX, clientY);
+          const n = emitTouch(sys, so.styles, so.spec, event, at, rng, { ...b, strength, shiny: so.shiny });
+          if (n > 0) burst();
+        },
+        trail(clientX, clientY) {
+          if (disposed || gone || so.spec.trailPx <= 0) return;
+          const p = local(clientX, clientY);
+          if (!trailLast) {
+            trailLast = p;
+            return;
+          }
+          const dist = Math.hypot(p.x - trailLast.x, p.y - trailLast.y);
+          if (dist < so.spec.trailPx) return;
+          // 빠르게 끌어도 한 번에 최대 3개 (간격을 채운다)
+          const steps = Math.min(3, Math.floor(dist / so.spec.trailPx));
+          const b = bodyOf(src);
+          for (let i = 1; i <= steps; i++) {
+            const k = i / steps;
+            const at = { x: trailLast.x + (p.x - trailLast.x) * k, y: trailLast.y + (p.y - trailLast.y) * k };
+            emitTouch(sys, so.styles, so.spec, 'pull', at, rng, { ...b, shiny: so.shiny });
+          }
+          trailLast = p;
+          burst();
+        },
+        endTrail() {
+          trailLast = null;
+        },
+        react(kind, count, clientX, clientY) {
+          if (disposed || gone) return;
+          const b = bodyOf(src);
+          const head = b.head;
+          const at = clientX === undefined || clientY === undefined ? head : local(clientX, clientY);
+          const zAt = { x: head.x + b.radius * 0.5, y: head.y };
+          const n =
+            kind === 'dizzy'
+              ? emitStyle(sys, REACTION_STYLES.dizzy, count, { x: head.x, y: head.y - 6 }, rng, b.radius * 0.6)
+              : emitStyle(sys, REACTION_STYLES[kind], count, kind === 'zzz' ? zAt : at, rng);
+          if (n > 0) burst();
+        },
+        setAmbient(on) {
+          src.ambient = on && so.spec.ambientPerSec > 0 && !gone;
+          if (src.ambient) ensure();
+        },
+        dispose() {
+          gone = true;
+          sources.delete(src);
+        },
+      };
     },
     resize() {
       resize();
@@ -199,6 +233,7 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
       disposed = true;
       if (raf !== null) cancelAnimationFrame(raf);
       raf = null;
+      sources.clear();
       clearFx(sys);
       ctx?.clearRect(0, 0, w, h);
     },

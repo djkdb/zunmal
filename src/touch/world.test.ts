@@ -172,6 +172,22 @@ describe('world: 쌓기', () => {
     expect(settle(1.6 * R)).toBeLessThan(0.05);
   });
 
+  it('들고 옮겨 다른 말랑이 위에 놓으면 그 위에 쌓인다', () => {
+    const w = createWorld({ w: 4, d: 3 });
+    addBody(w, { id: 'bottom', x: 2.5, y: 1.5, r: R });
+    addBody(w, { id: 'mover', x: 0.8, y: 1.5, r: R });
+    grabBody(w, 'mover');
+    for (let x = 0.8; x <= 2.5; x += 0.03) {
+      moveHeld(w, 'mover', x, 1.5);
+      run(w, 32);
+    }
+    run(w, 600);
+    releaseBody(w, 'mover', 0, 0);
+    run(w, 4000);
+    expect(body(w, 'mover').z).toBeGreaterThan(R);
+    expect(Math.abs(body(w, 'mover').x - body(w, 'bottom').x)).toBeLessThan(0.2);
+  });
+
   it('쌓인 채로 오래 두어도 떨리거나 에너지가 늘지 않는다', () => {
     const w = createWorld({ w: 3, d: 3 });
     addBody(w, { id: 'bottom', x: 1.5, y: 1.5, r: R });
@@ -245,7 +261,7 @@ describe('world: 손가락', () => {
     addBody(w, { id: 'a', x: 1, y: 1.5, r: R });
     addBody(w, { id: 'b', x: 2.2, y: 1.5, r: R });
     grabBody(w, 'a');
-    for (let x = 1; x <= 2.6; x += 0.05) {
+    for (let x = 1; x <= 2.6; x += 0.12) {
       moveHeld(w, 'a', x, 1.5);
       run(w, 32);
     }

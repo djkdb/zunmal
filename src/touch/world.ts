@@ -106,6 +106,10 @@ export const WORLD_TUNING = {
   heldMassScale: 3,
   /** 들어 올리는 높이 (세계 단위) */
   liftZ: 0.22,
+  /** 들고 옮기는 말랑이가 다른 말랑이에 이만큼(반지름 합 대비) 다가가면 그 위로 올라탄다 */
+  climbReach: 1.25,
+  /** 이보다 느리게 옮길 때만 올라탄다 (빠르면 밀어낸다) */
+  climbSpeed: 2.2,
   /** 이 속도 미만의 착지는 튀지 않는다 (미세 떨림 방지) */
   restSpeed: 0.9,
   /** 착지 소리를 내는 최소 속도 */
@@ -356,9 +360,24 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
     b.squeezeZ = 0;
     if (b.held) {
       const c = 2 * T.holdZeta * Math.sqrt(T.holdK);
+      // 다른 말랑이 위로 옮기면 그 위에 올라탈 만큼 들어 올린다 → 놓으면 쌓인다
+      let targetZ = b.holdZ;
+      // 천천히 가져가면 올라타고, 빠르게 밀면 밀어낸다
+      const climbing = Math.hypot(b.vx, b.vy) < T.climbSpeed;
+      for (const o of bodies) {
+        if (!climbing) break;
+        if (o === b || o.held) continue;
+        const d = Math.hypot(b.x - o.x, b.y - o.y);
+        const rr = b.r + o.r;
+        if (d < rr * T.climbReach) {
+          // 가까워질수록 미리 올라가 옆으로 밀지 않고 넘어간다
+          const up = Math.sqrt(Math.max(0, rr * rr - d * d * 0.6));
+          targetZ = Math.max(targetZ, o.z + o.r + up - b.r + 0.03);
+        }
+      }
       b.vx += (T.holdK * (b.holdX - b.x) - c * b.vx) * h;
       b.vy += (T.holdK * (b.holdY - b.y) - c * b.vy) * h;
-      b.vz += (T.holdK * (b.holdZ - b.z) - c * b.vz) * h;
+      b.vz += (T.holdK * (targetZ - b.z) - c * b.vz) * h;
     } else {
       b.vz -= T.gravity * h;
       // 매트에 닿아 있으면 매트가 곧바로 받친다 (몸끼리 계산 전에 — 그래야 아래 말랑이의 "떨어지려는 속도"가
