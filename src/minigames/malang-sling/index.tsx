@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { Malang } from '../../components/Malang';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { darken, lighten } from '../../lib/color';
+import { haptic } from '../../lib/haptics';
 import { defaultRng } from '../../lib/rng';
 import { Countdown } from '../shared/Countdown';
 import { GameHud } from '../shared/GameHud';
@@ -593,7 +594,7 @@ function MalangSlingGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniG
             buddyRef.current?.react('happy', 800, false);
             if (!reduced) {
               burst(fx, e.x, e.y, ['#ff7aa2', '#ffd23f', '#5cc8ff', '#7ed957', '#b98cff'], 14);
-              navigator.vibrate?.(18);
+              haptic('tap'); // 진동이 없는 iOS·예외를 던지는 앱 안 브라우저도 안전하게
             }
             fx.popups.push({
               x: Math.max(30, Math.min(WORLD.width - 30, e.x)),

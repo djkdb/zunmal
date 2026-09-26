@@ -67,6 +67,7 @@ import {
 } from '../data/playroomDecor';
 import { TOUCH_FX, rarityRank } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { haptic } from '../lib/haptics';
 import { josa } from '../lib/josa';
 import { useGameStore } from '../store/useGameStore';
@@ -1863,15 +1864,6 @@ function Playroom() {
     closePhoto();
   };
 
-  useEffect(() => {
-    if (!photo) return undefined;
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') closePhoto();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [photo, closePhoto]);
-
   const photoRef = useRef(photo);
   photoRef.current = photo;
   useEffect(
@@ -2205,30 +2197,58 @@ function Playroom() {
 
       {flash && <span className="pr-flash" aria-hidden="true" />}
       {photo && (
-        <div className="touch-photo" role="dialog" aria-modal="true" aria-labelledby="touch-photo-title">
-          <div className="touch-photo__panel">
-            <h2 id="touch-photo-title" className="touch-photo__title">
-              찰칵! 사진을 찍었어요
-            </h2>
-            <img className="touch-photo__img" src={photo.url} alt="놀이방 매트 사진 카드" />
-            <div className="touch-photo__actions">
-              <button type="button" className="btn btn--primary" autoFocus onClick={() => void sharePhoto()}>
-                <ShareIcon size={22} />
-                {photo.canShare ? '공유하기' : '저장하기'}
-              </button>
-              {photo.canShare && (
-                <button type="button" className="btn" onClick={() => void savePhoto()}>
-                  저장하기
-                </button>
-              )}
-            </div>
-            <button type="button" className="touch-photo__close" aria-label="닫기" onClick={closePhoto}>
-              <CloseIcon size={22} />
-            </button>
-          </div>
-        </div>
+        <PhotoDialog
+          url={photo.url}
+          canShare={photo.canShare}
+          onShare={() => void sharePhoto()}
+          onSave={() => void savePhoto()}
+          onClose={closePhoto}
+        />
       )}
     </section>
+  );
+}
+
+/** 사진 미리보기 창: 공유(또는 저장)로 초점, Tab 은 창 안에서만, Esc 닫기, 닫으면 사진 버튼으로 */
+function PhotoDialog({
+  url,
+  canShare,
+  onShare,
+  onSave,
+  onClose,
+}: {
+  url: string;
+  canShare: boolean;
+  onShare(): void;
+  onSave(): void;
+  onClose(): void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const shareRef = useRef<HTMLButtonElement>(null);
+  useDialogFocus(rootRef, onClose, shareRef);
+  return (
+    <div ref={rootRef} className="touch-photo" role="dialog" aria-modal="true" aria-labelledby="touch-photo-title">
+      <div className="touch-photo__panel">
+        <h2 id="touch-photo-title" className="touch-photo__title">
+          찰칵! 사진을 찍었어요
+        </h2>
+        <img className="touch-photo__img" src={url} alt="놀이방 매트 사진 카드" />
+        <div className="touch-photo__actions">
+          <button ref={shareRef} type="button" className="btn btn--primary" onClick={onShare}>
+            <ShareIcon size={22} />
+            {canShare ? '공유하기' : '저장하기'}
+          </button>
+          {canShare && (
+            <button type="button" className="btn" onClick={onSave}>
+              저장하기
+            </button>
+          )}
+        </div>
+        <button type="button" className="touch-photo__close" aria-label="닫기" onClick={onClose}>
+          <CloseIcon size={22} />
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -104,7 +104,8 @@ export function ShopPage() {
       {/* 계산대: 모인 코인 / 가득 참 + 막대 + 받기, 그 아래 가게 요약(시간당·직원 칸·가득 참 시간)과 다음 칸 */}
       <div className={`shop__till${reading.full ? ' is-full' : ''}`}>
         <div className="shop__till-row">
-          <p className="shop__amount" aria-live="polite">
+          {/* 4초마다 오르는 숫자라 알림 영역이 아니다 — 받았을 때만 아래 상태 줄이 읽어 준다 */}
+          <p className="shop__amount">
             <CoinIcon size={30} />
             <span className="shop__amount-num">{reading.coins.toLocaleString()}</span>
             {!empty && (
@@ -137,6 +138,9 @@ export function ShopPage() {
         >
           <span className="shop__fill" style={{ width: `${reading.fill * 100}%` }} />
         </div>
+        <p className="visually-hidden" role="status">
+          {claimed !== null ? `${claimed.toLocaleString()}코인을 받았어요` : ''}
+        </p>
         <p className="shop__till-note">
           {empty
             ? '말랑이가 일하면 코인이 쌓여요'

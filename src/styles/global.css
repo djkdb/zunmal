@@ -730,9 +730,14 @@ strong {
 /* ------------------------------------------------------------------
  * 모달 (<dialog>)
  * ------------------------------------------------------------------ */
+/* 창이 열려 있는 동안 뒤 화면은 스크롤하지 않는다 (배경을 문질러도 페이지가 따라 올라가지 않게) */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 .modal {
   width: min(440px, calc(100vw - 24px));
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   padding: 0;
   border: 0;
   border-radius: 24px;

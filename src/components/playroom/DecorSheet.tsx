@@ -1,4 +1,5 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { MAT_PATTERNS, matBackgroundCss } from '../../data/matPatterns';
 import {
   MAT_PATTERN_IDS,
@@ -23,14 +24,9 @@ interface DecorSheetProps {
 /** 꾸미기 시트: 매트 무늬 고르기 + 소품 놓기/치우기 (무료) */
 export function DecorSheet({ mat, props, onPickMat, onToggleProp, onClose }: DecorSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    closeRef.current?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // 닫기 버튼으로 초점, Tab 은 시트 안에서만, Esc 닫기, 닫으면 붓 버튼으로
+  useDialogFocus(sheetRef, onClose, closeRef);
 
   const placed = new Set(props.map((p) => p.id));
   const full = props.length >= MAX_PROPS;
@@ -38,6 +34,7 @@ export function DecorSheet({ mat, props, onPickMat, onToggleProp, onClose }: Dec
   return (
     <div className="pr-sheet-backdrop" onClick={onClose}>
       <div
+        ref={sheetRef}
         className="pr-decor"
         role="dialog"
         aria-modal="true"

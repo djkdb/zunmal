@@ -614,3 +614,8 @@
 .epic--still .epic__title span {
   animation: none;
 }
+
+/* 전체 화면 연출 자체에 초점이 가도(화면 읽기용) 테두리는 그리지 않는다 */
+.epic:focus {
+  outline: none;
+}

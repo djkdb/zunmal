@@ -141,12 +141,33 @@
   font-size: var(--fs-l);
 }
 
+/* 행동 줄은 창 아래에 붙어 있다 — 작은 폰에서 친밀도 칸이 길어도 파트너·만지기·닫기가 늘 보이게 */
 .collection-detail__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 8px;
+  position: sticky;
+  bottom: -16px; /* .modal__body 아래 여백만큼 */
+  align-self: stretch;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px -16px -16px;
+  padding: 12px 16px 16px;
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface) 12px);
+}
+
+.collection-detail__actions .btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 0.9375rem;
+}
+
+.collection-detail__actions .share {
+  display: block;
+}
+
+.detail-modal--secret .collection-detail__actions {
+  background: linear-gradient(rgba(27, 16, 64, 0), #1b1040 12px);
 }
 
 .collection__name:empty {

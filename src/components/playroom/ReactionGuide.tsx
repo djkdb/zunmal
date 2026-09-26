@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { MATERIALS, MATERIAL_IDS, type FillingSpec, type MaterialId } from '../../data/materials';
 import { CAPSULE_HINT } from '../../touch/capsule';
 import { PAIR_PLAYS, type PairPlayId } from '../../touch/interactions';
@@ -80,14 +81,9 @@ interface ReactionGuideProps {
 /** 반응 방법 보기: 모든 손짓과 반응을 그림 + 한 줄 설명 + 열림/잠김으로 */
 export function ReactionGuide({ level, name, material, filling = null, onClose, onShow }: ReactionGuideProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    closeRef.current?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // 닫기 버튼으로 초점, Tab 은 시트 안에서만, Esc 닫기, 닫으면 방법 보기 버튼으로
+  useDialogFocus(sheetRef, onClose, closeRef);
 
   const row = (d: DemoSpec, lockLevel: number | null) => {
     const locked = lockLevel !== null && !isUnlocked(d.key as never, level);
@@ -118,6 +114,7 @@ export function ReactionGuide({ level, name, material, filling = null, onClose, 
   return (
     <div className="pr-sheet-backdrop" onClick={onClose}>
       <div
+        ref={sheetRef}
         className="pr-guide"
         role="dialog"
         aria-modal="true"

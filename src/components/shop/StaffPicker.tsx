@@ -140,7 +140,7 @@ export function StaffPicker({ slot, slots, onClose }: StaffPickerProps) {
             자리 비우기
           </button>
         )}
-        <button type="button" className="btn btn--small btn--primary staff-sheet__done" onClick={onClose} autoFocus>
+        <button type="button" className="btn btn--small btn--secondary staff-sheet__done" onClick={onClose} autoFocus>
           닫기
         </button>
       </div>

@@ -123,6 +123,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
   const [mode, setMode] = useState<Mode>(() => (reduced ? '2d' : getLoadedScene3d() ? '3d' : 'loading'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<EpicScene | null>(null);
   const particles = useRef<Particle[]>([]);
   const phaseRef = useRef<Phase>(phase);
@@ -287,6 +288,11 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     };
   }, [reduced, mode, theme, script, tier]);
 
+  // 전체 화면 창이 뜨면 초점을 안으로 (화면 읽기가 뒤 뽑기 화면에 머물지 않게). 끝나면 결과 창이 초점을 가져간다
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
+
   // 키보드: Enter/Space/Esc로 넘어가기
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -312,6 +318,8 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
 
   return (
     <div
+      ref={rootRef}
+      tabIndex={-1}
       className={`epic epic--${tier} epic--m-${theme.motif} epic--${phase} epic--${mode}${reduced ? ' epic--still' : ''}${item.shiny ? ' is-shiny' : ''}`}
       style={style}
       role="dialog"
