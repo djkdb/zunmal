@@ -1,0 +1,149 @@
+.sl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl__info {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 1.5em;
+  margin: 0;
+}
+
+.sl__stage-no {
+  font-family: var(--font-display);
+  font-size: var(--fs-m);
+  color: var(--ink);
+}
+
+.sl__stage {
+  position: relative;
+  /* 2:3 비율 유지 — 화면이 낮으면 폭을 줄여 발사 버튼이 항상 보이도록 */
+  width: min(100%, 400px, max(180px, calc((100dvh - 260px) * 2 / 3)));
+  margin: 0 auto;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 82% 14%, #fff7c2 0 22px, transparent 23px),
+    linear-gradient(180deg, #c9ecff 0%, #eaf7ff 45%, #fff4fb 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: grab;
+}
+
+.sl__stage:active {
+  cursor: grabbing;
+}
+
+.sl__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 480;
+}
+
+.sl__malang,
+.sl__front {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.sl__malang {
+  opacity: 0;
+  will-change: transform;
+  line-height: 0;
+}
+
+.sl__front {
+  width: 100%;
+  height: 100%;
+}
+
+.sl__waiting {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  line-height: 0;
+}
+
+.sl__banner {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.sl__banner strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-xxl);
+  color: var(--paper);
+  -webkit-text-stroke: 6px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--ink);
+  animation: sl-stamp 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.sl__banner span {
+  padding: 2px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--lemon);
+  font-size: var(--fs-s);
+}
+
+.sl__banner.is-end {
+  background: rgba(255, 246, 230, 0.6);
+}
+
+@keyframes sl-stamp {
+  from {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl__banner strong {
+    animation: none;
+  }
+}
+
+.sl__controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 400px);
+  margin: 0 auto;
+}
+
+.sl__help {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.sl__fire {
+  min-width: 112px;
+  min-height: 52px;
+  touch-action: manipulation;
+  font-family: var(--font-display);
+}
+
+.sl__fire[aria-disabled='true'] {
+  filter: saturate(0.4);
+  opacity: 0.7;
+}
