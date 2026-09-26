@@ -76,6 +76,20 @@ export function CapsuleIcon(props: IconProps) {
   );
 }
 
+/** 10연 뽑기: 캡슐 세 개가 쌓인 더미 (1회는 CapsuleIcon 하나) */
+export function CapsuleStackIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.5 23 a7 7 0 0 1 14 0 Z" fill="#c9b6ff" />
+      <path d="M2.5 23 a7 7 0 0 0 14 0 Z" fill="#fff" />
+      <path d="M15.5 23 a7 7 0 0 1 14 0 Z" fill="#ffd66b" />
+      <path d="M15.5 23 a7 7 0 0 0 14 0 Z" fill="#fff" />
+      <path d="M9 12 a7 7 0 0 1 14 0 Z" fill="#ff9fb8" />
+      <path d="M9 12 a7 7 0 0 0 14 0 Z" fill="#fff" />
+    </Svg>
+  );
+}
+
 /** 도감: 펼친 책 */
 export function BookIcon(props: IconProps) {
   return (

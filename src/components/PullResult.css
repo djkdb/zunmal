@@ -144,13 +144,8 @@
 }
 
 .pull-modal--secret .pull-single__desc,
-.pull-modal--secret .pull-detail__desc,
-.pull-modal--secret .pull-actions__short {
+.pull-modal--secret .pull-detail__desc {
   color: #e6dcff;
-}
-
-.pull-modal--secret .pull-actions__short a {
-  color: #ffe07a;
 }
 
 .pull-modal--single.pull-modal--secret .modal__body {
@@ -191,6 +186,10 @@
   background: var(--surface-2);
   color: var(--sub);
   box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.pull-tag__word {
+  margin-right: 3px;
 }
 
 .pull-tag--note {
@@ -932,97 +931,123 @@
   min-height: 44px;
 }
 
+/* 다 연 뒤 요약: 칸마다 이름 + 숫자 (가운데점 없이 간격으로 나눈다) */
 .pull-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 44px;
-}
-
-.pull-modal--single .pull-summary {
-  justify-content: center;
-}
-
-.pull-summary__list {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
+  justify-content: center;
+  gap: 0 14px;
+  min-height: 32px;
   margin: 0;
-  padding-left: 4px;
+  padding: 0 4px;
 }
 
-.pull-summary__list > div {
+.pull-summary > div {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
 }
 
-.pull-summary__list dt {
+.pull-summary dt {
   color: var(--sub);
   font-size: 0.8125rem;
 }
 
-.pull-summary__list dd {
+.pull-summary dd {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   margin: 0;
-  font-weight: 700;
-  font-size: 1.0625rem;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 1rem;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
-.pull-summary__list > .is-lit dd {
+.pull-summary > .is-lit dd {
   color: var(--primary-text);
 }
 
-.pull-modal--secret .pull-summary__list dt {
-  color: #e6dcff;
-}
-
-/* 작은 글자 링크지만 누르는 영역은 44px */
-.pull-summary__link {
-  flex-shrink: 0;
+/* 도감 숫자 = 도감 화면 링크 (글자는 작아도 누르는 영역 44px) */
+.pull-summary__book {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 6px;
+  margin-block: -8px;
   color: var(--link);
-  font-weight: 700;
-  font-size: 0.875rem;
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
 
-.pull-summary__link.is-short {
-  color: var(--primary-text);
+.pull-modal--secret .pull-summary dt {
+  color: #e6dcff;
 }
 
-.pull-modal--secret .pull-summary__link {
+.pull-modal--secret .pull-summary__book {
   color: #ffe07a;
 }
 
+/* 다시 뽑기 · 자랑하기 · 닫기 */
 .pull-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 6px;
+}
+
+.pull-actions.has-share {
+  grid-template-columns: 1fr auto auto;
 }
 
 .pull-actions .btn {
   min-height: 44px;
-  padding-inline: 6px;
-  gap: 4px;
-  font-size: 0.875rem;
+  padding-inline: 12px;
+  gap: 6px;
+  font-size: 0.9375rem;
   white-space: nowrap;
 }
 
 .pull-actions .pull-actions__close {
   min-width: 56px;
   padding-inline: 14px;
+}
+
+/* 코인이 모자라 다시 못 뽑을 때 */
+.pull-short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--radius-btn);
+  background: var(--primary-tint);
+}
+
+.pull-short__text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.pull-short__go {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
+.pull-modal--secret .pull-short {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pull-modal--secret .pull-short__text {
+  color: #fff;
 }
 
 /* 새 말랑이: 놀이방에서 기다린다는 한 줄 + 지금 만지러 가기 */

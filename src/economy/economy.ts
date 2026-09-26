@@ -96,3 +96,9 @@ export function applyDailyReset<T extends DailyState>(state: T, now: Date = new 
   if (state.lastDailyResetDate === today) return state;
   return { ...state, dailyEarnedCoins: 0, lastDailyResetDate: today };
 }
+
+/** 이 뽑기까지 더 필요한 코인 (충분하면 0). "다시 뽑기"를 못 할 때 이유와 미니게임 안내에 쓴다. */
+export function coinsNeededForPull(coins: number, kind: PullKind): number {
+  const have = Number.isFinite(coins) ? Math.max(0, Math.floor(coins)) : 0;
+  return Math.max(0, PULL_PRICE[kind] - have);
+}

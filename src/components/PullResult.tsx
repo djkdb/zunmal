@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { playRarityFanfare, sfx } from '../audio/sfx';
-import { RARITY_META, rarityRank, type Rarity } from '../data/rarity';
+import { CHARACTERS } from '../data/characters';
+import { GACHA_RULES, RARITY_META, rarityRank, type Rarity } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
+import { coinsNeededForPull, type PullKind } from '../economy/economy';
 import type { ResolvedPull } from '../gacha/engine';
 import { releaseDeferredCoins } from '../lib/coinFx';
+import { pullShareContent } from '../lib/share';
 import { useReducedMotion } from '../hooks/useReducedMotion';
-import { CoinIcon } from './icons';
+import { CapsuleIcon, CapsuleStackIcon, CoinIcon } from './icons';
 import { Malang } from './Malang';
 import { Modal } from './Modal';
 import { buzz } from './pullHaptics';
@@ -18,14 +21,15 @@ import {
   openSequence,
   openTiming,
   openedCount,
+  SHARE_MIN_RARITY,
+  shareHighlightIndex,
   summarizePulls,
   topRarity,
   type CardPhase,
 } from './pullReveal';
 import { RarityBadge } from './RarityBadge';
+import { ShareButton } from './ShareButton';
 import './PullResult.css';
-
-type PullKind = 'single' | 'multi';
 
 interface PullResultProps {
   items: readonly ResolvedPull[];
@@ -33,8 +37,14 @@ interface PullResultProps {
   onClose(): void;
   /** 전체 화면 연출(신화 이상)로 이미 보여 준 결과의 위치. 이 카드는 처음부터 앞면이고 결과음도 생략한다. */
   seenIndex?: number;
+  /** 방금 뽑은 방식 — "다시 뽑기"는 같은 방식으로 */
+  kind: PullKind;
   /** 다시 뽑기 버튼용 현재 코인 */
   coins: number;
+  /** 도감에 모은 종류 수 (이번 결과 포함) */
+  ownedCount: number;
+  /** 이번 뽑기 뒤 천장까지 남은 횟수 (다 열면 요약 줄에 보인다) */
+  pityLeft: number;
   onPullAgain(kind: PullKind): void;
   /** 캡슐을 모두 열었을 때 한 번 (천장 카운터를 이때 바꾼다) */
   onRevealed?(): void;
@@ -61,12 +71,16 @@ function ShinyTag({ className = '' }: { className?: string }) {
   return <span className={`pull-tag pull-tag--shiny pull-tag--sparkle ${className}`}>반짝!</span>;
 }
 
-function OwnershipTag({ item }: { item: ResolvedPull }) {
-  // 반짝은 "반짝!" 딱지가 따로 알려 주므로 여기서는 새로 모은 것만
-  if (item.isNewShiny) return <span className="pull-tag pull-tag--new">NEW</span>;
-  if (item.isNew) return <span className="pull-tag pull-tag--new">NEW</span>;
+/**
+ * 얻은 방식 딱지 — 어디서나 같은 모양: 새로 모음 = 딸기우유 "NEW", 중복 = 회색 "중복 [코인]+N".
+ * 좁은 10연 카드(compact)에서는 "중복" 글자를 빼고 코인 +N만 (카드 이름표가 스크린리더에 "이미 있어서 N코인"을 읽어 준다).
+ * 반짝은 "반짝!" 딱지가 따로 알려 준다.
+ */
+function OwnershipTag({ item, compact = false }: { item: ResolvedPull; compact?: boolean }) {
+  if (item.isNew || item.isNewShiny) return <span className="pull-tag pull-tag--new">NEW</span>;
   return (
     <span className="pull-tag pull-tag--dup">
+      {!compact && <span className="pull-tag__word">중복</span>}
       <CoinIcon size={12} />+{item.refund.toLocaleString()}
     </span>
   );
@@ -167,7 +181,7 @@ function PullCard({
             </span>
             <span className="pull-card__name">{item.character.name}</span>
             <RarityBadge rarity={item.rarity} compact />
-            <OwnershipTag item={item} />
+            <OwnershipTag item={item} compact />
           </span>
         </span>
       </button>
@@ -206,6 +220,8 @@ function DetailBar({ item, top, onDismiss }: { item: ResolvedPull; top: boolean;
             {item.character.name}
           </span>
           <RarityBadge rarity={item.rarity} compact />
+          {item.shiny && <ShinyTag />}
+          <OwnershipTag item={item} />
           {item.byPity && <span className="pull-tag pull-tag--note">천장 확정</span>}
           {item.byGuarantee && <span className="pull-tag pull-tag--note">레어 이상 보장</span>}
         </span>
@@ -215,91 +231,124 @@ function DetailBar({ item, top, onDismiss }: { item: ResolvedPull; top: boolean;
   );
 }
 
-/** 한 줄 요약 + 도감(또는 코인 모으기) 링크 */
+/**
+ * 다 연 뒤 한 줄 요약: 새 말랑이 N · 반짝 N · 환급 +N · 도감 N/32 · 천장까지 N회 (가운데점 없이 칸으로 나눈다).
+ * 1회는 카드 딱지가 NEW/중복을 말해 주므로 도감과 천장만. 도감 숫자는 도감 화면 링크.
+ */
 function SummaryLine({
   items,
-  short,
+  ownedCount,
+  pityLeft,
   refundRef,
 }: {
   items: readonly ResolvedPull[];
-  short: boolean;
+  ownedCount: number;
+  pityLeft: number;
   refundRef: RefObject<HTMLElement | null>;
 }) {
   const s = summarizePulls(items);
+  const multi = items.length > 1;
+  const pityLabel = RARITY_META[GACHA_RULES.pityMinRarity].label;
   return (
-    <div className="pull-summary">
-      {items.length > 1 && (
-        <dl className="pull-summary__list">
-          <div>
-            <dt>새 말랑이</dt>
-            <dd>{s.newCount}</dd>
-          </div>
-          {s.shinyCount > 0 && (
-            <div className="is-lit">
-              <dt>반짝</dt>
-              <dd>{s.shinyCount}</dd>
-            </div>
-          )}
-          {s.refund > 0 && (
-            <div>
-              <dt className="visually-hidden">환급 코인</dt>
-              <dd ref={refundRef as RefObject<HTMLElement>}>
-                <CoinIcon size={14} />+{s.refund.toLocaleString()}
-              </dd>
-            </div>
-          )}
-        </dl>
+    <dl className="pull-summary">
+      {multi && (
+        <div className={s.newCount > 0 ? 'is-lit' : ''}>
+          <dt>새 말랑이</dt>
+          <dd>{s.newCount}</dd>
+        </div>
       )}
-      {short ? (
-        <Link to="/play" className="pull-summary__link is-short" onClick={() => sfx.button()}>
-          코인 모으러 가기
-        </Link>
-      ) : (
-        <Link to="/collection" className="pull-summary__link" onClick={() => sfx.button()}>
-          도감 보기
-        </Link>
+      {multi && s.shinyCount > 0 && (
+        <div className="is-lit">
+          <dt>반짝</dt>
+          <dd>{s.shinyCount}</dd>
+        </div>
       )}
+      {multi && s.refund > 0 && (
+        <div>
+          <dt>환급</dt>
+          <dd ref={refundRef as RefObject<HTMLElement>}>
+            <CoinIcon size={14} />+{s.refund.toLocaleString()}
+          </dd>
+        </div>
+      )}
+      <div>
+        <dt>도감</dt>
+        <dd>
+          <Link
+            to="/collection"
+            className="pull-summary__book"
+            onClick={() => sfx.button()}
+            aria-label={`도감 보기, ${CHARACTERS.length}마리 중 ${ownedCount}마리`}
+          >
+            {ownedCount}/{CHARACTERS.length}
+          </Link>
+        </dd>
+      </div>
+      <div>
+        <dt>{pityLabel} 이상까지</dt>
+        <dd>{pityLeft}회</dd>
+      </div>
+    </dl>
+  );
+}
+
+/** 코인이 모자라 다시 못 뽑을 때: 얼마나 모자란지 + 미니게임으로 */
+function ShortNote({ need, id }: { need: number; id: string }) {
+  return (
+    <div className="pull-short">
+      <p id={id} className="pull-short__text">
+        <CoinIcon size={16} />
+        {need.toLocaleString()}코인 더 모으면 다시 뽑을 수 있어요
+      </p>
+      <Link to="/play" className="btn btn--primary btn--small pull-short__go" onClick={() => sfx.button()}>
+        미니게임에서 코인 모으기
+      </Link>
     </div>
   );
 }
 
+/** 다시 뽑기(같은 방식) + 자랑하기(자랑거리가 있을 때) + 닫기 */
 function Actions({
+  kind,
   coins,
+  shortId,
+  share,
   onPullAgain,
   onClose,
   closeRef,
 }: {
+  kind: PullKind;
   coins: number;
+  shortId: string;
+  share: (() => ReturnType<typeof pullShareContent>) | null;
   onPullAgain(kind: PullKind): void;
   onClose(): void;
   closeRef: RefObject<HTMLButtonElement | null>;
 }) {
+  const price = PULL_PRICE[kind];
+  const need = coinsNeededForPull(coins, kind);
+  const what = kind === 'multi' ? `${PULL_COUNT.multi}연` : '1회';
   return (
-    <div className="pull-actions">
-      {(['single', 'multi'] as const).map((kind) => {
-        const price = PULL_PRICE[kind];
-        const enough = coins >= price;
-        const label = kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기';
-        return (
-          <button
-            key={kind}
-            type="button"
-            className={`btn btn--small pull-actions__again ${kind === 'multi' ? 'btn--secondary' : 'btn--primary'}`}
-            disabled={!enough}
-            onClick={() => {
-              sfx.button();
-              onPullAgain(kind);
-            }}
-            aria-label={`${label}, ${price.toLocaleString()}코인${enough ? '' : ' (코인 부족)'}`}
-          >
-            {label}
-            <span className="pull-actions__cost" aria-hidden="true">
-              <CoinIcon size={14} />
-              {price.toLocaleString()}
-            </span>
-          </button>
-        );
-      })}
+    <div className={`pull-actions${share ? ' has-share' : ''}`}>
+      <button
+        type="button"
+        className={`btn btn--small pull-actions__again ${need > 0 ? 'btn--secondary' : 'btn--primary'}`}
+        disabled={need > 0}
+        aria-describedby={need > 0 ? shortId : undefined}
+        onClick={() => {
+          sfx.button();
+          onPullAgain(kind);
+        }}
+        aria-label={`${what} 다시 뽑기, ${price.toLocaleString()}코인`}
+      >
+        {kind === 'multi' ? <CapsuleStackIcon size={20} /> : <CapsuleIcon size={20} />}
+        다시 뽑기
+        <span className="pull-actions__cost" aria-hidden="true">
+          <CoinIcon size={14} />
+          {price.toLocaleString()}
+        </span>
+      </button>
+      {share && <ShareButton content={share} squeeze />}
       <button ref={closeRef} type="button" className="btn btn--small btn--secondary pull-actions__close" onClick={onClose}>
         닫기
       </button>
@@ -378,7 +427,18 @@ function SingleCapsule({ item, phase, onPress }: { item: ResolvedPull; phase: Ca
  * "모두 열기"는 남은 캡슐을 짧은 간격으로 열되 전설 이상은 뜸을 지킨다.
  * 다 열리면 한 줄 요약과 다시 뽑기 버튼이 나온다. 열린 카드를 누르면 설명 띠가 뜬다.
  */
-export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPullAgain, onRevealed }: PullResultProps) {
+export function PullResult({
+  items,
+  totalRefund,
+  onClose,
+  seenIndex,
+  kind,
+  coins,
+  ownedCount,
+  pityLeft,
+  onPullAgain,
+  onRevealed,
+}: PullResultProps) {
   const reduced = useReducedMotion();
   const n = items.length;
   const single = n === 1 ? items[0] : undefined;
@@ -530,8 +590,21 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
         ? REVEAL_TITLE[shownTop]
         : `${n}연 뽑기 결과`;
   const detailItem = selected !== null && phases[selected] === 'face' ? items[selected] : undefined;
-  const short = coins < PULL_PRICE.single;
+  const need = coinsNeededForPull(coins, kind);
   const newItem = items[summary.bestNewIndex];
+  const shareItem = items[shareHighlightIndex(items)];
+  const share = shareItem
+    ? () =>
+        pullShareContent({
+          name: shareItem.character.name,
+          rarityLabel:
+            rarityRank(shareItem.rarity) >= rarityRank(SHARE_MIN_RARITY) ? RARITY_META[shareItem.rarity].label : undefined,
+          shiny: shareItem.shiny,
+          isNew: shareItem.isNew || shareItem.isNewShiny,
+          owned: ownedCount,
+          total: CHARACTERS.length,
+        })
+    : null;
 
   return (
     <Modal
@@ -582,9 +655,18 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
         <div className={`pull-footer${done ? '' : ' is-opening'}`}>
           {done ? (
             <>
-              <SummaryLine items={items} short={short} refundRef={refundRef} />
+              <SummaryLine items={items} ownedCount={ownedCount} pityLeft={pityLeft} refundRef={refundRef} />
               {newItem && <TouchNow item={newItem} />}
-              <Actions coins={coins} onPullAgain={onPullAgain} onClose={onClose} closeRef={closeRef} />
+              {need > 0 && <ShortNote need={need} id="pull-short-reason" />}
+              <Actions
+                kind={kind}
+                coins={coins}
+                shortId="pull-short-reason"
+                share={share}
+                onPullAgain={onPullAgain}
+                onClose={onClose}
+                closeRef={closeRef}
+              />
             </>
           ) : single ? (
             <p className="pull-hint">
