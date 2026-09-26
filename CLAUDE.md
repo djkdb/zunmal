@@ -144,6 +144,14 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 스프링 기반 말랑 물리(순수 모듈, 테스트 있음) + WebAudio로 합성한 찰박·쭉·뽁 소리.
 - 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다.
 - 만지면 친밀도(`affection`)가 오른다. 친밀도는 코인을 주지 않는다.
+- **3D 젤리** (`components/touch3d/`, three.js): 윤곽 path를 부풀린 메시(`touch/jellyMesh.ts`) +
+  순수 스프링 변형(`touch/softbody.ts`: 누른 자국·당김·비틀림·숨쉬기, 부피 보존, 테스트 있음).
+  전체 눌림·기울기는 2D와 같은 `physics.ts` 값을 쓴다 → 소리·애정·미션이 두 버전에서 같다.
+  - 겉모습은 화면 밖에 그린 실제 `<Malang>`을 구운 텍스처(`rasterMalang.ts`) — 새 말랑이·그림 수정이 자동 반영.
+    몸 밖 장식은 몸 뒤/앞 평평한 카드, 외곽선은 뒤집힌 껍질. 얼굴(기쁨·졸림·놀람·깜빡임)은 텍스처 교체.
+  - `loadJelly3d.ts`로 만지기 화면에서만 받는 청크(three는 epic과 공유 청크). 1.5초 안에 못 받거나 WebGL이 없거나
+    움직임 줄이기면 기존 2D SVG. 렌더러 하나를 캐릭터 전환에도 재사용, 떠나면 dispose + forceContextLoss.
+  - 멈추면 그리지 않는다(숨쉬기는 놓은 뒤 약 7초만). DPR 최대 2, 느리면 자동으로 낮춘다.
 
 ## 소리 (`audio/`)
 
