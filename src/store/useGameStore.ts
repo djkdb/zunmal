@@ -23,7 +23,15 @@ import {
   type MissionKind,
   type MissionState,
 } from '../missions/missions';
-import { SAVE_KEY, SAVE_VERSION, createInitialSave, migrateSave, sanitizeSave, type SaveData } from './persistence';
+import {
+  PLAYROOM_MAX_OUT,
+  SAVE_KEY,
+  SAVE_VERSION,
+  createInitialSave,
+  migrateSave,
+  sanitizeSave,
+  type SaveData,
+} from './persistence';
 
 export type { PullKind };
 
@@ -50,6 +58,15 @@ export interface GameActions {
   claimSet(collectionId: string): ClaimSetResult;
   /** 말랑이 만지기: 친밀도 증가 (+ 쓰다듬기 미션 진행) */
   petMalang(characterId: string, amount?: number, now?: Date): void;
+  /**
+   * 놀이방: 봉인된 캡슐을 열었다 → 연 말랑이로 기록하고 매트에 올린다 (자리가 있으면).
+   * cap 은 이 기기의 매트 상한 (PLAYROOM_MAX_OUT 이하). 처음 연 것이면 true.
+   */
+  unboxMalang(characterId: string, cap?: number): boolean;
+  /** 놀이방: 연 말랑이를 매트에 꺼낸다. 이미 나와 있거나 매트가 꽉 찼거나 안 연 말랑이면 false */
+  takeOutMalang(characterId: string, cap?: number): boolean;
+  /** 놀이방: 매트의 말랑이를 선반에 넣는다 */
+  putBackMalang(characterId: string): void;
   /** 오늘의 미션 보상 받기 */
   claimMission(id: MissionKind, now?: Date): { ok: true; coins: number } | { ok: false; reason: string };
   /** 미션 3개를 모두 받은 뒤 추가 보너스 받기. 받은 코인(없으면 0)을 돌려준다. */
@@ -140,7 +157,14 @@ function pickSave(state: GameState): SaveData {
     partnerShiny: state.partnerShiny,
     missions: state.missions,
     redeemedCoupons: state.redeemedCoupons,
+    unboxed: state.unboxed,
+    playroom: state.playroom,
   };
+}
+
+function clampCap(cap: number | undefined): number {
+  if (cap === undefined || !Number.isFinite(cap)) return PLAYROOM_MAX_OUT;
+  return Math.max(1, Math.min(PLAYROOM_MAX_OUT, Math.floor(cap)));
 }
 
 export function createGameStore(storage: PersistStorage<SaveData> = createSafeStorage(browserStorage)) {
@@ -156,6 +180,9 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           set({
             ownedMalangs: { [characterId]: { count: 1, shinyCount: 0, firstObtainedAt: now.getTime() } },
             partnerId: characterId,
+            // 시작 말랑이는 직접 골랐으니 캡슐 없이 바로 매트에
+            unboxed: [characterId],
+            playroom: { out: [characterId] },
           });
           return true;
         },
@@ -253,6 +280,35 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
             affection: next !== prev ? { ...state.affection, [characterId]: next } : state.affection,
             missions: progressMissions(state.missions, now, [['pet', add]]),
           });
+        },
+
+        unboxMalang(characterId, cap) {
+          const state = get();
+          if (!state.ownedMalangs[characterId]) return false;
+          const first = !state.unboxed.includes(characterId);
+          const out = state.playroom.out;
+          const canPlace = !out.includes(characterId) && out.length < clampCap(cap);
+          if (!first && !canPlace) return false;
+          set({
+            unboxed: first ? [...state.unboxed, characterId] : state.unboxed,
+            playroom: canPlace ? { out: [...out, characterId] } : state.playroom,
+          });
+          return first;
+        },
+
+        takeOutMalang(characterId, cap) {
+          const state = get();
+          if (!state.ownedMalangs[characterId] || !state.unboxed.includes(characterId)) return false;
+          const out = state.playroom.out;
+          if (out.includes(characterId) || out.length >= clampCap(cap)) return false;
+          set({ playroom: { out: [...out, characterId] } });
+          return true;
+        },
+
+        putBackMalang(characterId) {
+          const out = get().playroom.out;
+          if (!out.includes(characterId)) return;
+          set({ playroom: { out: out.filter((id) => id !== characterId) } });
         },
 
         claimMission(id, now = new Date()) {

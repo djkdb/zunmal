@@ -40,6 +40,10 @@ export interface PhotoInput {
   rarity: Rarity;
   shiny: boolean;
   level: number;
+  /** 여럿이 함께 찍었을 때 애정 단계 대신 쓰는 한 줄 (3단계 단체 사진 틀이 이 자리를 키운다) */
+  caption?: string;
+  /** 여럿이 함께 (등급 딱지 없이, 밝은 바탕) */
+  group?: boolean;
   /** 말랑이 상자 (client 좌표) — 사진 칸을 여기에 맞춘다 */
   jelly: Rect;
   /** 잘라낼 수 있는 범위 (client 좌표, 무대) */
@@ -127,9 +131,17 @@ function gatherScene(input: PhotoInput): HTMLCanvasElement {
   return c;
 }
 
-/** 2D 말랑이 SVG 를 그대로 이미지로 (외곽선 포함) */
+/** 2D 사진에서 그림 상자 밖으로 번지는 몫 (전설 이상 오라가 네모로 잘리지 않게) — 상자 폭 대비 한쪽 */
+export const RASTER_PAD = 0.3;
+
+/**
+ * 2D 말랑이 SVG 를 그대로 이미지로 (외곽선·오라 포함). 결과는 상자보다 한쪽마다 RASTER_PAD 만큼 넓다 —
+ * 놓을 때도 svg 상자를 같은 비율로 넓혀 놓는다.
+ */
 export async function rasterizeVisibleMalang(svg: SVGSVGElement, bodyPath: string, bottom: number): Promise<HTMLCanvasElement> {
-  return rasterizeMalang(svg, { part: 'full', rect: { ...VIEWBOX }, size: 720, bodyPath, bottom });
+  const p = VIEWBOX.w * RASTER_PAD;
+  const rect = { x: VIEWBOX.x - p, y: VIEWBOX.y - p, w: VIEWBOX.w + 2 * p, h: VIEWBOX.h + 2 * p };
+  return rasterizeMalang(svg, { part: 'full', rect, size: 900, bodyPath, bottom });
 }
 
 export async function composePhoto(input: PhotoInput): Promise<Blob> {
@@ -147,9 +159,9 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   }
   const color = rarityColor(input.rarity);
   // 일반 등급 색(베이지)은 번지면 탁해 보여서 딸기우유색으로
-  const glowColor = input.rarity === 'common' ? '#ffb3c8' : color;
+  const glowColor = input.rarity === 'common' || input.group ? '#ffb3c8' : color;
   const meta = RARITY_META[input.rarity];
-  const dark = input.rarity === 'secret';
+  const dark = input.rarity === 'secret' && !input.group;
 
   // 배경 + 스프링클
   ctx.fillStyle = CREAM;
@@ -227,7 +239,10 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   ctx.strokeStyle = INK;
   ctx.stroke();
 
-  // 등급 딱지: 색 + 별 + 글자
+  // 등급 딱지: 색 + 별 + 글자 (단체 사진은 없음)
+  if (!input.group) drawBadge();
+  function drawBadge() {
+  if (!ctx) return;
   const label = meta.label;
   ctx.font = `44px ${FONT}`;
   const starCount = Math.min(6, meta.stars);
@@ -271,13 +286,14 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
     ctx.textAlign = 'center';
     ctx.fillText('반짝', sx + shinyRect.w / 2, shinyRect.y + shinyRect.h / 2 + 2);
   }
+  }
 
   // 이름 (풍선 글씨)
   balloonText(ctx, input.name, L.name.x, L.name.y, L.name.size);
 
-  // 애정 단계: 하트 + 글자
+  // 애정 단계(또는 단체 사진 한 줄): 하트 + 글자
   ctx.font = `${L.level.size}px ${FONT}`;
-  const levelText = `애정 Lv.${input.level}`;
+  const levelText = input.caption ?? `애정 Lv.${input.level}`;
   const lw = ctx.measureText(levelText).width;
   const hx = L.level.x - lw / 2 - 30;
   heart(ctx, hx, L.level.y, 24);

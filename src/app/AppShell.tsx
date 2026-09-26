@@ -23,6 +23,8 @@ export function AppShell() {
   const refreshDaily = useGameStore((s) => s.refreshDaily);
   // 게임 플레이 중에는 하단 내비게이션을 숨겨 조작 영역을 확보한다
   const inGame = useMatch('/play/:gameId') !== null;
+  // 놀이방(만지기)은 화면 전체가 놀이 매트인 독립 창: 위 막대·아래 탭을 모두 숨긴다
+  const inPlayroom = useMatch('/touch/*') !== null;
 
   // 화면을 옮기면 항상 맨 위에서 시작 (이전 화면의 스크롤 위치가 남지 않도록)
   const { pathname } = useLocation();
@@ -76,11 +78,16 @@ export function AppShell() {
       <button type="button" className="skip-link" onClick={() => document.getElementById('main')?.focus()}>
         본문으로 건너뛰기
       </button>
-      <TopBar />
-      <main ref={mainRef} className={`app-main${inGame ? ' app-main--game' : ''}`} id="main" tabIndex={-1}>
+      {!(inPlayroom && !needsStarter) && <TopBar />}
+      <main
+        ref={mainRef}
+        className={`app-main${inGame ? ' app-main--game' : ''}${inPlayroom ? ' app-main--playroom' : ''}`}
+        id="main"
+        tabIndex={-1}
+      >
         {needsStarter ? <StarterPicker /> : <Outlet />}
       </main>
-      {!needsStarter && !inGame && <BottomNav />}
+      {!needsStarter && !inGame && !inPlayroom && <BottomNav />}
       <CoinBurst />
     </div>
   );

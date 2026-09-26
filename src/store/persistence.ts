@@ -19,8 +19,11 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
  *  - v4: 일일 미션 진행(missions)
  *  - v5: 소리 설정 분리 — settings { muted } → { sfxOn, musicOn } (효과음/배경음악)
  *  - v6: 받은 쿠폰(redeemedCoupons)
+ *  - v7: 놀이방 — 캡슐을 연 말랑이(unboxed), 매트 위에 꺼내 둔 말랑이(playroom.out)
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
+/** 매트 위에 동시에 꺼내 둘 수 있는 최대 수 (저장 상한. 기기별 실제 상한은 touch/perfGovernor.ts 가 정한다) */
+export const PLAYROOM_MAX_OUT = 5;
 export const SAVE_KEY = 'malang-gacha-save';
 
 export interface OwnedMalang {
@@ -44,6 +47,11 @@ export interface Settings {
   musicOn: boolean;
 }
 
+export interface PlayroomSave {
+  /** 매트 위에 꺼내 둔 말랑이 id (꺼낸 순서). 항상 unboxed ∩ 보유, 최대 PLAYROOM_MAX_OUT */
+  out: string[];
+}
+
 export interface SaveData {
   coins: number;
   ownedMalangs: Record<string, OwnedMalang>;
@@ -64,6 +72,10 @@ export interface SaveData {
   missions: MissionState;
   /** 받은 쿠폰 id (economy/config.ts COUPONS) */
   redeemedCoupons: string[];
+  /** 캡슐을 열어 본 말랑이 id — 여기 없는 보유 말랑이는 놀이방 선반에 봉인된 캡슐로 나온다 */
+  unboxed: string[];
+  /** 놀이방(만지기) 매트 상태 */
+  playroom: PlayroomSave;
 }
 
 export function createInitialSave(now: Date = new Date()): SaveData {
@@ -82,6 +94,8 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     partnerShiny: false,
     missions: createMissionState(seoulDateKey(now)),
     redeemedCoupons: [],
+    unboxed: [],
+    playroom: { out: [] },
   };
 }
 
@@ -159,6 +173,19 @@ function sanitizeMissions(value: unknown, fallback: MissionState): MissionState 
   return { date: value.date, progress, claimed, bonusClaimed: value.bonusClaimed === true };
 }
 
+function sanitizeUnboxed(value: unknown, owned: Record<string, OwnedMalang>): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((v): v is string => typeof v === 'string' && owned[v] !== undefined))];
+}
+
+/** 매트 위 말랑이: 캡슐을 연 보유 말랑이만, 중복 없이, 최대 PLAYROOM_MAX_OUT */
+function sanitizePlayroom(value: unknown, unboxed: readonly string[]): PlayroomSave {
+  const out = isRecord(value) && Array.isArray(value.out) ? value.out : [];
+  const allowed = new Set(unboxed);
+  const ids = [...new Set(out.filter((v): v is string => typeof v === 'string' && allowed.has(v)))];
+  return { out: ids.slice(0, PLAYROOM_MAX_OUT) };
+}
+
 /**
  * 임의의 값을 안전한 SaveData로 변환한다. 어떤 입력에도 throw하지 않는다.
  * 잘못된 필드는 기본값으로, 알 수 없는 캐릭터는 제거한다.
@@ -171,6 +198,7 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
   const partnerId =
     typeof raw.partnerId === 'string' && ownedMalangs[raw.partnerId] ? raw.partnerId : null;
   const settings = isRecord(raw.settings) ? raw.settings : {};
+  const unboxed = sanitizeUnboxed(raw.unboxed, ownedMalangs);
 
   return {
     // 시작 선물 코인은 새 저장(createInitialSave)에만 준다. 기존 저장의 코인이 손상되면 0으로.
@@ -192,6 +220,8 @@ export function sanitizeSave(raw: unknown, now: Date = new Date()): SaveData {
     partnerShiny: raw.partnerShiny === true,
     missions: sanitizeMissions(raw.missions, base.missions),
     redeemedCoupons: Array.isArray(raw.redeemedCoupons) ? [...new Set(raw.redeemedCoupons.filter(isCouponId))] : [],
+    unboxed,
+    playroom: sanitizePlayroom(raw.playroom, unboxed),
   };
 }
 
@@ -238,6 +268,16 @@ function migrateV4toV5(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * v6 → v7: 놀이방. 이미 가진 말랑이는 모두 연 것으로 친다 (기존 플레이어가 캡슐 수십 개를 열지 않게).
+ * 매트에는 파트너 하나를 꺼내 둔다.
+ */
+function migrateV6toV7(raw: Record<string, unknown>): Record<string, unknown> {
+  const owned = isRecord(raw.ownedMalangs) ? Object.keys(raw.ownedMalangs) : [];
+  const partner = typeof raw.partnerId === 'string' && owned.includes(raw.partnerId) ? raw.partnerId : null;
+  return { ...raw, unboxed: owned, playroom: { out: partner ? [partner] : [] } };
+}
+
+/**
  * 저장된 버전에서 현재 버전으로 마이그레이션한 뒤 sanitize한다.
  * 알 수 없는(미래) 버전도 가능한 필드만 살려 복구한다.
  */
@@ -250,6 +290,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   // v3 → v4: missions는 sanitize가 오늘 날짜의 빈 진행으로 채운다.
   if (fromVersion < 5) data = migrateV4toV5(data);
   // v5 → v6: redeemedCoupons는 sanitize가 빈 목록으로 채운다.
-  // 향후: if (fromVersion < 7) data = migrateV6toV7(data);
+  if (fromVersion < 7) data = migrateV6toV7(data);
+  // 향후: if (fromVersion < 8) data = migrateV7toV8(data);
   return sanitizeSave(data, now);
 }

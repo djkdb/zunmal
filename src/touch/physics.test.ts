@@ -232,3 +232,17 @@ describe('reactions: melt, hop, stretchUp', () => {
     expect(maxY).toBeGreaterThan(1.08);
   });
 });
+
+describe('impact (놀이방 착지·부딪힘)', () => {
+  it('착지는 세로로 눌렸다 출렁이며 돌아오고, 옆 부딪힘은 반대쪽으로 기운다', async () => {
+    const { impact } = await import('./physics');
+    let s = impact(createTouchState(), 0, 1);
+    expect(s.squash.v).toBeGreaterThan(0);
+    expect(s.lean.v).toBe(0);
+    for (let t = 0; t < 4000; t += 16) s = step(s, 16);
+    expect(isAtRest(s)).toBe(true);
+    const side = impact(createTouchState(), -1, 0.5);
+    expect(side.lean.v).toBeLessThan(0);
+    expect(impact(createTouchState(), Number.NaN, Number.NaN).squash.v).toBeGreaterThan(0);
+  });
+});

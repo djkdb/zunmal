@@ -1,14 +1,18 @@
 /**
- * 말랑 만지기 3D 젤리 장면 (three.js). TouchPage 가 동적 import 로만 불러온다 — 첫 화면 번들과 분리.
+ * 놀이방 3D 젤리 무대 (three.js). 놀이방 페이지가 동적 import 로만 불러온다 — 첫 화면 번들과 분리.
  *
+ * - 무대(JellyStage) 하나 = 렌더러·장면·카메라 하나. 매트 위 말랑이 N 마리는 무대 안의 몸(JellyBodyView)이다.
+ *   몸마다 메시·재질·텍스처를 갖고, 그리기는 무대가 한 번에 한다 (render-on-demand: 페이지가 부를 때만).
  * - 몸: 말랑이 윤곽을 부풀린 메시(touch/jellyMesh) + 순수 스프링 변형(touch/softbody).
- *   정점은 매 프레임 CPU 에서 옮기고 법선을 다시 계산한다 (정점 약 2.6k).
+ *   정점은 CPU 에서 옮기고 법선을 다시 계산한다 (몸당 정점 약 2.6k) — 멈춰 있는 몸은 다시 계산하지 않는다.
  * - 겉모습: 실제 <Malang> SVG 를 구운 텍스처(얼굴·무늬·앞 장식 포함)를 앞면에 투영 → 찌그러지면 얼굴도 같이 찌그러진다.
  *   몸 밖으로 나온 장식은 몸 뒤/앞의 평평한 카드로 그려 같은 변형장을 따라 움직인다.
  * - 재질: 클리어코트 + 쉰(sheen) + 가장자리 빛(프레넬) + 가운데가 은은히 밝은 가짜 속빛 → 젤리.
  *   게임의 스티커 느낌을 위해 잉크색 뒤집힌 껍질 외곽선(epic 캡슐과 같은 방식).
- * - 성능: 렌더러는 하나를 공유해 캐릭터를 바꿔도 다시 만들지 않는다. DPR 최대 2 (느리면 1.5 → 1.25),
- *   그리기는 호출될 때만(draw) — 멈춰 있으면 페이지가 부르지 않는다.
+ * - 3/4 시점: 몸은 화면을 보고 서 있고, 매트 깊이는 z(카메라 쪽)로 둔다. 원근 때문에 앞뒤 몸의 크기·위치가
+ *   어긋나지 않도록 z 만큼 위치·크기를 되돌려(보정) DOM 좌표와 정확히 맞춘다.
+ * - 성능: 렌더러 하나를 공유해 다시 만들지 않는다. DPR 최대 2 (느리면 1.5 → 1.25). 떠나면 dispose + 컨텍스트 해제.
+ * - 3단계(꾸미기·단체 사진)는 이 무대에 소품 메시를 더하는 자리(`stage.scene`)를 쓴다.
  */
 import {
   BackSide,
@@ -50,44 +54,71 @@ import { faceExtras, type TouchFace } from '../../touch/faceExtras';
 
 export type JellyFace = TouchFace;
 
-export interface JellyViewOptions {
-  /** 캔버스를 붙일 상자 (무대 위를 덮는 절대 위치 요소) */
+export interface JellyStageOptions {
+  /** 캔버스를 붙일 상자 (매트 전체를 덮는 절대 위치 요소) */
   container: HTMLElement;
-  /** 2D 말랑이 상자 (VIEWBOX 148 단위 정사각형) — 3D 몸을 여기에 정확히 맞춘다 */
-  anchor: HTMLElement;
+  /** WebGL 컨텍스트를 잃었을 때 (2D 로 돌아간다) */
+  onLost: () => void;
+}
+
+export interface JellyBodyOptions {
   shape: MalangShape;
   /** 얼굴별 원본 SVG (화면 밖에 그려 둔 <Malang>) */
   getSource: (face: JellyFace) => SVGSVGElement | null;
   /** 첫 얼굴 */
   face: JellyFace;
-  /** WebGL 컨텍스트를 잃었을 때 (2D 로 돌아간다) */
-  onLost: () => void;
   /** 몸 뒤 빛 (전설 이상·반짝). strength 0 이면 없음 */
   glow?: { color: string; strength: number };
   /** 반짝 말랑이 무지갯빛 (0~1) */
   iridescence?: number;
 }
 
-export interface JellyView {
-  /** 텍스처를 굽고 첫 장면을 그리면 끝난다. 실패하면 reject → 2D 로 */
+/** 몸을 놓을 자리 (client px) */
+export interface BodyPlacement {
+  /** 몸통 바닥 가운데 (들어 올린 높이 포함) */
+  x: number;
+  y: number;
+  /** 그림 좌표 1 단위가 몇 px 인가 (말랑이 상자 px / VIEWBOX.w) */
+  unit: number;
+  /** 앞뒤 순서: 클수록 앞 (px 단위, 매트 위 깊이) */
+  depth: number;
+  /** 매트에서 들어 올린 높이 (px) — 그림자는 매트에 남는다 */
+  lift: number;
+}
+
+export interface JellyBodyView {
+  /** 텍스처를 구우면 끝난다. 실패하면 reject → 이 몸은 2D 로 */
   ready: Promise<void>;
-  /** 크기·위치 다시 맞추기 (창 크기 변경) */
-  layout(): void;
-  /** 화면 좌표 → 몸 표면 (쉬는 자세 기준). 몸 밖이면 null */
+  place(p: BodyPlacement): void;
+  /** 화면 좌표 → 이 몸 표면 (쉬는 자세 기준). 몸 밖이면 null */
   hit(clientX: number, clientY: number): SoftHit | null;
   /** 앞면 가운데 (키보드 조작용) */
   frontHit(): SoftHit;
-  /** 변형해서 그린다 */
-  draw(pose: Pose, soft: SoftState): void;
+  /** 변형 (그리기는 stage.render) */
+  update(pose: Pose, soft: SoftState): void;
   setFace(face: JellyFace): void;
   /** 얼굴을 손가락 쪽으로 (그림 좌표, 최대 몇 단위) */
   setGaze(x: number, y: number): void;
-  /** 지금 모습을 다시 그려 2D 캔버스로 복사 (사진 찍기). 컨테이너 전체 */
-  snapshot(): HTMLCanvasElement | null;
   /** 만질 때 몸 뒤 빛과 가장자리 빛이 잠깐 부푼다 (0~1) */
   pulse(amount: number): void;
   /** 빛이 아직 부풀어 있다 → 페이지가 그리기를 계속해야 한다 */
   busy(): boolean;
+  setVisible(v: boolean): void;
+  dispose(): void;
+}
+
+export interface JellyStage {
+  addBody(opts: JellyBodyOptions): JellyBodyView;
+  /** 화면 좌표에서 가장 앞에 닿는 몸 (없으면 null) */
+  pick(clientX: number, clientY: number): { body: JellyBodyView; hit: SoftHit } | null;
+  /** 크기 다시 맞추기 (창 크기 변경) */
+  layout(): void;
+  render(): void;
+  /** 지금 모습을 다시 그려 2D 캔버스로 복사 (사진 찍기). 컨테이너 전체 */
+  snapshot(): HTMLCanvasElement | null;
+  canvas: HTMLCanvasElement;
+  /** 3단계 소품이 들어갈 장면 */
+  scene: Scene;
   dispose(): void;
 }
 
@@ -303,10 +334,17 @@ function outlineMaterial(): MeshBasicMaterial {
   return mat;
 }
 
-// ── 장면 ─────────────────────────────────────────────────
+// ── 무대 ─────────────────────────────────────────────────
 
-export function createJellyView(opts: JellyViewOptions): JellyView {
-  const shape = SHAPES[opts.shape];
+interface BodyInternal {
+  view: JellyBodyView;
+  mesh: Mesh;
+  applyPlacement(): void;
+  beforeRender(now: number): void;
+  hitFrom(h: { point: Vector3; face?: { a: number; b: number; c: number } | null }): SoftHit | null;
+}
+
+export function createJellyStage(opts: JellyStageOptions): JellyStage {
   const s = acquireRenderer();
   const renderer = s.renderer;
   const canvas = renderer.domElement;
@@ -319,17 +357,6 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
   };
   canvas.addEventListener('webglcontextlost', onLost);
 
-  // 몸통 윤곽 범위 + 여백 = 몸 텍스처 영역
-  const flat = flattenPath(shape.body);
-  const minX = Math.min(...flat.map((p) => p.x));
-  const maxX = Math.max(...flat.map((p) => p.x));
-  const minY = Math.min(...flat.map((p) => p.y));
-  const maxY = Math.max(...flat.map((p) => p.y));
-  const bodyRect: RasterRect = { x: minX - 4, y: minY - 4, w: maxX - minX + 8, h: maxY - minY + 8 };
-
-  const mesh: JellyMesh = buildJellyMesh(shape.body, { uvRect: bodyRect });
-  const scratch = createScratch(mesh);
-
   const scene = new Scene();
   scene.environment = s.env;
   scene.environmentIntensity = 0.55;
@@ -339,185 +366,31 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
   key.position.set(-0.6, 1, 0.9);
   scene.add(key);
 
-  const root = new Group();
-  scene.add(root);
+  const bodies = new Set<BodyInternal>();
+  const meshOwner = new Map<Mesh, BodyInternal>();
 
-  // 몸
-  const geo = new BufferGeometry();
-  const pos = new BufferAttribute(new Float32Array(mesh.rest), 3);
-  pos.setUsage(DynamicDrawUsage);
-  const nor = new BufferAttribute(new Float32Array(mesh.restNormal), 3);
-  nor.setUsage(DynamicDrawUsage);
-  geo.setAttribute('position', pos);
-  geo.setAttribute('normal', nor);
-  geo.setAttribute('uv', new BufferAttribute(mesh.uv, 2));
-  geo.setIndex(new BufferAttribute(mesh.index, 1));
-  // 변형해도 레이캐스트가 미리 걸러내지 않도록 넉넉한 경계
-  geo.boundingSphere = new Sphere(new Vector3(0, mesh.height / 2, 0), 400);
-  geo.boundingBox = new Box3(new Vector3(-400, -400, -400), new Vector3(400, 400, 400));
-
-  const glowOpt = opts.glow && opts.glow.strength > 0 ? opts.glow : null;
-  const glowColor = new Color(glowOpt?.color ?? '#ffffff');
-  const uniforms: JellyUniforms = {
-    uGaze: { value: new Vector2(0, 0) },
-    uFaceUv: { value: new Vector2(0.5, 0.5) },
-    uFaceR: { value: new Vector2(0.3, 0.3) },
-    uRimBoost: { value: 0 },
-    uRimColor: { value: glowColor },
-    uShiny: { value: Math.max(0, Math.min(1, opts.iridescence ?? 0)) },
-    uTime: { value: 0 },
-  };
-  // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
-  uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
-  uniforms.uFaceR.value.set((shape.eyeGap + 17) / bodyRect.w, 17 / bodyRect.h);
-  const baseRim = glowOpt ? glowOpt.strength * 0.3 : 0;
-  uniforms.uRimBoost.value = baseRim;
-  const placeholder = new CanvasTexture(document.createElement('canvas'));
-  const bodyMat = jellyMaterial(placeholder, uniforms, uniforms.uShiny.value);
-  const body = new Mesh(geo, bodyMat);
-  body.frustumCulled = false;
-  root.add(body);
-  const inkMat = outlineMaterial();
-  const ink = new Mesh(geo, inkMat);
-  ink.frustumCulled = false;
-  root.add(ink);
-
-  // 장식 카드 (뒤: 외곽선 아래 / 앞: 외곽선 위)
-  const makeCard = (z: number, order: number, depthTest: boolean) => {
-    const grid = buildCardGrid(CARD_RECT, mesh.bottom, z, 18);
-    const g = new BufferGeometry();
-    const p = new BufferAttribute(new Float32Array(grid.rest), 3);
-    p.setUsage(DynamicDrawUsage);
-    g.setAttribute('position', p);
-    g.setAttribute('uv', new BufferAttribute(grid.uv, 2));
-    g.setIndex(new BufferAttribute(grid.index, 1));
-    const m = new MeshBasicMaterial({
-      transparent: true,
-      premultipliedAlpha: true,
-      depthWrite: false,
-      depthTest,
-      toneMapped: false,
-      visible: false,
-    });
-    const card = new Mesh(g, m);
-    card.frustumCulled = false;
-    card.renderOrder = order;
-    root.add(card);
-    return { grid, mesh: card, pos: p, mat: m };
-  };
-  const backCard = makeCard(-2, 2, true);
-  const frontCard = makeCard(3, 4, false);
-
-  // 바닥 그림자 (몸 뒤, 아래 절반만 보인다)
-  const shadowTex = shadowTexture();
-  const shadowMat = new MeshBasicMaterial({
-    map: shadowTex,
-    transparent: true,
-    depthWrite: false,
-    toneMapped: false,
-    opacity: 0.9,
-  });
-  const shadow = new Mesh(new PlaneGeometry(1, 1), shadowMat);
-  shadow.renderOrder = 1;
-  shadow.frustumCulled = false;
-  const shadowZ = -mesh.depth * 0.6 - 3;
-  shadow.position.set(0, 0, shadowZ);
-  root.add(shadow);
-
-  // 몸 뒤 빛 (전설 이상·반짝): 텍스처 한 장 + 보통 섞기 — 새 렌더 타깃·후처리 없음
-  let glowTex: CanvasTexture | null = null;
-  let glowMat: MeshBasicMaterial | null = null;
-  let glow: Mesh | null = null;
-  if (glowOpt) {
-    glowTex = glowTexture();
-    glowMat = new MeshBasicMaterial({
-      map: glowTex,
-      color: glowColor,
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      opacity: 0,
-    });
-    glow = new Mesh(new PlaneGeometry(1, 1), glowMat);
-    glow.renderOrder = 0;
-    glow.frustumCulled = false;
-    glow.position.set(0, mesh.height * 0.5, shadowZ - 4);
-    root.add(glow);
-  }
-  // 만질 때 부푸는 양: 시각(ms) 기준으로 스스로 줄어든다
-  let pulseAmt = 0;
-  let pulseAt = 0;
-  const PULSE_MS = 650;
-  const pulseNow = (now: number) => {
-    if (pulseAmt <= 0) return 0;
-    const k = 1 - (now - pulseAt) / PULSE_MS;
-    return k > 0 ? pulseAmt * k * k : 0;
-  };
-
-  // ── 텍스처 ──
-  const faceTex = new Map<JellyFace, CanvasTexture>();
-  const pendingFace = new Map<JellyFace, Promise<CanvasTexture | null>>();
-  let wantFace: JellyFace = opts.face;
-  let lastPose: Pose | null = null;
-
-  const bake = (face: JellyFace): Promise<CanvasTexture | null> => {
-    const cached = faceTex.get(face);
-    if (cached) return Promise.resolve(cached);
-    let p = pendingFace.get(face);
-    if (!p) {
-      const src = opts.getSource(face);
-      p = src
-        ? rasterizeMalang(src, {
-            part: 'body',
-            rect: bodyRect,
-            size: TEX_SIZE,
-            bodyPath: shape.body,
-            bottom: mesh.bottom,
-            extras: faceExtras(face, shape),
-          }).then(
-            (c) => {
-              if (disposed) return null;
-              const t = toTexture(c, renderer);
-              faceTex.set(face, t);
-              return t;
-            },
-          )
-        : Promise.resolve(null);
-      pendingFace.set(face, p);
-    }
-    return p;
-  };
-
-  const applyFace = (t: CanvasTexture) => {
-    if (bodyMat.map === t) return;
-    // 텍스처끼리 바꾸는 것은 셰이더를 다시 만들 필요가 없다 (눈 깜빡임이 가볍다)
-    bodyMat.map = t;
-  };
-
-  // ── 배치 ──
   let cssW = 1;
   let cssH = 1;
+  let dist = 1000;
+  let rect = { left: 0, top: 0 };
   const layout = () => {
     const cr = opts.container.getBoundingClientRect();
-    const ar = opts.anchor.getBoundingClientRect();
+    rect = { left: cr.left, top: cr.top };
     cssW = Math.max(1, Math.round(cr.width));
     cssH = Math.max(1, Math.round(cr.height));
     renderer.setPixelRatio(s.dpr);
     renderer.setSize(cssW, cssH, false);
     camera.aspect = cssW / cssH;
-    const dist = cssH / 2 / Math.tan(((FOV / 2) * Math.PI) / 180);
+    dist = cssH / 2 / Math.tan(((FOV / 2) * Math.PI) / 180);
     camera.position.set(0, 0, dist);
-    camera.near = dist * 0.5;
-    camera.far = dist * 1.6;
+    camera.near = dist * 0.4;
+    camera.far = dist * 1.8;
     camera.updateProjectionMatrix();
-    const unit = ar.width / VIEWBOX.w;
-    root.scale.setScalar(unit);
-    const px = ar.left - cr.left + (60 - VIEWBOX.x) * unit;
-    const py = ar.top - cr.top + (mesh.bottom - VIEWBOX.y) * unit;
-    root.position.set(px - cssW / 2, cssH / 2 - py, 0);
+    for (const b of bodies) b.applyPlacement();
   };
+  layout();
 
-  // ── 그리기 ──
+  // 계속 느리면(≈ 40fps 미만) 해상도를 낮춘다
   let emaMs = 0;
   let samples = 0;
   let lastDraw = 0;
@@ -525,10 +398,9 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
     const now = performance.now();
     const gap = now - lastDraw;
     lastDraw = now;
-    if (gap <= 0 || gap > 100) return; // 연속 그리기 중일 때만 잰다
+    if (gap <= 0 || gap > 600) return;
     emaMs = samples === 0 ? gap : emaMs * 0.9 + gap * 0.1;
     samples++;
-    // 계속 느리면(≈ 40fps 미만) 해상도를 낮춘다
     if (samples > 45 && emaMs > 25 && s.dpr > 1.25) {
       s.dpr = Math.max(1.25, s.dpr - 0.5);
       samples = 0;
@@ -536,104 +408,265 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
     }
   };
 
-  const drawNow = (pose: Pose, soft: SoftState) => {
+  const renderNow = () => {
     if (disposed) return;
-    lastPose = pose;
-    const out = pos.array as Float32Array;
-    deformJelly(mesh, pose, soft, out, scratch);
-    computeNormals(out, mesh.index, nor.array as Float32Array);
-    pos.needsUpdate = true;
-    nor.needsUpdate = true;
-    for (const card of [backCard, frontCard]) {
-      if (!card.mat.visible) continue;
-      deformPoints(card.grid.rest, card.grid.vertexCount, mesh.height, pose, soft, card.pos.array as Float32Array);
-      card.pos.needsUpdate = true;
-    }
-    // 그림자: 눌려 퍼지면 넓게, 떠오르면 옅게
-    const w = mesh.halfWidth * 2.25 * pose.scaleX;
-    shadow.scale.set(w, 20 * Math.max(0.6, pose.scaleX), 1);
-    shadow.position.x = pose.offsetX;
-    shadowMat.opacity = 0.9 * Math.max(0.3, 1 - Math.max(0, pose.offsetY) / 20);
     const now = performance.now();
-    const p = pulseNow(now);
-    uniforms.uRimBoost.value = baseRim + p * 0.35;
-    uniforms.uTime.value = now / 1000;
-    if (glow && glowMat && glowOpt) {
-      // 몸을 따라 움직이고 숨쉬듯 아주 조금 커졌다 작아진다
-      const breathe = 1 + 0.03 * Math.sin(now / 900);
-      const size = mesh.halfWidth * 3.3 * (breathe + p * 0.35);
-      glow.scale.set(size * pose.scaleX, size * pose.scaleY, 1);
-      glow.position.x = pose.offsetX;
-      glow.position.y = mesh.height * 0.5 * pose.scaleY + pose.offsetY;
-      glowMat.opacity = Math.min(1, glowOpt.strength * 0.75 + p * 0.5);
-    }
+    for (const b of bodies) b.beforeRender(now);
     renderer.render(scene, camera);
   };
 
-  let lastSoft: SoftState | null = null;
-  const redraw = () => {
-    if (lastPose && lastSoft) drawNow(lastPose, lastSoft);
-  };
-
-  const ready = (async () => {
-    // 원본 그림이 화면에 붙을 때까지 한 프레임 기다린다
-    await new Promise<void>((r) => requestAnimationFrame(() => r()));
-    if (disposed) return;
-    const bakeCard = async (part: 'back' | 'front', card: typeof backCard) => {
-      const src = opts.getSource('default');
-      if (!src) return;
-      const c = await rasterizeMalang(src, { part, rect: CARD_RECT, size: TEX_SIZE, bodyPath: shape.body, bottom: mesh.bottom });
-      if (disposed) return;
-      card.mat.map = toTexture(c, renderer);
-      card.mat.visible = true;
-      card.mat.needsUpdate = true;
-    };
-    const [first] = await Promise.all([bake(opts.face), bakeCard('back', backCard), bakeCard('front', frontCard)]);
-    if (disposed) return;
-    if (!first) throw new Error('no source');
-    applyFace(first);
-    bodyMat.needsUpdate = true;
-    placeholder.dispose();
-    layout();
-  })();
-
   const raycaster = new Raycaster();
   const ndc = new Vector2();
-  const tri = new Triangle();
-  const bary = new Vector3();
-  const va = new Vector3();
-  const vb = new Vector3();
-  const vc = new Vector3();
-
-  const restHit = (a: number, b: number, c: number, w: Vector3): SoftHit => {
-    const r = mesh.rest;
-    const n = mesh.restNormal;
-    const mix = (arr: Float32Array, k: number) => arr[a * 3 + k]! * w.x + arr[b * 3 + k]! * w.y + arr[c * 3 + k]! * w.z;
-    const nx = mix(n, 0);
-    const ny = mix(n, 1);
-    const nz = mix(n, 2);
-    const l = Math.hypot(nx, ny, nz) || 1;
-    return {
-      point: { x: mix(r, 0), y: mix(r, 1), z: mix(r, 2) },
-      normal: { x: nx / l, y: ny / l, z: nz / l },
-    };
+  const setRay = (clientX: number, clientY: number): boolean => {
+    const r = canvas.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return false;
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    scene.updateMatrixWorld();
+    return true;
   };
 
-  return {
-    ready,
-    layout: () => {
-      layout();
-      redraw();
-    },
-    hit(clientX, clientY) {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return null;
-      ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
-      const hits = raycaster.intersectObject(body, false);
-      const h = hits[0];
-      if (!h || !h.face) return null;
-      const local = body.worldToLocal(h.point.clone());
+  const addBody = (bo: JellyBodyOptions): JellyBodyView => {
+    const shape = SHAPES[bo.shape];
+    // 몸통 윤곽 범위 + 여백 = 몸 텍스처 영역
+    const flat = flattenPath(shape.body);
+    const minX = Math.min(...flat.map((p) => p.x));
+    const maxX = Math.max(...flat.map((p) => p.x));
+    const minY = Math.min(...flat.map((p) => p.y));
+    const maxY = Math.max(...flat.map((p) => p.y));
+    const bodyRect: RasterRect = { x: minX - 4, y: minY - 4, w: maxX - minX + 8, h: maxY - minY + 8 };
+    const mesh: JellyMesh = buildJellyMesh(shape.body, { uvRect: bodyRect });
+    const scratch = createScratch(mesh);
+    let bodyDisposed = false;
+
+    const root = new Group();
+    scene.add(root);
+
+    const geo = new BufferGeometry();
+    const pos = new BufferAttribute(new Float32Array(mesh.rest), 3);
+    pos.setUsage(DynamicDrawUsage);
+    const nor = new BufferAttribute(new Float32Array(mesh.restNormal), 3);
+    nor.setUsage(DynamicDrawUsage);
+    geo.setAttribute('position', pos);
+    geo.setAttribute('normal', nor);
+    geo.setAttribute('uv', new BufferAttribute(mesh.uv, 2));
+    geo.setIndex(new BufferAttribute(mesh.index, 1));
+    // 변형해도 레이캐스트가 미리 걸러내지 않도록 넉넉한 경계
+    geo.boundingSphere = new Sphere(new Vector3(0, mesh.height / 2, 0), 400);
+    geo.boundingBox = new Box3(new Vector3(-400, -400, -400), new Vector3(400, 400, 400));
+
+    const glowOpt = bo.glow && bo.glow.strength > 0 ? bo.glow : null;
+    const glowColor = new Color(glowOpt?.color ?? '#ffffff');
+    const uniforms: JellyUniforms = {
+      uGaze: { value: new Vector2(0, 0) },
+      uFaceUv: { value: new Vector2(0.5, 0.5) },
+      uFaceR: { value: new Vector2(0.3, 0.3) },
+      uRimBoost: { value: 0 },
+      uRimColor: { value: glowColor },
+      uShiny: { value: Math.max(0, Math.min(1, bo.iridescence ?? 0)) },
+      uTime: { value: 0 },
+    };
+    // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
+    uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
+    uniforms.uFaceR.value.set((shape.eyeGap + 17) / bodyRect.w, 17 / bodyRect.h);
+    const baseRim = glowOpt ? glowOpt.strength * 0.3 : 0;
+    uniforms.uRimBoost.value = baseRim;
+    const placeholder = new CanvasTexture(document.createElement('canvas'));
+    const bodyMat = jellyMaterial(placeholder, uniforms, uniforms.uShiny.value);
+    const bodyMesh = new Mesh(geo, bodyMat);
+    bodyMesh.frustumCulled = false;
+    bodyMesh.visible = false;
+    root.add(bodyMesh);
+    const inkMat = outlineMaterial();
+    const ink = new Mesh(geo, inkMat);
+    ink.frustumCulled = false;
+    ink.visible = false;
+    root.add(ink);
+
+    // 장식 카드: 뒤 = 몸 뒤, 앞 = 몸 앞면보다 조금 앞 (깊이 검사를 켜야 여러 마리가 겹칠 때 앞 몸이 가린다)
+    const makeCard = (z: number, order: number) => {
+      const grid = buildCardGrid(CARD_RECT, mesh.bottom, z, 18);
+      const g = new BufferGeometry();
+      const p = new BufferAttribute(new Float32Array(grid.rest), 3);
+      p.setUsage(DynamicDrawUsage);
+      g.setAttribute('position', p);
+      g.setAttribute('uv', new BufferAttribute(grid.uv, 2));
+      g.setIndex(new BufferAttribute(grid.index, 1));
+      const m = new MeshBasicMaterial({
+        transparent: true,
+        premultipliedAlpha: true,
+        depthWrite: false,
+        depthTest: true,
+        toneMapped: false,
+        visible: false,
+      });
+      const card = new Mesh(g, m);
+      card.frustumCulled = false;
+      card.renderOrder = order;
+      root.add(card);
+      return { grid, mesh: card, pos: p, mat: m };
+    };
+    const backCard = makeCard(-2, 2);
+    const frontCard = makeCard(mesh.depth + 2, 4);
+
+    // 바닥 그림자 (몸 뒤, 매트에 남는다)
+    const shadowTex = shadowTexture();
+    const shadowMat = new MeshBasicMaterial({
+      map: shadowTex,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      opacity: 0.9,
+    });
+    const shadow = new Mesh(new PlaneGeometry(1, 1), shadowMat);
+    shadow.renderOrder = 1;
+    shadow.frustumCulled = false;
+    const shadowZ = -mesh.depth * 0.6 - 3;
+    shadow.position.set(0, 0, shadowZ);
+    root.add(shadow);
+
+    // 몸 뒤 빛 (전설 이상·반짝): 텍스처 한 장 + 보통 섞기 — 새 렌더 타깃·후처리 없음
+    let glowTex: CanvasTexture | null = null;
+    let glowMat: MeshBasicMaterial | null = null;
+    let glow: Mesh | null = null;
+    if (glowOpt) {
+      glowTex = glowTexture();
+      glowMat = new MeshBasicMaterial({
+        map: glowTex,
+        color: glowColor,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        opacity: 0,
+      });
+      glow = new Mesh(new PlaneGeometry(1, 1), glowMat);
+      glow.renderOrder = 0;
+      glow.frustumCulled = false;
+      glow.position.set(0, mesh.height * 0.5, shadowZ - 4);
+      root.add(glow);
+    }
+    // 만질 때 부푸는 양: 시각(ms) 기준으로 스스로 줄어든다
+    let pulseAmt = 0;
+    let pulseAt = 0;
+    const PULSE_MS = 650;
+    const pulseNow = (now: number) => {
+      if (pulseAmt <= 0) return 0;
+      const k = 1 - (now - pulseAt) / PULSE_MS;
+      return k > 0 ? pulseAmt * k * k : 0;
+    };
+
+    // ── 텍스처 ──
+    const faceTex = new Map<JellyFace, CanvasTexture>();
+    const pendingFace = new Map<JellyFace, Promise<CanvasTexture | null>>();
+    let wantFace: JellyFace = bo.face;
+    const bake = (face: JellyFace): Promise<CanvasTexture | null> => {
+      const cached = faceTex.get(face);
+      if (cached) return Promise.resolve(cached);
+      let p = pendingFace.get(face);
+      if (!p) {
+        const src = bo.getSource(face);
+        p = src
+          ? rasterizeMalang(src, {
+              part: 'body',
+              rect: bodyRect,
+              size: TEX_SIZE,
+              bodyPath: shape.body,
+              bottom: mesh.bottom,
+              extras: faceExtras(face, shape),
+            }).then((c) => {
+              if (bodyDisposed || disposed) return null;
+              const t = toTexture(c, renderer);
+              faceTex.set(face, t);
+              return t;
+            })
+          : Promise.resolve(null);
+        pendingFace.set(face, p);
+      }
+      return p;
+    };
+    const applyFace = (t: CanvasTexture) => {
+      // 텍스처끼리 바꾸는 것은 셰이더를 다시 만들 필요가 없다 (눈 깜빡임이 가볍다)
+      if (bodyMat.map !== t) bodyMat.map = t;
+    };
+
+    // ── 자리 ──
+    let placement: BodyPlacement | null = null;
+    let lastPose: Pose | null = null;
+    let visible = true;
+    let ready = false;
+    const applyPlacement = () => {
+      const p = placement;
+      if (!p) return;
+      // 깊이(zg)만큼 카메라에 가까워진 만큼 위치·크기를 줄여 화면에서는 정확히 p 에 보이게 한다
+      const zg = Math.max(-dist * 0.5, Math.min(dist * 0.5, p.depth));
+      const k = (dist - zg) / dist;
+      const px = p.x - rect.left;
+      const py = p.y - rect.top;
+      root.position.set((px - cssW / 2) * k, (cssH / 2 - py) * k, zg);
+      root.scale.setScalar(p.unit * k);
+      const liftUnits = p.unit > 0 ? p.lift / p.unit : 0;
+      shadow.position.y = -liftUnits;
+      shadowMat.opacity = 0.9 * Math.max(0.25, 1 - liftUnits / 120);
+    };
+
+    const updateNow = (pose: Pose, soft: SoftState) => {
+      if (bodyDisposed || disposed) return;
+      lastPose = pose;
+      const out = pos.array as Float32Array;
+      deformJelly(mesh, pose, soft, out, scratch);
+      computeNormals(out, mesh.index, nor.array as Float32Array);
+      pos.needsUpdate = true;
+      nor.needsUpdate = true;
+      for (const card of [backCard, frontCard]) {
+        if (!card.mat.visible) continue;
+        deformPoints(card.grid.rest, card.grid.vertexCount, mesh.height, pose, soft, card.pos.array as Float32Array);
+        card.pos.needsUpdate = true;
+      }
+      // 그림자: 눌려 퍼지면 넓게
+      const w = mesh.halfWidth * 2.25 * pose.scaleX;
+      shadow.scale.set(w, 20 * Math.max(0.6, pose.scaleX), 1);
+      shadow.position.x = pose.offsetX;
+    };
+
+    const beforeRender = (now: number) => {
+      const p = pulseNow(now);
+      uniforms.uRimBoost.value = baseRim + p * 0.35;
+      uniforms.uTime.value = now / 1000;
+      if (glow && glowMat && glowOpt) {
+        // 몸을 따라 움직이고 숨쉬듯 아주 조금 커졌다 작아진다
+        const pose = lastPose;
+        const sx = pose?.scaleX ?? 1;
+        const sy = pose?.scaleY ?? 1;
+        const breathe = 1 + 0.03 * Math.sin(now / 900);
+        const size = mesh.halfWidth * 3.3 * (breathe + p * 0.35);
+        glow.scale.set(size * sx, size * sy, 1);
+        glow.position.x = pose?.offsetX ?? 0;
+        glow.position.y = mesh.height * 0.5 * sy + (pose?.offsetY ?? 0);
+        glowMat.opacity = Math.min(1, glowOpt.strength * 0.75 + p * 0.5);
+      }
+    };
+
+    const tri = new Triangle();
+    const bary = new Vector3();
+    const va = new Vector3();
+    const vb = new Vector3();
+    const vc = new Vector3();
+    const restHit = (a: number, b: number, c: number, w: Vector3): SoftHit => {
+      const r = mesh.rest;
+      const n = mesh.restNormal;
+      const mix = (arr: Float32Array, k: number) => arr[a * 3 + k]! * w.x + arr[b * 3 + k]! * w.y + arr[c * 3 + k]! * w.z;
+      const nx = mix(n, 0);
+      const ny = mix(n, 1);
+      const nz = mix(n, 2);
+      const l = Math.hypot(nx, ny, nz) || 1;
+      return {
+        point: { x: mix(r, 0), y: mix(r, 1), z: mix(r, 2) },
+        normal: { x: nx / l, y: ny / l, z: nz / l },
+      };
+    };
+    const hitFrom = (h: { point: Vector3; face?: { a: number; b: number; c: number } | null }): SoftHit | null => {
+      if (!h.face) return null;
+      const local = bodyMesh.worldToLocal(h.point.clone());
       const p = pos.array as Float32Array;
       const { a, b, c } = h.face;
       va.fromArray(p, a * 3);
@@ -642,34 +675,136 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
       tri.set(va, vb, vc);
       if (!tri.getBarycoord(local, bary)) return null;
       return restHit(a, b, c, bary);
+    };
+
+    const readyP = (async () => {
+      // 원본 그림이 화면에 붙을 때까지 한 프레임 기다린다
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      if (bodyDisposed || disposed) return;
+      const bakeCard = async (part: 'back' | 'front', card: typeof backCard) => {
+        const src = bo.getSource('default');
+        if (!src) return;
+        const c = await rasterizeMalang(src, { part, rect: CARD_RECT, size: TEX_SIZE, bodyPath: shape.body, bottom: mesh.bottom });
+        if (bodyDisposed || disposed) return;
+        card.mat.map = toTexture(c, renderer);
+        card.mat.visible = true;
+        card.mat.needsUpdate = true;
+      };
+      const [first] = await Promise.all([bake(bo.face), bakeCard('back', backCard), bakeCard('front', frontCard)]);
+      if (bodyDisposed || disposed) return;
+      if (!first) throw new Error('no source');
+      applyFace(first);
+      bodyMat.needsUpdate = true;
+      placeholder.dispose();
+      ready = true;
+      bodyMesh.visible = true;
+      ink.visible = true;
+    })();
+
+    const internal: BodyInternal = {
+      view: null as unknown as JellyBodyView,
+      mesh: bodyMesh,
+      applyPlacement,
+      beforeRender,
+      hitFrom,
+    };
+    const view: JellyBodyView = {
+      ready: readyP,
+      place(p) {
+        placement = p;
+        applyPlacement();
+      },
+      hit(clientX, clientY) {
+        if (!ready || !visible || !setRay(clientX, clientY)) return null;
+        const h = raycaster.intersectObject(bodyMesh, false)[0];
+        return h ? hitFrom(h) : null;
+      },
+      frontHit() {
+        return restHit(0, 0, 0, new Vector3(1, 0, 0));
+      },
+      update: updateNow,
+      setFace(face) {
+        wantFace = face;
+        void bake(face).then((t) => {
+          if (!t || bodyDisposed || wantFace !== face) return;
+          applyFace(t);
+        });
+      },
+      setGaze(x, y) {
+        const gx = x / bodyRect.w;
+        const gy = -y / bodyRect.h;
+        const g = uniforms.uGaze.value;
+        if (Math.abs(g.x - gx) < 1e-4 && Math.abs(g.y - gy) < 1e-4) return;
+        g.set(gx, gy);
+      },
+      pulse(amount) {
+        if (!(amount > 0)) return;
+        const now = performance.now();
+        pulseAmt = Math.min(1, pulseNow(now) + amount);
+        pulseAt = now;
+      },
+      busy() {
+        return pulseNow(performance.now()) > 0.005;
+      },
+      setVisible(v) {
+        visible = v;
+        root.visible = v;
+      },
+      dispose() {
+        if (bodyDisposed) return;
+        bodyDisposed = true;
+        bodies.delete(internal);
+        meshOwner.delete(bodyMesh);
+        scene.remove(root);
+        root.traverse((o) => {
+          const m = o as Mesh;
+          m.geometry?.dispose();
+        });
+        bodyMat.dispose();
+        inkMat.dispose();
+        for (const card of [backCard, frontCard]) {
+          card.mat.map?.dispose();
+          card.mat.dispose();
+        }
+        shadowMat.dispose();
+        shadowTex.dispose();
+        glowMat?.dispose();
+        glowTex?.dispose();
+        placeholder.dispose();
+        faceTex.forEach((t) => t.dispose());
+        faceTex.clear();
+      },
+    };
+    internal.view = view;
+    bodies.add(internal);
+    meshOwner.set(bodyMesh, internal);
+    return view;
+  };
+
+  return {
+    canvas,
+    scene,
+    addBody,
+    pick(clientX, clientY) {
+      if (!setRay(clientX, clientY)) return null;
+      const meshes: Mesh[] = [];
+      for (const b of bodies) if (b.mesh.visible && b.mesh.parent?.visible !== false) meshes.push(b.mesh);
+      // 가까운 것부터 온다 → 가장 앞 몸
+      for (const h of raycaster.intersectObjects(meshes, false)) {
+        const owner = meshOwner.get(h.object as Mesh);
+        const hit = owner?.hitFrom(h);
+        if (owner && hit) return { body: owner.view, hit };
+      }
+      return null;
     },
-    frontHit() {
-      return restHit(0, 0, 0, new Vector3(1, 0, 0));
-    },
-    draw(pose, soft) {
-      lastSoft = soft;
+    layout,
+    render() {
       adaptQuality();
-      drawNow(pose, soft);
-    },
-    pulse(amount) {
-      if (!(amount > 0)) return;
-      const now = performance.now();
-      pulseAmt = Math.min(1, pulseNow(now) + amount);
-      pulseAt = now;
-    },
-    busy() {
-      return pulseNow(performance.now()) > 0.005;
-    },
-    setGaze(x, y) {
-      const gx = x / bodyRect.w;
-      const gy = -y / bodyRect.h;
-      const g = uniforms.uGaze.value;
-      if (Math.abs(g.x - gx) < 1e-4 && Math.abs(g.y - gy) < 1e-4) return;
-      g.set(gx, gy);
+      renderNow();
     },
     snapshot() {
       if (disposed) return null;
-      redraw();
+      renderNow();
       const out = document.createElement('canvas');
       out.width = canvas.width;
       out.height = canvas.height;
@@ -679,35 +814,11 @@ export function createJellyView(opts: JellyViewOptions): JellyView {
       ctx.drawImage(canvas, 0, 0);
       return out;
     },
-    setFace(face) {
-      wantFace = face;
-      void bake(face).then((t) => {
-        if (!t || disposed || wantFace !== face) return;
-        applyFace(t);
-        redraw();
-      });
-    },
     dispose() {
       if (disposed) return;
+      for (const b of [...bodies]) b.view.dispose();
       disposed = true;
       canvas.removeEventListener('webglcontextlost', onLost);
-      root.traverse((o) => {
-        const m = o as Mesh;
-        m.geometry?.dispose();
-      });
-      bodyMat.dispose();
-      inkMat.dispose();
-      for (const card of [backCard, frontCard]) {
-        card.mat.map?.dispose();
-        card.mat.dispose();
-      }
-      shadowMat.dispose();
-      shadowTex.dispose();
-      glowMat?.dispose();
-      glowTex?.dispose();
-      placeholder.dispose();
-      faceTex.forEach((t) => t.dispose());
-      faceTex.clear();
       renderer.renderLists.dispose();
       canvas.remove();
       releaseRenderer();
