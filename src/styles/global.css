@@ -114,10 +114,35 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* 게임 화면: 길게 누르거나 빠르게 문질러도 글자 선택·돋보기·복사 메뉴가 떠서 터치를 삼키지 않도록.
+     입력칸(기록 코드 등)만 다시 선택할 수 있게 둔다. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   overflow-x: hidden;
   /* 한국어는 어절 단위로 줄바꿈 ("미니게임으/로" 방지). 한 어절이 칸보다 길 때만 글자 단위로 끊는다. */
   word-break: keep-all;
   overflow-wrap: anywhere;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* 이미지·SVG를 길게 눌러 끌기/저장 메뉴가 뜨지 않게 */
+img,
+svg {
+  -webkit-user-drag: none;
+}
+
+/* 두 번 탭 확대 방지 (연타 미니게임에서 화면이 커지지 않게) */
+html {
+  touch-action: manipulation;
 }
 
 h1,
@@ -358,6 +383,7 @@ strong {
   opacity: 0.4;
 }
 
+
 /* 진한 젤리 버튼은 흰 글씨 + 잉크 외곽선 (게임 버튼 글씨) */
 .btn--primary,
 .btn--sky,
@@ -402,6 +428,12 @@ strong {
 .btn--mint.btn--small,
 .btn--grape.btn--small {
   -webkit-text-stroke-width: 4px;
+}
+
+/* 비활성 버튼은 색 버튼 규칙(흰 글씨 + 외곽선)보다 뒤·더 구체적으로 — 외곽선이 회색 글씨를 뭉개지 않게 */
+.btn.btn:disabled {
+  -webkit-text-stroke: 0;
+  color: var(--ink-soft);
 }
 
 .btn--big {

@@ -18,6 +18,7 @@ import {
   type FallingItem,
 } from './logic';
 import './CapsuleCatch.css';
+import { ArrowIcon } from '../shared/ArrowIcon';
 
 const INK = '#2b2233';
 const CAPSULE_COLORS = ['#ff8fab', '#7fd8be', '#8ecdf7', '#c3a6ff', '#ffd966'];
@@ -184,7 +185,7 @@ function drawScene(
   }
   drawPlayer(ctx, state.playerX, partner, state.elapsedMs < state.stunnedUntilMs, squash);
   ctx.textAlign = 'center';
-  ctx.font = '20px Jua, sans-serif';
+  ctx.font = '20px "Cafe24 Ssurround", Jua, sans-serif';
   for (const p of popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 700);
     ctx.fillStyle = p.color;
@@ -407,11 +408,11 @@ function CapsuleCatchGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       </div>
       <div className="cc__controls">
         <button type="button" className="btn cc__move" aria-label="왼쪽으로 이동 (누르고 있기)" {...holdButton(-1)}>
-          ◀
+          <ArrowIcon dir="left" />
         </button>
         <p className="small muted cc__help">화면을 누른 채 좌우로 밀거나 방향키로 움직여요</p>
         <button type="button" className="btn cc__move" aria-label="오른쪽으로 이동 (누르고 있기)" {...holdButton(1)}>
-          ▶
+          <ArrowIcon dir="right" />
         </button>
       </div>
     </div>

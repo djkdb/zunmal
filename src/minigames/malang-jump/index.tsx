@@ -19,6 +19,7 @@ import {
   type Platform,
 } from './logic';
 import './MalangJump.css';
+import { ArrowIcon } from '../shared/ArrowIcon';
 
 const INK = '#2b2233';
 const PAPER = '#fffcf5';
@@ -233,7 +234,7 @@ function drawScene(
   ctx.fillStyle = 'rgba(43,34,51,0.35)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 8]);
-  ctx.font = '14px Jua, sans-serif';
+  ctx.font = '14px "Cafe24 Ssurround", Jua, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
   const first = Math.ceil(s.cameraY / step) * step;
@@ -259,7 +260,7 @@ function drawScene(
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = '18px Jua, sans-serif';
+  ctx.font = '18px "Cafe24 Ssurround", Jua, sans-serif';
   for (const p of popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 700);
     ctx.fillStyle = '#e0457b';
@@ -518,11 +519,11 @@ function MalangJumpGame({ partner, onFinish, onExit, sfx }: MiniGameProps) {
       </div>
       <div className="mj__controls">
         <button type="button" className="btn mj__move" aria-label="왼쪽으로 이동 (누르고 있기)" {...holdButton(-1)}>
-          ◀
+          <ArrowIcon dir="left" />
         </button>
         <p className="small muted mj__help">화면 좌우를 눌러 움직여요</p>
         <button type="button" className="btn mj__move" aria-label="오른쪽으로 이동 (누르고 있기)" {...holdButton(1)}>
-          ▶
+          <ArrowIcon dir="right" />
         </button>
       </div>
     </div>

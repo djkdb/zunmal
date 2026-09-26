@@ -59,6 +59,8 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 - 360px 폭에서 가로 스크롤 금지. 360×640 화면에서도 홈의 주요 버튼이 첫 화면에 보여야 한다.
 - 재화를 쓰는 버튼은 state가 아니라 ref로 즉시 잠가 연타 중복 실행을 막는다 (`GachaPage`의 `lockRef`).
 - 사용자 입력 이전에 AudioContext 생성/재생 금지 (`audio/sfx.ts` 가 보장).
+- 글자 선택·길게 누르기 메뉴는 전역으로 막는다(`body` user-select/touch-callout none — iOS에서 터치를 삼킴). 입력칸과 `.selectable`만 예외.
+- 버튼·UI에 ◀▶ 같은 기호 글자를 쓰지 않는다(글꼴에 없어 iOS에서 빈칸). SVG 아이콘을 쓴다 (미니게임은 `minigames/shared/ArrowIcon`).
 
 ## 디자인 시스템
 
