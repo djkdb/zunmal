@@ -6,12 +6,14 @@ interface MatCapsuleProps {
   rec: BodyRec;
   onKeyDown: (rec: BodyRec, e: KeyboardEvent<HTMLButtonElement>) => void;
   onKeyUp: (rec: BodyRec, e: KeyboardEvent<HTMLButtonElement>) => void;
+  /** 머리 위에 보이는 여는 방법 한 줄 (없으면 숨김) */
+  hint?: string | null;
 }
 
 /**
  * 매트 위의 봉인된 캡슐. 모양 변화(비틀림·벌어짐·금·꾹 누름 고리)는 페이지가 CSS 변수로 바로 바꾼다 (다시 그리기 없음).
  */
-export function MatCapsule({ rec, onKeyDown, onKeyUp }: MatCapsuleProps) {
+export function MatCapsule({ rec, onKeyDown, onKeyUp, hint = null }: MatCapsuleProps) {
   return (
     <div
       ref={(el) => {
@@ -39,6 +41,11 @@ export function MatCapsule({ rec, onKeyDown, onKeyUp }: MatCapsuleProps) {
           <circle cx="20" cy="20" r="17" pathLength={1} />
         </svg>
       </span>
+      {hint && (
+        <span className="pr-capsule__hint" aria-hidden="true">
+          {hint}
+        </span>
+      )}
       <button
         ref={(el) => {
           rec.els.button = el;

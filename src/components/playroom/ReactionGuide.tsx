@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { MATERIALS, MATERIAL_IDS, type FillingSpec, type MaterialId } from '../../data/materials';
+import { CAPSULE_HINT } from '../../touch/capsule';
 import { PAIR_PLAYS, type PairPlayId } from '../../touch/interactions';
 import {
   BASIC_GESTURES,
@@ -25,6 +26,15 @@ export const ALL_DEMOS: readonly DemoSpec[] = [
   ...BASIC_GESTURES.map((g) => ({ key: g.id, label: g.label, howTo: g.howTo, gesture: g.gesture, area: g.area })),
   ...REACTION_UNLOCKS.map((r) => ({ key: r.id, label: r.label, howTo: r.howTo, gesture: r.gesture, area: r.area })),
 ];
+
+/** 매트 위 캡슐을 여는 시범 (반응 표와 따로 — 캡슐을 한 번 열 때까지 캡슐이 나오면 보여 준다) */
+export const CAPSULE_DEMO: DemoSpec = {
+  key: 'capsule',
+  label: '캡슐 열기',
+  howTo: CAPSULE_HINT,
+  gesture: 'taps',
+  area: 'body',
+};
 
 export function demoFor(key: string): DemoSpec | undefined {
   return ALL_DEMOS.find((d) => d.key === key);

@@ -3,8 +3,8 @@ import { getCharacter } from '../../data/characters';
 import { materialOf } from '../../data/materials';
 import { RARITY_META } from '../../data/rarity';
 import type { ShelfEntry } from '../../touch/shelf';
-import { CloseIcon } from '../icons';
 import { Malang } from '../Malang';
+import { RarityBadge } from '../RarityBadge';
 import { CapsuleArt } from './CapsuleArt';
 import { MaterialIcon } from './MaterialIcon';
 
@@ -19,13 +19,32 @@ interface ShelfProps {
   sealedCount: number;
   /** 매트에 한 마리뿐 — 손잡이를 "친구 꺼내기"로 */
   solo?: boolean;
+  /** 선반의 봉인된 캡슐을 차례로 모두 연다 (없으면 버튼을 숨긴다) */
+  onOpenAll?: () => void;
+  /** 모두 열기가 진행 중 */
+  openingAll?: boolean;
+  /** 방금 캡슐에서 나온 말랑이 — 칸이 폴짝 튀어 오른다 */
+  poppedIds?: ReadonlySet<string>;
 }
 
 /**
  * 아래에서 끌어 올리는 선반. 닫혀 있을 때는 손잡이 버튼만, 열리면 나무 선반 위에 말랑이·캡슐 칸.
  * 나와 있는 칸은 빈 받침으로 보이고 누르면 선반에 다시 넣는다.
  */
-export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, sealedCount, solo = false }: ShelfProps) {
+export function Shelf({
+  open,
+  entries,
+  onMat,
+  cap,
+  shinyIds,
+  onToggle,
+  onPick,
+  sealedCount,
+  solo = false,
+  onOpenAll,
+  openingAll = false,
+  poppedIds,
+}: ShelfProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -67,9 +86,22 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
         aria-label="말랑이 선반"
         hidden={!open}
       >
-        <p className="pr-shelf__help">
-          누르면 매트로 꺼내 함께 놀아요. 나와 있는 말랑이를 누르면 선반에 넣어요.
-        </p>
+        <div className="pr-shelf__top">
+          <p className="pr-shelf__help">
+            누르면 매트로 꺼내 함께 놀아요. 나와 있는 말랑이를 누르면 선반에 넣어요.
+          </p>
+          {onOpenAll && (sealedCount > 0 || openingAll) && (
+            <button
+              type="button"
+              className="btn btn--lemon btn--small pr-shelf__open-all"
+              onClick={onOpenAll}
+              disabled={openingAll}
+              aria-label={openingAll ? '캡슐 여는 중' : `새 캡슐 ${sealedCount}개 모두 열기`}
+            >
+              {openingAll ? '여는 중' : '모두 열기'}
+            </button>
+          )}
+        </div>
         <ul className="pr-shelf__grid">
           {entries.map((e) => {
             const c = getCharacter(e.id);
@@ -82,7 +114,7 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
               <li key={e.id} className="pr-shelf__cell">
                 <button
                   type="button"
-                  className={`pr-shelf__slot${e.out ? ' is-out' : ''}${e.sealed ? ' is-sealed' : ''}`}
+                  className={`pr-shelf__slot${e.out ? ' is-out' : ''}${e.sealed ? ' is-sealed' : ''}${poppedIds?.has(e.id) ? ' is-popped' : ''}`}
                   data-rarity={c.rarity}
                   aria-pressed={e.out}
                   aria-label={label}
@@ -103,15 +135,17 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
                       </span>
                     </>
                   )}
-
                 </button>
+                {/* 봉인된 캡슐: 이름 대신 등급만 (색 + 모양 + 글자) */}
+                {e.sealed && (
+                  <span className="pr-shelf__rarity" aria-hidden="true">
+                    <RarityBadge rarity={c.rarity} compact />
+                  </span>
+                )}
               </li>
             );
           })}
         </ul>
-        <button type="button" className="pr-shelf__close" aria-label="선반 닫기" onClick={onToggle}>
-          <CloseIcon size={22} />
-        </button>
       </div>
     </div>
   );

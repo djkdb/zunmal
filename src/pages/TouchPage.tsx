@@ -35,6 +35,7 @@ import { MatBody, bodyFrac, type RenderMode } from '../components/playroom/MatBo
 import { MatCapsule } from '../components/playroom/MatCapsule';
 import { FillingIcon, MaterialIcon } from '../components/playroom/MaterialIcon';
 import {
+  CAPSULE_DEMO,
   GhostFinger,
   ReactionGuide,
   demoFor,
@@ -63,12 +64,13 @@ import {
   type PlacedProp,
   type PropId,
 } from '../data/playroomDecor';
-import { TOUCH_FX } from '../data/rarity';
+import { TOUCH_FX, rarityRank } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { haptic } from '../lib/haptics';
 import { josa } from '../lib/josa';
 import { useGameStore } from '../store/useGameStore';
 import {
+  CAPSULE_HINT,
   holdProgress,
   ratchetIndex,
   readTwoFinger,
@@ -980,10 +982,14 @@ function Playroom() {
       squish.capsuleClick();
       later(() => squish.popOut(), 90);
       if (!reducedRef.current) haptic(TOUCH_FX[rec.character.rarity].milestoneHaptic);
-      useGameStore.getState().unboxMalang(id, Math.max(capRef.current, 1));
+      const store = useGameStore.getState();
+      store.unboxMalang(id, Math.max(capRef.current, 1));
+      markDemoSeen(CAPSULE_DEMO.key);
       setCapsules((c) => c.filter((x) => x !== id));
       setFocusId(id);
-      say(`${josa(rec.character.name, '이/가')} 나왔어요!`, 2600);
+      // 반짝이면 이름 앞에 "반짝"을 붙여 알린다
+      const shiny = (store.ownedMalangs[id]?.shinyCount ?? 0) > 0;
+      say(`${shiny ? '반짝 ' : ''}${josa(rec.character.name, '이/가')} 나왔어요!`, shiny ? 3400 : 2600);
     },
     [later, say],
   );
@@ -1225,6 +1231,22 @@ function Playroom() {
     }, 900);
     return () => window.clearTimeout(t);
   }, [layout, onMat, showDemo]);
+
+  // 캡슐이 매트에 떨어지면: 한 번 열어 볼 때까지 반투명 손가락이 톡톡톡 두드려 보인다
+  const capsuleDemoForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = capsulesOnMat[0];
+    if (!layout || !id || capsuleDemoForRef.current === id) return undefined;
+    if (readSeenDemos().has(CAPSULE_DEMO.key)) return undefined;
+    const t = window.setTimeout(() => {
+      const rec = recsRef.current.get(bodyKey('capsule', id));
+      const box = rec ? spriteBox(rec) : null;
+      if (!box) return;
+      capsuleDemoForRef.current = id;
+      setDemo({ spec: CAPSULE_DEMO, box });
+    }, 1100);
+    return () => window.clearTimeout(t);
+  }, [layout, capsulesOnMat, spriteBox]);
 
   // ── 손가락 ──────────────────────────────────────────────
 
@@ -1606,6 +1628,60 @@ function Playroom() {
     [cap, matCount, say],
   );
 
+  // 선반의 봉인된 캡슐 모두 열기: 등급 높은 순서(선반 순서)로 하나씩 딸깍 + 뽁, 칸이 폴짝. 끝나면 한 줄 요약.
+  const [openingAll, setOpeningAll] = useState(false);
+  const openAllLockRef = useRef(false);
+  const [popped, setPopped] = useState<ReadonlySet<string>>(() => new Set());
+  const openAllSealed = useCallback(() => {
+    if (openAllLockRef.current) return;
+    const ids = shelfEntries.filter((e) => e.sealed && !e.out).map((e) => e.id);
+    if (ids.length === 0) return;
+    openAllLockRef.current = true;
+    setOpeningAll(true);
+    sfx.button();
+    const reducedNow = reducedRef.current;
+    const step = reducedNow ? 0 : 420;
+    let best: Character | undefined;
+    let shinyName: string | null = null;
+    ids.forEach((id, i) => {
+      const run = () => {
+        const store = useGameStore.getState();
+        const c = getCharacter(id);
+        if (!c || !store.unboxMalang(id, Math.max(store.playroom.out.length, 1))) return;
+        if (!best || rarityRank(c.rarity) > rarityRank(best.rarity)) best = c;
+        if (!shinyName && (store.ownedMalangs[id]?.shinyCount ?? 0) > 0) shinyName = c.name;
+        if (!reducedNow || i === 0) {
+          squish.capsuleClick();
+          later(() => squish.popOut(), 90);
+        }
+        if (!reducedNow) {
+          haptic(TOUCH_FX[c.rarity].milestoneHaptic);
+          setPopped((prev) => new Set(prev).add(id));
+          later(
+            () =>
+              setPopped((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              }),
+            700,
+          );
+        }
+      };
+      if (step === 0) run();
+      else later(run, i * step);
+    });
+    later(() => {
+      openAllLockRef.current = false;
+      setOpeningAll(false);
+      const top = best as Character | undefined;
+      const extra = shinyName ? ` 반짝 ${shinyName}도 있어요!` : top && rarityRank(top.rarity) >= rarityRank('epic') ? ` ${josa(top.name, '이/가')} 제일 반가워요.` : '';
+      // 선반을 닫아야 요약 한 줄(선반 위 z 아래에 뜬다)과 매트의 말랑이가 보인다
+      setShelfOpen(false);
+      say(`캡슐 ${ids.length}개를 모두 열었어요.${extra}`, 3600);
+    }, step * ids.length + (step === 0 ? 0 : 200));
+  }, [shelfEntries, later, say]);
+
   const toggleShelf = useCallback(() => {
     sfx.button();
     setShelfOpen((o) => !o);
@@ -1986,10 +2062,19 @@ function Playroom() {
               />
             );
           })}
-          {capsulesOnMat.map((id) => {
+          {capsulesOnMat.map((id, i) => {
             const rec = getRec('capsule', id);
             if (!rec) return null;
-            return <MatCapsule key={rec.key} rec={rec} onKeyDown={onBodyKeyDown} onKeyUp={onBodyKeyUp} />;
+            // 여는 방법 딱지는 첫 캡슐 하나에만 (여럿이면 매트가 글자로 덮인다). 손가락 시범 중에는 시범 글이 대신한다
+            return (
+              <MatCapsule
+                key={rec.key}
+                rec={rec}
+                onKeyDown={onBodyKeyDown}
+                onKeyUp={onBodyKeyUp}
+                hint={i === 0 && demo?.spec.key !== CAPSULE_DEMO.key ? CAPSULE_HINT : null}
+              />
+            );
           })}
           {bursts.map((b) => (
             <span
@@ -2054,6 +2139,9 @@ function Playroom() {
           onPick={onShelfPick}
           sealedCount={sealedCount}
           solo={solo}
+          onOpenAll={openAllSealed}
+          openingAll={openingAll}
+          poppedIds={popped}
         />
       </div>
 

@@ -101,14 +101,29 @@ describe('capsule open gestures', () => {
     expect(ratchetIndex(-CAPSULE_TUNING.ratchetStep * 1.2)).toBe(1);
   });
 
-  it('톡 세 번(1.4초 안)이면 열리고, 느리면 다시 센다', () => {
+  it('톡 세 번이면 열리고, 천천히(앞 톡에서 2.2초 안) 눌러도 금이 쌓인다', () => {
     let taps: number[] = [];
     let p = 0;
     for (const t of [0, 400, 800]) ({ taps, progress: p } = registerCapsuleTap(taps, t));
     expect(p).toBe(1);
     taps = [];
+    // 1.5초 간격 — 예전(1.4초 창)에는 열리지 않던 느린 톡
     for (const t of [0, 1500, 3000]) ({ taps, progress: p } = registerCapsuleTap(taps, t));
+    expect(p).toBe(1);
+    taps = [];
+    ({ taps, progress: p } = registerCapsuleTap(taps, 0));
+    ({ taps, progress: p } = registerCapsuleTap(taps, 2000));
+    expect(p).toBeCloseTo(2 / 3);
+  });
+
+  it('오래 쉬면 금 간 단계가 처음부터', () => {
+    let taps: number[] = [];
+    let p = 0;
+    ({ taps, progress: p } = registerCapsuleTap(taps, 0));
+    ({ taps, progress: p } = registerCapsuleTap(taps, 1000));
+    ({ taps, progress: p } = registerCapsuleTap(taps, 1000 + CAPSULE_TUNING.tapWindowMs + 1));
     expect(p).toBeCloseTo(1 / 3);
+    expect(taps).toHaveLength(1);
   });
 
   it('꾹 0.9초면 열린다', () => {

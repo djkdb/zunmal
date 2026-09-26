@@ -786,7 +786,8 @@
 .pr-shelf__panel {
   position: relative;
   width: 100%;
-  max-height: min(48dvh, 380px);
+  /* 매트 위 말랑이를 덜 가리게 낮게 (넘치면 선반 안에서 스크롤) */
+  max-height: min(40dvh, 360px);
   overflow-y: auto;
   padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
   border-radius: 22px 22px 0 0;
@@ -798,8 +799,21 @@
   display: none;
 }
 
+.pr-shelf__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.pr-shelf__open-all {
+  flex: none;
+  white-space: nowrap;
+}
+
 .pr-shelf__help {
-  margin: 0 44px 12px 0;
+  flex: 1;
+  margin: 0;
   font-size: var(--fs-xs);
   line-height: 1.4;
   color: var(--sub);
@@ -808,9 +822,9 @@
 .pr-shelf__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 16px 10px;
+  gap: 22px 10px;
   margin: 0;
-  padding: 0;
+  padding: 0 0 6px;
   list-style: none;
 }
 
@@ -894,20 +908,34 @@
   letter-spacing: 0.02em;
 }
 
-.pr-shelf__close {
+.pr-shelf__rarity {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--sub);
-  cursor: pointer;
+  left: 50%;
+  bottom: -8px;
+  z-index: 2;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 모두 열기: 캡슐이 열려 말랑이가 나온 칸이 폴짝 */
+.pr-shelf__slot.is-popped {
+  animation: pr-shelf-pop 0.55s var(--ease-jelly) both;
+}
+
+@keyframes pr-shelf-pop {
+  0% {
+    transform: scale(0.6);
+    box-shadow: 0 0 0 0 var(--lemon);
+  }
+  45% {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 10px rgb(255 214 107 / 0.45);
+  }
+  100% {
+    transform: none;
+    box-shadow: var(--shadow-btn);
+  }
 }
 
 /* ── 아래에서 올라오는 시트 (만지는 방법·꾸미기) ───────────────── */
@@ -1756,4 +1784,32 @@
 .pr-guide__feel-text .pr-guide__how {
   flex-basis: 100%;
   margin: 0;
+}
+
+/* ── 캡슐 열기 안내 딱지 (매트 위 캡슐 머리 위) ───────────────── */
+.pr-capsule__hint {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--pr-sprite) * 0.52);
+  width: max-content;
+  max-width: min(260px, 80vw);
+  padding: 6px 14px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: center;
+  word-break: keep-all;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-shelf__slot.is-popped {
+    animation: none;
+  }
 }
