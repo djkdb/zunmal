@@ -29,6 +29,16 @@ import {
   squishRelease,
   startStretch,
   stretchTargets,
+  flavorSquelch,
+  flavorRelease,
+  FLAVOR_TONES,
+  peel,
+  riseSigh,
+  cheekRub,
+  groan,
+  boing,
+  land,
+  bump,
 } from './squish';
 
 describe('squish pure helpers', () => {
@@ -99,6 +109,49 @@ describe('squish pure helpers', () => {
     expect(hard.vibratoDepth / hard.baseFreq).toBeGreaterThan(soft.vibratoDepth / soft.baseFreq);
     expect(hard.endFreq).toBeLessThan(hard.baseFreq);
     expect(releaseParams(0.5, () => 0.5, 3).vibratoRate).toBeCloseTo(3);
+  });
+});
+
+describe('촉감별 소리 맛', () => {
+  it('기본(plain)은 예전 소리 그대로', () => {
+    const p = squelchParams(0.5, createSeededRng(3));
+    expect(flavorSquelch(p, 'plain')).toBe(p);
+    const r = releaseParams(0.5, () => 0.5);
+    expect(flavorRelease(r, 'plain')).toBe(r);
+  });
+
+  it('젤리는 높고, 슬로우 라이징은 낮고 조용하고 길다', () => {
+    const p = squelchParams(0.7, createSeededRng(3));
+    const jelly = flavorSquelch(p, 'jelly');
+    const slow = flavorSquelch(p, 'slowRise');
+    expect(jelly.filterStart).toBeGreaterThan(p.filterStart);
+    expect(slow.gain).toBeLessThan(p.gain);
+    expect(slow.duration).toBeGreaterThan(p.duration);
+    expect(slow.filterStart).toBeLessThan(p.filterStart);
+    const r = releaseParams(0.7, () => 0.5);
+    expect(flavorRelease(r, 'jelly').baseFreq).toBeGreaterThan(flavorRelease(r, 'slowRise').baseFreq * 1.5);
+    // 슬로우 라이징은 거의 출렁이지 않는다
+    expect(flavorRelease(r, 'slowRise').vibratoDepth).toBeLessThan(r.vibratoDepth * 0.3);
+  });
+
+  it('찐득이는 거품이 더 많고, 모든 맛이 편한 음량 안', () => {
+    const p = squelchParams(1, createSeededRng(9));
+    expect(flavorSquelch(p, 'sticky').bubbles.length).toBeGreaterThan(p.bubbles.length);
+    for (const f of Object.keys(FLAVOR_TONES) as (keyof typeof FLAVOR_TONES)[]) {
+      const q = flavorSquelch(p, f);
+      expect(q.gain).toBeLessThanOrEqual(0.5);
+      for (const b of q.bubbles) expect(b.gain).toBeLessThan(0.1);
+    }
+  });
+
+  it('쭉쭉이 "쭈우욱"은 늘어난 길이만큼 올라간다 (다른 맛은 없다)', () => {
+    const short = stretchTargets(0.5, 0.5, 'stretchy', 0.5);
+    const long = stretchTargets(0.5, 0.5, 'stretchy', 2.4);
+    expect(long.squeakFreq).toBeGreaterThan(short.squeakFreq * 1.8);
+    expect(long.squeakGain).toBeGreaterThan(short.squeakGain);
+    expect(long.squeakGain).toBeLessThan(0.08);
+    expect(stretchTargets(0.5, 0.5, 'jelly', 2.4).squeakGain).toBe(0);
+    expect(stretchTargets(0.5, 0.5, 'sticky').creakRate).toBeLessThan(stretchTargets(0.5, 0.5).creakRate);
   });
 });
 
@@ -282,10 +335,22 @@ describe('squish audio graph', () => {
       vi.runAllTimers();
     }
     shimmer();
-    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter]) {
+    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter, () => peel(1), () => riseSigh(2), cheekRub, groan, () => boing(1)]) {
       fn();
       vi.runAllTimers();
     }
+    for (const f of ['plain', 'slowRise', 'jelly', 'stretchy', 'sticky'] as const) {
+      squishPress(1, f);
+      squishRelease(1, 3, f);
+      poke(0.5, f);
+      land(0.8, f);
+      bump(0.8, f);
+      const s = startStretch(f);
+      s.update(1, 1, 2.5);
+      s.stop();
+      vi.runAllTimers();
+    }
+
     expect(problems).toEqual([]);
     expect(starts).toBeGreaterThan(20);
     expect(created).toBe(1);
