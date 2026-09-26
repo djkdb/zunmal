@@ -1,8 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { computeMatLayout, matBounds, squeezePose, toScreen, toWorld } from './matView';
+import { SOLO_SPRITE_MAX, computeMatLayout, matBounds, remapPoint, soloSpot, squeezePose, toScreen, toWorld } from './matView';
 import { REST_POSE } from './softbody';
 
 describe('mat layout', () => {
+  it('혼자 놀 때는 말랑이가 더 크고, 바닥은 여전히 HUD 아래·선반 위', () => {
+    for (const [w, h, top, bottom] of [
+      [360, 640, 130, 580],
+      [390, 844, 140, 780],
+      [1024, 768, 120, 700],
+    ] as const) {
+      const group = computeMatLayout(w, h, { top, bottom });
+      const solo = computeMatLayout(w, h, { top, bottom }, { solo: true });
+      expect(solo.sprite).toBeGreaterThan(group.sprite * 1.2);
+      expect(solo.sprite).toBeLessThanOrEqual(SOLO_SPRITE_MAX);
+      expect(solo.groupSprite).toBe(group.sprite);
+      expect(group.groupSprite).toBe(group.sprite);
+      expect(solo.floorTop).toBeGreaterThan(top);
+      expect(solo.floorLeft + solo.floorW).toBeLessThanOrEqual(w);
+      // 혼자 자리에 서면 머리가 HUD 아래, 발은 바닥 안
+      const b = matBounds(solo);
+      const spot = soloSpot(b);
+      const s = toScreen(solo, spot.x, spot.y, 0);
+      expect(s.y - solo.sprite * 0.95).toBeGreaterThan(top - 1);
+      expect(s.y).toBeLessThanOrEqual(solo.floorTop + solo.floorH);
+      expect(Math.abs(s.x - w / 2)).toBeLessThan(1);
+    }
+  });
+
+  it('배치가 바뀌어도 화면 위 같은 자리에 머문다', () => {
+    const a = computeMatLayout(360, 640, { top: 130, bottom: 580 });
+    const b = computeMatLayout(360, 640, { top: 130, bottom: 580 }, { solo: true });
+    const p = remapPoint(a, b, 1.1, 0.9, 0.4);
+    const sa = toScreen(a, 1.1, 0.9, 0);
+    const sb = toScreen(b, p.x, p.y, 0);
+    expect(sb.x).toBeCloseTo(sa.x);
+    expect(sb.y).toBeCloseTo(sa.y);
+    expect(p.z * b.sprite).toBeCloseTo(0.4 * a.sprite);
+  });
+
   it('360×640 폰: 말랑이 100px 이상, 바닥은 HUD 아래·선반 위, 가로 넘침 없음', () => {
     const l = computeMatLayout(360, 640, { top: 90, bottom: 570 });
     expect(l.sprite).toBeGreaterThanOrEqual(100);

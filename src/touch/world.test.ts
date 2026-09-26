@@ -7,12 +7,14 @@ import {
   findDropSpot,
   getBody,
   grabBody,
+  moveObstacle,
   isWorldAtRest,
   moveHeld,
   nudgeBody,
   releaseBody,
   removeBody,
   resizeWorld,
+  setObstacles,
   settleWorld,
   stepWorld,
   worldEnergy,
@@ -297,5 +299,99 @@ describe('world: 손가락', () => {
     resizeWorld(w, { w: 3, d: 3 });
     expect(body(w, 'a').x).toBeLessThanOrEqual(3 - R);
     expect(body(w, 'a').y).toBeLessThanOrEqual(3 - R);
+  });
+});
+
+describe('world: 소품(움직이지 않는 장애물)', () => {
+  it('상한에 세지 않고, 매트 안으로 들어오고, 같은 id 는 하나만', () => {
+    const w = createWorld({ w: 3, d: 3 }, { cap: 1 });
+    setObstacles(w, [
+      { id: 'cushion', x: -2, y: 9, r: 0.3, h: 0.3 },
+      { id: 'cushion', x: 1, y: 1, r: 0.3, h: 0.3 },
+      { id: 'plant', x: 2, y: 1, r: 0.2, h: 0.6 },
+    ]);
+    expect(w.obstacles).toHaveLength(2);
+    expect(w.obstacles[0]!.x).toBeCloseTo(0.3);
+    expect(w.obstacles[0]!.y).toBeCloseTo(2.7);
+    expect(addBody(w, { id: 'a', x: 1.5, y: 1.5, r: R })).toBe(true);
+    resizeWorld(w, { w: 1.5, d: 1.5 });
+    expect(w.obstacles[1]!.x).toBeLessThanOrEqual(1.5 - 0.2 + 1e-9);
+  });
+
+  it('던진 말랑이는 소품을 뚫지 못하고 튕겨 나오며 부딪힘 사건을 낸다', () => {
+    const w = createWorld({ w: 4, d: 3 });
+    setObstacles(w, [{ id: 'box', x: 2.6, y: 1.5, r: 0.25, h: 0.44 }]);
+    addBody(w, { id: 'a', x: 1, y: 1.5, r: R });
+    releaseBody(w, 'a', 6, 0);
+    let minGap = Infinity;
+    const events: WorldEvent[] = [];
+    for (let t = 0; t < 2000; t += 16) {
+      events.push(...stepWorld(w, 16));
+      const a = body(w, 'a');
+      if (a.z < 0.3) minGap = Math.min(minGap, Math.hypot(a.x - 2.6, a.y - 1.5));
+    }
+    const a = body(w, 'a');
+    expect(minGap).toBeGreaterThan((R + 0.25) * 0.6);
+    expect(a.x).toBeLessThan(2.6);
+    expect(events.some((e) => e.kind === 'wall' && e.id === 'a' && e.nx < 0)).toBe(true);
+    // 소품은 그대로
+    expect(w.obstacles[0]!.x).toBe(2.6);
+  });
+
+  it('쿠션 위에 떨어뜨리면 얹혀 쉬고, 세계가 멈춘다', () => {
+    const w = createWorld({ w: 3, d: 3 });
+    setObstacles(w, [{ id: 'cushion', x: 1.5, y: 1.5, r: 0.34, h: 0.26 }]);
+    addBody(w, { id: 'a', x: 1.5, y: 1.5, z: 1, r: R, h: 0.6 });
+    run(w, 4000);
+    const a = body(w, 'a');
+    expect(a.z).toBeGreaterThan(0.05);
+    expect(a.supported).toBe(true);
+    expect(isWorldAtRest(w)).toBe(true);
+  });
+
+  it('소품을 말랑이 밑으로 끌어 놓아도 확 튀지 않고 비켜나거나 올라앉는다', () => {
+    const w = createWorld({ w: 3, d: 3 });
+    addBody(w, { id: 'a', x: 1.5, y: 1.5, r: R });
+    setObstacles(w, [{ id: 'box', x: 0.5, y: 0.5, r: 0.25, h: 0.44 }]);
+    moveObstacle(w, 'box', 1.52, 1.5);
+    let maxSpeed = 0;
+    for (let t = 0; t < 3000; t += 16) {
+      stepWorld(w, 16);
+      const a = body(w, 'a');
+      maxSpeed = Math.max(maxSpeed, Math.hypot(a.vx, a.vy, a.vz));
+    }
+    const a = body(w, 'a');
+    expect(maxSpeed).toBeLessThan(6);
+    const beside = Math.hypot(a.x - 1.52, a.y - 1.5) > (R + 0.25) * 0.8;
+    const onTop = a.z > 0.1 && a.supported;
+    expect(beside || onTop).toBe(true);
+    expect(isWorldAtRest(w)).toBe(true);
+    expect(moveObstacle(w, 'nope', 1, 1)).toBeNull();
+  });
+
+  it('새 말랑이는 소품을 피해 떨어뜨린다', () => {
+    const w = createWorld({ w: 3, d: 3 });
+    setObstacles(w, [
+      { id: 'a', x: 1.5, y: 1.65, r: 0.34, h: 0.26 },
+      { id: 'b', x: 0.6, y: 0.6, r: 0.25, h: 0.4 },
+    ]);
+    const spot = findDropSpot(w, R, createSeededRng(3));
+    for (const o of w.obstacles) expect(Math.hypot(spot.x - o.x, spot.y - o.y)).toBeGreaterThan(o.r + R);
+  });
+
+  it('들고 가져가면 소품 위에 올라탄다', () => {
+    const w = createWorld({ w: 3, d: 3 });
+    setObstacles(w, [{ id: 'cushion', x: 1.8, y: 1.5, r: 0.34, h: 0.26 }]);
+    addBody(w, { id: 'a', x: 0.6, y: 1.5, r: R, h: 0.6 });
+    grabBody(w, 'a');
+    for (let i = 0; i <= 60; i++) {
+      moveHeld(w, 'a', 0.6 + (1.2 * i) / 60, 1.5);
+      stepWorld(w, 16);
+    }
+    releaseBody(w, 'a', 0, 0);
+    run(w, 3000);
+    const a = body(w, 'a');
+    expect(a.z).toBeGreaterThan(0.05);
+    expect(Math.hypot(a.x - 1.8, a.y - 1.5)).toBeLessThan(0.4);
   });
 });

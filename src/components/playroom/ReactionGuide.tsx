@@ -175,28 +175,28 @@ function PairArt({ play }: { play: PairPlayId }) {
     <path
       d={`M${x - 13} ${y} C${x - 13} ${y - 21 * squash} ${x + 13} ${y - 21 * squash} ${x + 13} ${y} Q${x} ${y + 3} ${x - 13} ${y} Z`}
       fill={fill}
-      stroke="#2b2233"
+      stroke="#22304a"
       strokeWidth={2.2}
       strokeLinejoin="round"
     />
   );
   const eyes = (x: number, y: number) => (
-    <g fill="#2b2233">
+    <g fill="#22304a">
       <circle cx={x - 3.5} cy={y} r={1.3} />
       <circle cx={x + 3.5} cy={y} r={1.3} />
     </g>
   );
   return (
     <svg className="gesture-art" viewBox="0 0 64 64" width={60} height={60} aria-hidden="true" focusable="false">
-      <rect x={2} y={2} width={60} height={60} rx={14} fill="#fff6e8" stroke="#2b2233" strokeWidth={2} />
+      <rect x={2} y={2} width={60} height={60} rx={14} fill="#f3f8fe" />
       {play === 'cheekRub' && (
         <>
           {blob(21, 46, '#ffd0e0')}
           {blob(43, 46, '#bff3ff')}
           {eyes(22, 38)}
           {eyes(42, 38)}
-          <path d="M32 18 c-3 -4 -8 -1 -5 3 l5 5 l5 -5 c3 -4 -2 -7 -5 -3 Z" fill="#ff7aa2" stroke="#2b2233" strokeWidth={1.6} />
-          <path d="M8 40 h5 M56 40 h-5" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" />
+          <path d="M32 18 c-3 -4 -8 -1 -5 3 l5 5 l5 -5 c3 -4 -2 -7 -5 -3 Z" fill="#ff9fb8" stroke="#22304a" strokeWidth={1.6} />
+          <path d="M8 40 h5 M56 40 h-5" stroke="#22304a" strokeWidth={2} strokeLinecap="round" />
         </>
       )}
       {play === 'stack' && (
@@ -204,7 +204,7 @@ function PairArt({ play }: { play: PairPlayId }) {
           {blob(32, 54, '#bff3ff', 0.8)}
           {blob(32, 36, '#ffd0e0')}
           {eyes(32, 29)}
-          <path d="M46 14 v12 m-4 -4 l4 4 l4 -4" fill="none" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M46 14 v12 m-4 -4 l4 4 l4 -4" fill="none" stroke="#22304a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         </>
       )}
       {play === 'bump' && (
@@ -213,15 +213,15 @@ function PairArt({ play }: { play: PairPlayId }) {
           {blob(46, 48, '#c8f08a')}
           {eyes(18, 40)}
           {eyes(46, 40)}
-          <path d="M32 22 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 Z" fill="#ffd84d" stroke="#2b2233" strokeWidth={1.4} strokeLinejoin="round" />
-          <path d="M5 30 h7 M52 30 h7" stroke="#2b2233" strokeWidth={2} strokeLinecap="round" />
+          <path d="M32 22 l2 5 l5 1 l-4 3 l1 5 l-4 -3 l-4 3 l1 -5 l-4 -3 l5 -1 Z" fill="#ffd66b" stroke="#22304a" strokeWidth={1.4} strokeLinejoin="round" />
+          <path d="M5 30 h7 M52 30 h7" stroke="#22304a" strokeWidth={2} strokeLinecap="round" />
         </>
       )}
       {play === 'rest' && (
         <>
           {blob(20, 48, '#ffe2b8')}
           {blob(44, 48, '#d9c9ff')}
-          <path d="M15 40 q2 2 4 0 M21 40 q2 2 4 0 M39 40 q2 2 4 0 M45 40 q2 2 4 0" fill="none" stroke="#2b2233" strokeWidth={1.6} strokeLinecap="round" />
+          <path d="M15 40 q2 2 4 0 M21 40 q2 2 4 0 M39 40 q2 2 4 0 M45 40 q2 2 4 0" fill="none" stroke="#22304a" strokeWidth={1.6} strokeLinecap="round" />
           <text x={48} y={22} fontSize={11} fontWeight={700} fill="#6f63c9">z</text>
           <text x={54} y={15} fontSize={8} fontWeight={700} fill="#6f63c9">z</text>
         </>
@@ -279,12 +279,12 @@ export function GhostFinger({ demo, box, reduced, onDone }: GhostFingerProps) {
           <svg className="pr-ghost__finger" viewBox="0 0 40 56" width="40" height="56">
             <path
               d="M16 52 C9 46 5 38 6 31 C7 27 11 27 13 30 L14 32 L14 8 C14 4 20 4 20 8 L20 24 C20 21 26 21 26 24 L26 27 C26 24 32 24 32 27 L32 30 C32 27 37 27 37 31 L37 40 C37 47 33 52 28 52 Z"
-              fill="#fffdf8"
-              stroke="#2b2233"
-              strokeWidth="2.6"
+              fill="#fff"
+              stroke="#22304a"
+              strokeWidth="2.2"
               strokeLinejoin="round"
             />
-            <ellipse cx="17" cy="9" rx="2.2" ry="3" fill="#ffd5e2" />
+            <ellipse cx="17" cy="9" rx="2.2" ry="3" fill="#ffe3ec" />
           </svg>
         </>
       )}

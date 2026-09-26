@@ -27,8 +27,9 @@ import { sfx } from '../audio/sfx';
 import { CloseIcon, ShareIcon } from '../components/icons';
 import { VIEWBOX } from '../components/malang/helpers';
 import { SHAPES } from '../components/malang/shapes';
-import { bodyKey, type BodyRec, type MatKind } from '../components/playroom/bodyRec';
+import { bodyKey, propKey, type BodyRec, type GrabKind, type MatKind } from '../components/playroom/bodyRec';
 import { CAPSULE_TOP, CapsuleArt } from '../components/playroom/CapsuleArt';
+import { DecorSheet } from '../components/playroom/DecorSheet';
 import { MalangActor, TAP_MS } from '../components/playroom/malangActor';
 import { MatBody, bodyFrac, type RenderMode } from '../components/playroom/MatBody';
 import { MatCapsule } from '../components/playroom/MatCapsule';
@@ -41,6 +42,7 @@ import {
   readSeenDemos,
   type DemoSpec,
 } from '../components/playroom/ReactionGuide';
+import { PropArt } from '../components/playroom/PropArt';
 import { Shelf } from '../components/playroom/Shelf';
 import { createFxLayer, type FxLayer } from '../components/touch3d/fxLayer';
 import type { JellyStage } from '../components/touch3d/jellyScene';
@@ -53,7 +55,15 @@ import {
 import type { PhotoLayer } from '../components/touch3d/photo';
 import { getCharacter, type Character } from '../data/characters';
 import { fillingOf, materialOf } from '../data/materials';
-import { RARITY_META, TOUCH_FX } from '../data/rarity';
+import { MAT_PATTERNS, matBackgroundCss, matTileDataUrl } from '../data/matPatterns';
+import {
+  PROPS,
+  propSpot,
+  type MatPatternId,
+  type PlacedProp,
+  type PropId,
+} from '../data/playroomDecor';
+import { TOUCH_FX } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { haptic } from '../lib/haptics';
 import { josa } from '../lib/josa';
@@ -74,9 +84,25 @@ import {
   type InteractBody,
   type InteractEvent,
 } from '../touch/interactions';
-import { computeMatLayout, matBounds, squeezePose, toScreen, toWorld, type MatLayout } from '../touch/matView';
+import {
+  computeMatLayout,
+  matBounds,
+  remapPoint,
+  soloSpot,
+  squeezePose,
+  toScreen,
+  toWorld,
+  type MatLayout,
+} from '../touch/matView';
 import { createPerf, looksLikePhone, samplePerf, type PerfState } from '../touch/perfGovernor';
-import { photoFileName } from '../touch/photoCard';
+import {
+  frameGroup,
+  groupCaption,
+  groupRarityChips,
+  groupTitle,
+  photoCardLayout,
+  photoFileName,
+} from '../touch/photoCard';
 import { fxStylesFor } from '../touch/touchFx';
 import {
   AFFECTION_PER_LEVEL,
@@ -95,11 +121,13 @@ import {
   grabBody,
   isWorldAtRest,
   moveHeld,
+  moveObstacle,
   nudgeBody,
   popBody,
   releaseBody,
   removeBody,
   resizeWorld,
+  setObstacles,
   setWorldCap,
   setWorldReducedMotion,
   settleWorld,
@@ -130,7 +158,7 @@ const ARROWS: Partial<Record<string, { x: number; y: number }>> = {
 
 interface PointerRec {
   key: string;
-  kind: MatKind;
+  kind: GrabKind;
   startX: number;
   startY: number;
   startT: number;
@@ -213,6 +241,8 @@ function Playroom() {
   const affection = useGameStore((s) => s.affection);
   const partnerId = useGameStore((s) => s.partnerId);
   const partnerShiny = useGameStore((s) => s.partnerShiny);
+  const matId = useGameStore((s) => s.playroom.mat);
+  const placedProps = useGameStore((s) => s.playroom.props);
 
   const unboxed = useMemo(() => new Set(unboxedList), [unboxedList]);
   const [capsules, setCapsules] = useState<string[]>([]);
@@ -222,12 +252,21 @@ function Playroom() {
     [capsules, owned, unboxed],
   );
   const matCount = onMat.length + capsulesOnMat.length;
+  // 기본은 한 마리만 크게 만진다. 친구를 꺼내면 여럿이 노는 배치(작게), 다시 하나가 되면 크게 가운데로
+  const solo = matCount <= 1;
+  const soloRef = useRef(solo);
+  soloRef.current = solo;
 
   const [mode, setMode] = useState<RenderMode>(() => (reduced || isJelly3dUnsupported() ? '2d' : 'loading'));
   const [stage, setStage] = useState<JellyStage | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [shelfOpen, setShelfOpen] = useState(false);
+  const shelfOpenRef = useRef(shelfOpen);
+  shelfOpenRef.current = shelfOpen;
+  /** 선반을 닫았을 때 잰 손잡이 위 끝 — 선반이 열려 있는 동안 다시 재도 매트 바닥이 줄지 않게 */
+  const closedShelfTopRef = useRef<number | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [decorOpen, setDecorOpen] = useState(false);
   const [demo, setDemo] = useState<{ spec: DemoSpec; box: { left: number; top: number; size: number } } | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -281,6 +320,7 @@ function Playroom() {
   const fxCanvasRef = useRef<HTMLCanvasElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
   const shelfRef = useRef<HTMLDivElement>(null);
+  const propElsRef = useRef(new Map<PropId, HTMLDivElement>());
 
   const later = useCallback((fn: () => void, ms: number) => {
     const t = window.setTimeout(() => {
@@ -410,11 +450,28 @@ function Playroom() {
     if (!mat) return;
     const r = mat.getBoundingClientRect();
     const hudBottom = (hudRef.current?.getBoundingClientRect().bottom ?? 80) - r.top;
-    const shelfTop = (shelfRef.current?.getBoundingClientRect().top ?? r.bottom - 70) - r.top;
-    const L = computeMatLayout(r.width, r.height, { top: hudBottom, bottom: shelfTop });
+    const measuredShelfTop = (shelfRef.current?.getBoundingClientRect().top ?? r.bottom - 70) - r.top;
+    if (!shelfOpenRef.current) closedShelfTopRef.current = measuredShelfTop;
+    const shelfTop = Math.min(closedShelfTopRef.current ?? measuredShelfTop, r.height - 40);
+    const L = computeMatLayout(r.width, r.height, { top: hudBottom, bottom: shelfTop }, { solo: soloRef.current });
     // 매트가 화면 (0,0)에 붙어 있지 않을 수도 있으니 client 좌표로 옮긴다
     const Lc: MatLayout = { ...L, floorLeft: L.floorLeft + r.left, floorTop: L.floorTop + r.top };
+    const prev = layoutRef.current;
     layoutRef.current = Lc;
+    if (prev && (prev.sprite !== Lc.sprite || prev.floorLeft !== Lc.floorLeft || prev.floorTop !== Lc.floorTop)) {
+      // 배치가 바뀌어도(회전·혼자 ↔ 여럿) 말랑이는 화면 위 같은 자리에 머문다
+      for (const b of worldRef.current.bodies) {
+        const p = remapPoint(prev, Lc, b.x, b.y, b.z);
+        b.x = p.x;
+        b.y = p.y;
+        b.z = p.z;
+        if (b.held) {
+          const h = remapPoint(prev, Lc, b.holdX, b.holdY, b.holdZ);
+          b.holdX = h.x;
+          b.holdY = h.y;
+        }
+      }
+    }
     resizeWorld(worldRef.current, matBounds(Lc));
     setLayout(Lc);
     stageRef.current?.layout();
@@ -471,7 +528,8 @@ function Playroom() {
       const h = kind === 'capsule' ? CAPSULE_R * 2 : ((shape.bottom - shape.top) / VIEWBOX.w) * 0.92;
       const spawn = spawnRef.current.get(key);
       spawnRef.current.delete(key);
-      const spot = spawn ?? { ...findDropSpot(world, r, Math.random), z: reducedRef.current ? 0 : DROP_Z, pop: false };
+      const drop = wantedKeys.length === 1 ? soloSpot(world.bounds) : findDropSpot(world, r, Math.random);
+      const spot = spawn ?? { ...drop, z: reducedRef.current ? 0 : DROP_Z, pop: false };
       const material = kind === 'malang' ? materialOf(rec.character).world : undefined;
       addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r, h, material });
       if (spawn?.pop) {
@@ -482,30 +540,137 @@ function Playroom() {
     requestFrame();
   }, [wantedKeys, layout, getRec, later, requestFrame]);
 
-  // 처음 들어올 때: 주소의 말랑이(도감 "만지러 가기")를 꺼내 두고, 매트가 비었으면 파트너를 꺼낸다
+  // ── 꾸미기 소품: 세계의 장애물 + DOM 그림 ─────────────────
+
+  /** 소품 크기 배율 (세계 단위): 혼자 놀 때 말랑이가 커져도 소품은 화면에서 같은 크기 */
+  const propScale = useCallback(() => {
+    const L = layoutRef.current;
+    return L ? L.groupSprite / L.sprite : 1;
+  }, []);
+
+  /** 저장된 소품 자리(0..1) → 세계 좌표 (매트 안쪽으로) */
+  const propWorld = useCallback((p: PlacedProp) => {
+    const { w, d } = worldRef.current.bounds;
+    const r = PROPS[p.id].r * propScale();
+    const clampTo = (v: number, max: number) => Math.min(Math.max(v, Math.min(r, max / 2)), Math.max(max - r, max / 2));
+    return { x: clampTo(p.x * w, w), y: clampTo(p.y * d, d) };
+  }, [propScale]);
+
+  useLayoutEffect(() => {
+    if (!layoutRef.current) return;
+    const world = worldRef.current;
+    const k = propScale();
+    setObstacles(
+      world,
+      placedProps.map((p) => ({ id: propKey(p.id), ...propWorld(p), r: PROPS[p.id].r * k, h: PROPS[p.id].h * k })),
+    );
+    for (const rec of recsRef.current.values()) rec.still = false;
+    requestFrame();
+  }, [placedProps, layout, propWorld, propScale, requestFrame]);
+
+  /** 소품 DOM 을 세계 자리로 (끄는 동안은 React 다시 그리기 없이) */
+  const placePropEl = useCallback((id: PropId, x: number, y: number) => {
+    const L = layoutRef.current;
+    const el = propElsRef.current.get(id);
+    if (!L || !el) return;
+    const s = toScreen(L, x, y, 0);
+    el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
+    el.style.zIndex = String(Math.round(s.depth));
+  }, []);
+
+  /** 손가락 아래 소품 (앞에 있는 것부터) */
+  const hitProp = useCallback((x: number, y: number): PropId | null => {
+    const L = layoutRef.current;
+    if (!L) return null;
+    const S = L.groupSprite;
+    const list = worldRef.current.obstacles
+      .map((o) => ({ o, s: toScreen(L, o.x, o.y, 0) }))
+      .sort((a, b) => b.s.depth - a.s.depth);
+    for (const { o, s } of list) {
+      const id = o.id.slice('prop:'.length) as PropId;
+      const def = PROPS[id];
+      if (!def) continue;
+      const w = def.w * S;
+      const h = w * def.aspect;
+      const pad = 10;
+      if (x >= s.x - w / 2 - pad && x <= s.x + w / 2 + pad && y >= s.y - h - pad && y <= s.y + pad) return id;
+    }
+    return null;
+  }, []);
+
+  const onPickMat = useCallback((id: MatPatternId) => {
+    sfx.button();
+    useGameStore.getState().setPlayroomMat(id);
+  }, []);
+
+  const onToggleProp = useCallback(
+    (id: PropId) => {
+      const st = useGameStore.getState();
+      if (st.playroom.props.some((p) => p.id === id)) {
+        sfx.button();
+        st.removeProp(id);
+        return;
+      }
+      // 이미 있는 소품·말랑이에서 먼 가장자리에 놓는다
+      const world = worldRef.current;
+      const { w, d } = world.bounds;
+      const taken = [
+        ...st.playroom.props.map((p) => ({ x: p.x, y: p.y })),
+        ...world.bodies.map((b) => ({ x: b.x / w, y: b.y / d })),
+      ];
+      const spot = propSpot(taken, d / w);
+      if (st.placeProp(id, spot.x, spot.y)) {
+        squish.land(0.25);
+      } else {
+        squish.bump(0.3);
+      }
+    },
+    [],
+  );
+
+  // 처음 들어올 때: 기본은 한 마리만 — 주소의 말랑이(도감 "만지러 가기") 또는 파트너 하나만 매트에 둔다.
+  // 친구는 선반에서 더 꺼내 함께 논다
   const openedParamRef = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openedParamRef.current) return;
     openedParamRef.current = true;
     const st = useGameStore.getState();
     const target = paramId && st.ownedMalangs[paramId] ? paramId : null;
-    const onMatNow = st.playroom.out.filter((id) => st.unboxed.includes(id));
     if (target) {
       if (st.unboxed.includes(target)) {
-        if (!onMatNow.includes(target)) {
-          if (onMatNow.length >= capRef.current && onMatNow[0]) st.putBackMalang(onMatNow[0]);
-          st.takeOutMalang(target, capRef.current);
-        }
+        st.soloMalang(target);
       } else {
-        if (onMatNow.length >= capRef.current && onMatNow[0]) st.putBackMalang(onMatNow[0]);
-        setCapsules((c) => (c.includes(target) ? c : [...c, target]));
+        // 아직 안 연 말랑이: 캡슐 하나만 매트에
+        st.soloMalang(null);
+        setCapsules([target]);
       }
       setFocusId(target);
-    } else if (onMatNow.length === 0) {
-      const first = [st.partnerId, ...st.unboxed].find((id) => id && st.ownedMalangs[id]);
-      if (first) st.takeOutMalang(first, capRef.current);
+    } else {
+      const first = [st.partnerId, ...st.unboxed].find((id) => id && st.ownedMalangs[id] && st.unboxed.includes(id));
+      st.soloMalang(first ?? null);
     }
   }, [paramId]);
+
+  // 혼자 ↔ 여럿이 바뀌면 배치를 다시 잰다 (혼자면 크게). 다시 혼자가 되면 남은 말랑이를 가운데로 데려온다
+  const prevSoloRef = useRef(solo);
+  useLayoutEffect(() => {
+    if (prevSoloRef.current === solo) return;
+    prevSoloRef.current = solo;
+    measure();
+    if (!solo) return;
+    const world = worldRef.current;
+    const only = world.bodies.length === 1 ? world.bodies[0] : undefined;
+    if (only && !only.held) {
+      const c = soloSpot(world.bounds);
+      only.x = c.x;
+      only.y = c.y;
+      only.vx = 0;
+      only.vy = 0;
+      if (!reducedRef.current) only.z = Math.max(only.z, 0.25);
+    }
+    for (const rec of recsRef.current.values()) rec.still = false;
+    requestFrame();
+  }, [solo, measure, requestFrame]);
 
   // 집중한 말랑이: 없거나 매트에서 사라지면 첫 말랑이로
   useEffect(() => {
@@ -1112,7 +1277,10 @@ function Playroom() {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (demo) setDemo(null);
     const t = hitTest(e.clientX, e.clientY);
-    if (!t) return;
+    if (!t) {
+      startPropDrag(e);
+      return;
+    }
     const { rec } = t;
     const now = performance.now();
     if (rec.kind === 'malang') {
@@ -1163,12 +1331,59 @@ function Playroom() {
     requestFrame();
   };
 
+  /** 소품 끌어 옮기기 시작 (말랑이·캡슐이 아닌 곳을 눌렀을 때) */
+  const startPropDrag = (e: PointerEvent<HTMLDivElement>) => {
+    const L = layoutRef.current;
+    const id = hitProp(e.clientX, e.clientY);
+    const ob = id ? worldRef.current.obstacles.find((o) => o.id === propKey(id)) : undefined;
+    if (!L || !id || !ob) return;
+    // 소품 하나에 손가락 하나
+    for (const p of pointersRef.current.values()) if (p.key === ob.id) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // 캡처 실패해도 계속 동작
+    }
+    const w = toWorld(L, e.clientX, e.clientY);
+    const now = performance.now();
+    pointersRef.current.set(e.pointerId, {
+      key: ob.id,
+      kind: 'prop',
+      startX: e.clientX,
+      startY: e.clientY,
+      startT: now,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastT: now,
+      vx: 0,
+      vy: 0,
+      grab: { dx: ob.x - w.x, dy: ob.y - w.y },
+      startAnchor: { x: ob.x, y: ob.y },
+      moved: false,
+    });
+    propElsRef.current.get(id)?.classList.add('is-held');
+    squish.poke(0.2);
+  };
+
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const p = pointersRef.current.get(e.pointerId);
     const L = layoutRef.current;
     if (!p || !L) {
       // 마우스를 올려 두면 집중한 말랑이가 그쪽을 본다
       if (e.pointerType === 'mouse' && focusId) recsRef.current.get(bodyKey('malang', focusId))?.actor?.lookAt(e.clientX, e.clientY);
+      return;
+    }
+    if (p.kind === 'prop') {
+      if (Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > 6) p.moved = true;
+      p.lastX = e.clientX;
+      p.lastY = e.clientY;
+      p.lastT = performance.now();
+      const w = toWorld(L, e.clientX, e.clientY);
+      const pos = moveObstacle(worldRef.current, p.key, w.x + (p.grab?.dx ?? 0), w.y + (p.grab?.dy ?? 0));
+      if (pos) placePropEl(p.key.slice('prop:'.length) as PropId, pos.x, pos.y);
+      // 옆 말랑이가 밀려나도록 세계를 깨운다
+      for (const rec of recsRef.current.values()) rec.still = false;
+      requestFrame();
       return;
     }
     const rec = recsRef.current.get(p.key);
@@ -1236,6 +1451,19 @@ function Playroom() {
     const p = pointersRef.current.get(e.pointerId);
     if (!p) return;
     pointersRef.current.delete(e.pointerId);
+    if (p.kind === 'prop') {
+      const id = p.key.slice('prop:'.length) as PropId;
+      propElsRef.current.get(id)?.classList.remove('is-held');
+      const world = worldRef.current;
+      const ob = world.obstacles.find((o) => o.id === p.key);
+      if (ob && p.moved) {
+        // 놓은 자리를 저장 (매트 바닥 기준 0..1)
+        useGameStore.getState().placeProp(id, ob.x / world.bounds.w, ob.y / world.bounds.d);
+        squish.land(0.3);
+      }
+      requestFrame();
+      return;
+    }
     const rec = recsRef.current.get(p.key);
     const L = layoutRef.current;
     if (!rec || !L) return;
@@ -1404,56 +1632,90 @@ function Playroom() {
         o.getContext('2d')?.drawImage(c, 0, 0);
         return o;
       };
+      const world = worldRef.current;
       const st = modeRef.current === '3d' ? stageRef.current : null;
       const snap = st?.snapshot() ?? null;
       const fxCanvas = fxCanvasRef.current;
       const fxCopy = fxCanvas ? copy(fxCanvas) : null;
       const mod = await import('../components/touch3d/photo');
-      const layers: PhotoLayer[] = [];
-      // 앞뒤 순서대로 (뒤 말랑이부터)
-      const ordered = recs
-        .map((r) => ({ r, wb: getBody(worldRef.current, r.key) }))
-        .sort((a, b) => (a.wb?.y ?? 0) - (b.wb?.y ?? 0));
-      if (snap && st) layers.push({ image: snap, rect: toRect(st.canvas.getBoundingClientRect()) });
-      for (const { r } of ordered) {
+
+      // 그릴 것들 (뒤에서 앞): 소품 → 3D 스냅샷 → 2D 말랑이 → 입자. 2D 면 소품과 말랑이를 깊이 순서로 섞는다
+      const items: { depth: number; layer: () => Promise<PhotoLayer | null> }[] = [];
+      for (const o of world.obstacles) {
+        const id = o.id.slice('prop:'.length) as PropId;
+        const svg = propElsRef.current.get(id)?.querySelector<SVGSVGElement>('.pr-prop__art svg');
+        if (!svg) continue;
+        const depth = snap ? -1e6 + o.y : toScreen(L, o.x, o.y, 0).depth;
+        items.push({
+          depth,
+          layer: async () => {
+            const r = svg.getBoundingClientRect();
+            const img = await mod.rasterizePlainSvg(svg, r.width, r.height);
+            const px = r.width * mod.PROP_PAD;
+            const py = r.height * mod.PROP_PAD;
+            return { image: img, rect: { x: r.left - px, y: r.top - py, w: r.width + 2 * px, h: r.height + 2 * py } };
+          },
+        });
+      }
+      for (const r of recs) {
         if (snap && r.view) continue;
         const svg = r.els.sprite?.querySelector<SVGSVGElement>('svg');
-        if (!svg) continue;
-        const shape = SHAPES[r.character.shape];
-        const img = await mod.rasterizeVisibleMalang(svg, shape.body, shape.bottom);
-        const sr = svg.getBoundingClientRect();
-        const px = sr.width * mod.RASTER_PAD;
-        const py = sr.height * mod.RASTER_PAD;
-        layers.push({ image: img, rect: { x: sr.left - px, y: sr.top - py, w: sr.width + 2 * px, h: sr.height + 2 * py } });
+        const wb = getBody(world, r.key);
+        if (!svg || !wb) continue;
+        items.push({
+          depth: toScreen(L, wb.x, wb.y, wb.z).depth,
+          layer: async () => {
+            const shape = SHAPES[r.character.shape];
+            const img = await mod.rasterizeVisibleMalang(svg, shape.body, shape.bottom);
+            const sr = svg.getBoundingClientRect();
+            const px = sr.width * mod.RASTER_PAD;
+            const py = sr.height * mod.RASTER_PAD;
+            return { image: img, rect: { x: sr.left - px, y: sr.top - py, w: sr.width + 2 * px, h: sr.height + 2 * py } };
+          },
+        });
+      }
+      if (snap && st) items.push({ depth: -1e5, layer: async () => ({ image: snap, rect: toRect(st.canvas.getBoundingClientRect()) }) });
+      items.sort((a, b) => a.depth - b.depth);
+      const layers: PhotoLayer[] = [];
+      for (const it of items) {
+        const layer = await it.layer();
+        if (layer) layers.push(layer);
       }
       if (fxCopy && fxCanvas) layers.push({ image: fxCopy, rect: toRect(fxCanvas.getBoundingClientRect()) });
-      // 사진 칸은 모든 말랑이를 감싸는 상자에 맞춘다
-      let x0 = Infinity;
-      let y0 = Infinity;
-      let x1 = -Infinity;
-      let y1 = -Infinity;
-      for (const r of recs) {
-        const b = spriteBox(r);
-        if (!b) continue;
-        x0 = Math.min(x0, b.left);
-        y0 = Math.min(y0, b.top);
-        x1 = Math.max(x1, b.left + b.size);
-        y1 = Math.max(y1, b.top + b.size);
-      }
-      const matRect = matRef.current?.getBoundingClientRect();
-      const main = focusChar ?? recs[0]!.character;
+
+      // 사진 칸: 매트 위 모든 말랑이를 감싸는 상자를 칸 비율로 넓힌다 (아무도 잘리지 않게)
+      const boxes = recs
+        .map((r) => spriteBox(r))
+        .filter((b): b is NonNullable<typeof b> => b !== null)
+        .map((b) => ({ x: b.left, y: b.top, w: b.size, h: b.size }));
+      const slot = photoCardLayout('', () => 0.5).photo;
+      const capture = frameGroup(boxes, slot.w / slot.h, L.sprite);
+      const clothRect = matRef.current?.querySelector('.playroom__cloth')?.getBoundingClientRect();
+      const pattern = MAT_PATTERNS[matId];
+
+      // 왼쪽부터 (사진에 보이는 순서로) 이름을 나란히
+      const ordered = recs
+        .map((r) => ({ r, x: getBody(world, r.key)?.x ?? 0 }))
+        .sort((a, b) => a.x - b.x)
+        .map((e) => e.r);
+      const main = focusChar ?? ordered[0]!.character;
       const group = recs.length > 1;
-      const top = recs.reduce((best, r) => (RARITY_META[r.character.rarity].stars > RARITY_META[best.rarity].stars ? r.character : best), main);
       const blob = await mod.composePhoto({
-        id: group ? recs.map((r) => r.id).join('-') : main.id,
-        name: group ? `말랑이 ${recs.length}마리` : main.name,
-        rarity: group ? top.rarity : main.rarity,
+        id: group ? ordered.map((r) => r.id).join('-') : main.id,
+        name: group ? groupTitle(recs.length) : main.name,
+        rarity: main.rarity,
         shiny: group ? false : recs[0]!.shiny,
         level: levelOf(affectionRef.current[main.id] ?? 0),
-        caption: group ? '놀이방에서 함께 놀았어요' : undefined,
+        caption: group ? groupCaption(ordered.map((r) => r.character.name)) : undefined,
         group,
-        jelly: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) },
-        bounds: matRect ? toRect(matRect) : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight },
+        chips: group ? groupRarityChips(ordered.map((r) => r.character.rarity)) : undefined,
+        capture,
+        mat: {
+          tileUrl: matTileDataUrl(matId),
+          tile: pattern.tile,
+          base: pattern.base,
+          origin: { x: clothRect?.left ?? 0, y: clothRect?.top ?? 0 },
+        },
         layers,
       });
       const fileName = photoFileName(group ? 'playroom' : main.id, new Date());
@@ -1533,21 +1795,79 @@ function Playroom() {
   const endDemo = useCallback(() => setDemo(null), []);
 
   const matStyle = { '--pr-sprite': `${layout?.sprite ?? 120}px` } as CSSProperties;
+  const clothStyle = useMemo(() => ({ '--mat-bg': matBackgroundCss(matId) }) as CSSProperties, [matId]);
+  const closeDecor = useCallback(() => setDecorOpen(false), []);
+
+  // 소품: 3D 에서는 3D 캔버스 아래 층, 2D 에서는 말랑이와 같은 층에서 깊이 순서로
+  const propNodes =
+    layout === null
+      ? null
+      : placedProps.map((p) => {
+          const def = PROPS[p.id];
+          const at = propWorld(p);
+          const spot = toScreen(layout, at.x, at.y, 0);
+          const w = def.w * layout.groupSprite;
+          const h = w * def.aspect;
+          return (
+            <div
+              key={p.id}
+              ref={(el) => {
+                if (el) propElsRef.current.set(p.id, el);
+                else propElsRef.current.delete(p.id);
+              }}
+              className="pr-prop"
+              data-prop={p.id}
+              style={{ transform: `translate3d(${spot.x.toFixed(1)}px, ${spot.y.toFixed(1)}px, 0)`, zIndex: Math.round(spot.depth) }}
+            >
+              <span
+                className="pr-prop__shadow"
+                style={{ width: def.r * 2.4 * layout.groupSprite, height: def.r * 0.5 * layout.groupSprite }}
+                aria-hidden="true"
+              />
+              <span className="pr-prop__art" style={{ width: w, height: h, left: -w / 2, top: -h }} aria-hidden="true">
+                <PropArt id={p.id} />
+              </span>
+            </div>
+          );
+        });
 
   return (
-    <section ref={matRef} className="playroom" style={matStyle} aria-labelledby="pr-title" data-mode={mode}>
+    <section
+      ref={matRef}
+      className="playroom"
+      style={matStyle}
+      aria-labelledby="pr-title"
+      data-mode={mode}
+      data-mat={matId}
+      data-dark-mat={MAT_PATTERNS[matId].dark || undefined}
+    >
       <h1 id="pr-title" className="visually-hidden">
         놀이방
       </h1>
       <div className="playroom__desk" aria-hidden="true">
-        <div className="playroom__cloth" />
+        <div className="playroom__cloth" style={clothStyle} />
       </div>
 
       {/* 위 HUD 를 먼저 둔다: 키보드 Tab 순서가 나가기 → 정보 → 방법 → 사진 → 매트 위 말랑이 → 선반 */}
       <div ref={hudRef} className="playroom__hud">
-        <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
-          <CloseIcon size={24} />
-        </button>
+        <div className="pr-hud-col">
+          <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
+            <BackShape />
+          </button>
+          <button
+            type="button"
+            className="pr-round pr-decor-btn"
+            aria-label="매트 꾸미기"
+            aria-haspopup="dialog"
+            aria-expanded={decorOpen}
+            onClick={() => {
+              sfx.button();
+              setDecorOpen(true);
+            }}
+          >
+            <BrushShape />
+          </button>
+        </div>
         {focusChar ? (
           <div className="pr-info" role="group" aria-label={`${josa(focusChar.name, '과/와')}의 애정`}>
             <p className="pr-info__row">
@@ -1599,26 +1919,28 @@ function Playroom() {
             <p className="pr-info__next">말랑이를 꺼내 함께 놀아요</p>
           </div>
         )}
-        <button
-          type="button"
-          className="pr-round pr-guide-btn"
-          aria-label="만지는 방법 보기"
-          onClick={() => {
-            sfx.button();
-            setGuideOpen(true);
-          }}
-        >
-          <HandShape />
-        </button>
-        <button
-          type="button"
-          className="pr-round pr-camera"
-          aria-label="매트 사진 찍기"
-          disabled={photoBusy || onMat.length === 0}
-          onClick={() => void takePhoto()}
-        >
-          <CameraShape />
-        </button>
+        <div className="pr-hud-col">
+          <button
+            type="button"
+            className="pr-round pr-guide-btn"
+            aria-label="만지는 방법 보기"
+            onClick={() => {
+              sfx.button();
+              setGuideOpen(true);
+            }}
+          >
+            <HandShape />
+          </button>
+          <button
+            type="button"
+            className="pr-round pr-camera"
+            aria-label="매트 사진 찍기"
+            disabled={photoBusy || onMat.length === 0}
+            onClick={() => void takePhoto()}
+          >
+            <CameraShape />
+          </button>
+        </div>
       </div>
 
       <div
@@ -1631,8 +1953,14 @@ function Playroom() {
         onLostPointerCapture={(e) => finishPointer(e, true)}
         onContextMenu={(e) => e.preventDefault()}
       >
+        {mode !== '2d' && (
+          <div className="playroom__props" aria-hidden="true">
+            {propNodes}
+          </div>
+        )}
         {mode !== '2d' && <div ref={glRef} className="playroom__gl" aria-hidden="true" />}
         <div className="playroom__bodies" role="group" aria-label="매트 위 말랑이">
+          {mode === '2d' && propNodes}
           {onMat.map((id) => {
             const rec = getRec('malang', id);
             if (!rec) return null;
@@ -1720,6 +2048,7 @@ function Playroom() {
           onToggle={toggleShelf}
           onPick={onShelfPick}
           sealedCount={sealedCount}
+          solo={solo}
         />
       </div>
 
@@ -1736,6 +2065,10 @@ function Playroom() {
             showDemo(d);
           }}
         />
+      )}
+
+      {decorOpen && (
+        <DecorSheet mat={matId} props={placedProps} onPickMat={onPickMat} onToggleProp={onToggleProp} onClose={closeDecor} />
       )}
 
       {flash && <span className="pr-flash" aria-hidden="true" />}
@@ -1790,30 +2123,56 @@ function capsuleGlow(rarity: Character['rarity']): string {
 
 function HeartShape() {
   return (
-    <svg className="pr-heart" viewBox="0 0 32 32" width={18} height={18} aria-hidden="true" focusable="false">
+    <svg className="pr-heart" viewBox="0 0 32 32" width={14} height={14} aria-hidden="true" focusable="false">
       <path
         d="M16 27 C10 22 4 18 4 11.5 C4 7.5 7 5 10.5 5 C13 5 14.8 6.4 16 8.4 C17.2 6.4 19 5 21.5 5 C25 5 28 7.5 28 11.5 C28 18 22 22 16 27 Z"
-        fill="#ff7aa2"
-        stroke="#2b2233"
-        strokeWidth={2.8}
+        fill="#ff9fb8"
+        stroke="currentColor"
+        strokeWidth={2.6}
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-/** 사진기: 잉크 외곽선 + 레몬 몸 + 렌즈 */
-function CameraShape() {
+/** 나가기: 둥근 선 왼쪽 꺾쇠 (글자 기호 대신 SVG) */
+function BackShape() {
   return (
-    <svg viewBox="0 0 32 32" width={26} height={26} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
+      <path d="M19 7 L10 16 L19 25" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 꾸미기: 딸기우유 붓 + 반짝 */
+function BrushShape() {
+  return (
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
+      <path d="M26.5 4.5 L14 17" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
       <path
-        d="M5 11 q0 -3 3 -3 h3 l2 -3 h6 l2 3 h3 q3 0 3 3 v12 q0 3 -3 3 h-16 q-3 0 -3 -3 Z"
-        fill="#ffd84d"
-        stroke="#2b2233"
-        strokeWidth={2.6}
+        d="M14.5 15.5 L17 18 Q17.5 22 14 24.5 Q10 27.5 4.5 27 Q6.5 24.5 7 21 Q8 16.5 12 15.5 Q13.5 15.2 14.5 15.5 Z"
+        fill="#ff9fb8"
+        stroke="currentColor"
+        strokeWidth={2.1}
         strokeLinejoin="round"
       />
-      <circle cx={16} cy={17} r={5.2} fill="#bff3ff" stroke="#2b2233" strokeWidth={2.6} />
+      <path d="M22 22 l0.9 2.1 l2.1 0.9 l-2.1 0.9 l-0.9 2.1 l-0.9 -2.1 l-2.1 -0.9 l2.1 -0.9 Z" fill="#ffd66b" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 사진기: 둥근 선 + 레몬 몸 + 하늘 렌즈 */
+function CameraShape() {
+  return (
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
+      <path
+        d="M5 11 q0 -3 3 -3 h3 l2 -3 h6 l2 3 h3 q3 0 3 3 v12 q0 3 -3 3 h-16 q-3 0 -3 -3 Z"
+        fill="#ffe7a3"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinejoin="round"
+      />
+      <circle cx={16} cy={17} r={5.2} fill="#dcebff" stroke="currentColor" strokeWidth={2.2} />
       <circle cx={14.4} cy={15.4} r={1.4} fill="#fff" />
     </svg>
   );
@@ -1822,12 +2181,12 @@ function CameraShape() {
 /** 손바닥: 만지는 방법 */
 function HandShape() {
   return (
-    <svg viewBox="0 0 32 32" width={26} height={26} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
       <path
         d="M11 29 C7 26 5 22 5 18 L5 14 C5 12 8 12 8 14 L8 17 L9 6 C9 4 12 4 12 6 L12 15 L13 4 C13 2 16 2 16 4 L16 15 L17 6 C17 4 20 4 20 6 L20 16 L21 10 C21 8 24 8 24 10 L24 20 C24 25 21 29 17 29 Z"
-        fill="#ffd6e2"
-        stroke="#2b2233"
-        strokeWidth={2.4}
+        fill="#ffe3ec"
+        stroke="currentColor"
+        strokeWidth={2.1}
         strokeLinejoin="round"
       />
     </svg>
@@ -1837,8 +2196,8 @@ function HandShape() {
 function LockShape() {
   return (
     <svg className="pr-lock" viewBox="0 0 32 32" width={13} height={13} aria-hidden="true" focusable="false">
-      <path d="M10 14 v-4 q0 -6 6 -6 q6 0 6 6 v4" fill="none" stroke="#2b2233" strokeWidth={3} strokeLinecap="round" />
-      <rect x={6} y={14} width={20} height={14} rx={4} fill="#ffd84d" stroke="#2b2233" strokeWidth={3} />
+      <path d="M10 14 v-4 q0 -6 6 -6 q6 0 6 6 v4" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" />
+      <rect x={6} y={14} width={20} height={14} rx={4} fill="#ffe7a3" stroke="currentColor" strokeWidth={2.8} />
     </svg>
   );
 }

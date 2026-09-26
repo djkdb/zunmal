@@ -9,6 +9,7 @@ import { GACHA_RULES } from '../data/rarity';
 import { LEGACY_TICKET_TO_COINS, STARTING_COINS } from '../economy/config';
 import { isCouponId } from '../economy/coupons';
 import { isValidDateKey, seoulDateKey } from '../economy/daily';
+import { DEFAULT_MAT, sanitizeMatId, sanitizeProps, type MatPatternId, type PlacedProp } from '../data/playroomDecor';
 
 /**
  * 저장 스키마 버전. 구조가 바뀌면 올리고 migrateSave에 변환 단계를 추가한다.
@@ -20,8 +21,9 @@ import { isValidDateKey, seoulDateKey } from '../economy/daily';
  *  - v5: 소리 설정 분리 — settings { muted } → { sfxOn, musicOn } (효과음/배경음악)
  *  - v6: 받은 쿠폰(redeemedCoupons)
  *  - v7: 놀이방 — 캡슐을 연 말랑이(unboxed), 매트 위에 꺼내 둔 말랑이(playroom.out)
+ *  - v8: 놀이방 꾸미기 — 매트 무늬(playroom.mat), 매트 위 소품(playroom.props). 기본은 한 마리만(out 은 하나로)
  */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 /** 매트 위에 동시에 꺼내 둘 수 있는 최대 수 (저장 상한. 기기별 실제 상한은 touch/perfGovernor.ts 가 정한다) */
 export const PLAYROOM_MAX_OUT = 5;
 export const SAVE_KEY = 'malang-gacha-save';
@@ -50,6 +52,10 @@ export interface Settings {
 export interface PlayroomSave {
   /** 매트 위에 꺼내 둔 말랑이 id (꺼낸 순서). 항상 unboxed ∩ 보유, 최대 PLAYROOM_MAX_OUT */
   out: string[];
+  /** 매트 무늬 (data/playroomDecor.ts) */
+  mat: MatPatternId;
+  /** 매트 위 소품 (id 마다 하나, 좌표는 매트 바닥 기준 0..1, 최대 MAX_PROPS) */
+  props: PlacedProp[];
 }
 
 export interface SaveData {
@@ -95,7 +101,7 @@ export function createInitialSave(now: Date = new Date()): SaveData {
     missions: createMissionState(seoulDateKey(now)),
     redeemedCoupons: [],
     unboxed: [],
-    playroom: { out: [] },
+    playroom: { out: [], mat: DEFAULT_MAT, props: [] },
   };
 }
 
@@ -178,12 +184,13 @@ function sanitizeUnboxed(value: unknown, owned: Record<string, OwnedMalang>): st
   return [...new Set(value.filter((v): v is string => typeof v === 'string' && owned[v] !== undefined))];
 }
 
-/** 매트 위 말랑이: 캡슐을 연 보유 말랑이만, 중복 없이, 최대 PLAYROOM_MAX_OUT */
+/** 매트 위 말랑이: 캡슐을 연 보유 말랑이만, 중복 없이, 최대 PLAYROOM_MAX_OUT. 무늬·소품은 알려진 것만 */
 function sanitizePlayroom(value: unknown, unboxed: readonly string[]): PlayroomSave {
-  const out = isRecord(value) && Array.isArray(value.out) ? value.out : [];
+  const rec = isRecord(value) ? value : {};
+  const out = Array.isArray(rec.out) ? rec.out : [];
   const allowed = new Set(unboxed);
   const ids = [...new Set(out.filter((v): v is string => typeof v === 'string' && allowed.has(v)))];
-  return { out: ids.slice(0, PLAYROOM_MAX_OUT) };
+  return { out: ids.slice(0, PLAYROOM_MAX_OUT), mat: sanitizeMatId(rec.mat), props: sanitizeProps(rec.props) };
 }
 
 /**
@@ -278,6 +285,17 @@ function migrateV6toV7(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * v7 → v8: 꾸미기 — 기본 무늬, 소품 없음. 놀이방 기본이 "한 마리만 크게"로 바뀌어 매트에는 한 마리만 남긴다
+ * (파트너가 나와 있었으면 파트너, 아니면 처음 꺼낸 말랑이).
+ */
+function migrateV7toV8(raw: Record<string, unknown>): Record<string, unknown> {
+  const playroom = isRecord(raw.playroom) ? raw.playroom : {};
+  const out = Array.isArray(playroom.out) ? playroom.out.filter((v): v is string => typeof v === 'string') : [];
+  const keep = typeof raw.partnerId === 'string' && out.includes(raw.partnerId) ? raw.partnerId : out[0];
+  return { ...raw, playroom: { ...playroom, out: keep ? [keep] : [], mat: DEFAULT_MAT, props: [] } };
+}
+
+/**
  * 저장된 버전에서 현재 버전으로 마이그레이션한 뒤 sanitize한다.
  * 알 수 없는(미래) 버전도 가능한 필드만 살려 복구한다.
  */
@@ -291,6 +309,7 @@ export function migrateSave(persisted: unknown, fromVersion: number, now: Date =
   if (fromVersion < 5) data = migrateV4toV5(data);
   // v5 → v6: redeemedCoupons는 sanitize가 빈 목록으로 채운다.
   if (fromVersion < 7) data = migrateV6toV7(data);
-  // 향후: if (fromVersion < 8) data = migrateV7toV8(data);
+  if (fromVersion < 8) data = migrateV7toV8(data);
+  // 향후: if (fromVersion < 9) data = migrateV8toV9(data);
   return sanitizeSave(data, now);
 }

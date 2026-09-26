@@ -1,8 +1,8 @@
 import { useId } from 'react';
 import type { ReactionArea, ReactionGesture } from '../../touch/reactions';
 
-const INK = '#2b2233';
-const HOT = '#ff7aa2';
+const INK = '#22304a';
+const HOT = '#ff9fb8';
 
 /** 영역 강조 사각형 (64×64 그림 좌표, 몸통 = 원 cx32 cy36 r22) */
 const AREA_CLIP: Record<ReactionArea, { x: number; y: number; w: number; h: number }[]> = {
@@ -146,7 +146,7 @@ export function GestureArt({
       <path d="M10 44 C10 22 20 12 32 12 C44 12 54 22 54 44 C54 54 46 58 32 58 C18 58 10 54 10 44 Z" fill="#ffe1ea" />
       <g clipPath={`url(#${clipId}-body)`}>
         {AREA_CLIP[area].map((r, i) => (
-          <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill={area === 'body' ? '#ffb3cb' : '#ff85aa'} opacity={0.8} />
+          <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill={area === 'body' ? '#ffc4d4' : '#ff9fb8'} opacity={0.85} />
         ))}
       </g>
       <path

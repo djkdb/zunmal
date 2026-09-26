@@ -3,7 +3,7 @@ import type { Rarity } from '../../data/rarity';
 
 /** 등급별 캡슐 윗뚜껑 색 (캡슐 머신과 같은 색) */
 export const CAPSULE_TOP: Record<Rarity, string> = {
-  common: '#f3ebdd',
+  common: '#dfe7f1',
   rare: '#7fbfff',
   epic: '#c79bff',
   legendary: '#ffc94d',
@@ -12,7 +12,7 @@ export const CAPSULE_TOP: Record<Rarity, string> = {
 };
 
 /**
- * 뽑기 캡슐 그림. 윗뚜껑(.cap-top)과 아랫단(.cap-bottom)을 따로 움직일 수 있다 —
+ * 뽑기 캡슐 그림 (캡슐 머신과 같은 파스텔 캡슐 + 흰 이음새). 윗뚜껑(.cap-top)과 아랫단(.cap-bottom)을 따로 움직일 수 있다 —
  * 놀이방은 CSS 변수(--cap-twist 각도, --cap-gap px, --cap-crack 0..1)로 비틀고 벌린다.
  */
 export function CapsuleArt({ rarity, className }: { rarity: Rarity; className?: string }) {
@@ -35,15 +35,15 @@ export function CapsuleArt({ rarity, className }: { rarity: Rarity; className?: 
         </linearGradient>
         <radialGradient id={`${id}-shine`} cx="40%" cy="80%" r="70%">
           <stop offset="0" stopColor="#fff" stopOpacity="0" />
-          <stop offset="1" stopColor="#2b2233" stopOpacity="0.14" />
+          <stop offset="1" stopColor="#1a4080" stopOpacity="0.1" />
         </radialGradient>
       </defs>
       <g className="cap-bottom">
-        <path d="M-30 0 A30 30 0 0 0 30 0 Z" fill="#fffdf8" stroke="#2b2233" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M-30 0 A30 30 0 0 0 30 0 Z" fill="#fff" stroke="#1a4080" strokeOpacity="0.16" strokeWidth="2" strokeLinejoin="round" />
         <path d="M-26 2 A26 26 0 0 0 26 2 Z" fill={`url(#${id}-shine)`} />
       </g>
       <g className="cap-top">
-        <path d="M-30 0 A30 30 0 0 1 30 0 Z" fill={fill} stroke="#2b2233" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M-30 0 A30 30 0 0 1 30 0 Z" fill={fill} stroke="#1a4080" strokeOpacity="0.16" strokeWidth="2" strokeLinejoin="round" />
         <ellipse cx="-12" cy="-16" rx="8" ry="4.5" fill="#fff" opacity="0.7" transform="rotate(-30 -12 -16)" />
         {top === 'cosmic' && (
           <g fill="#ffe07a">
@@ -52,9 +52,9 @@ export function CapsuleArt({ rarity, className }: { rarity: Rarity; className?: 
             <circle cx="-4" cy="-6" r="1.4" />
           </g>
         )}
-        <rect x="-31" y="-3" width="62" height="6" rx="3" fill="#2b2233" />
+        <rect x="-30" y="-2" width="60" height="4" rx="2" fill="#fff" />
         {/* 비틀면 보이는 금 */}
-        <path className="cap-crack" d="M-8 -3 l4 -5 l3 4 l4 -6" fill="none" stroke="#2b2233" strokeWidth="2" strokeLinecap="round" />
+        <path className="cap-crack" d="M-8 -3 l4 -5 l3 4 l4 -6" fill="none" stroke="#22304a" strokeOpacity="0.7" strokeWidth="1.8" strokeLinecap="round" />
       </g>
     </svg>
   );

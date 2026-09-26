@@ -1,3 +1,4 @@
+import { isMatPatternId, isPropId, withProp, withoutProp, type MatPatternId, type PropId } from '../data/playroomDecor';
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { STARTER_CHARACTER_IDS, getCharacter } from '../data/characters';
@@ -67,6 +68,17 @@ export interface GameActions {
   takeOutMalang(characterId: string, cap?: number): boolean;
   /** 놀이방: 매트의 말랑이를 선반에 넣는다 */
   putBackMalang(characterId: string): void;
+  /**
+   * 놀이방에 들어올 때: 기본은 한 마리만 크게 만진다 → 매트를 이 말랑이 하나로 (캡슐을 연 보유 말랑이가 아니면 빈 매트).
+   * 친구는 선반에서 더 꺼내 함께 논다.
+   */
+  soloMalang(characterId: string | null): void;
+  /** 놀이방 꾸미기: 매트 무늬 바꾸기 (무료) */
+  setPlayroomMat(mat: MatPatternId): void;
+  /** 놀이방 꾸미기: 소품을 놓거나 옮긴다 (x, y 는 매트 바닥 기준 0..1). 가득 차서 못 놓으면 false */
+  placeProp(id: PropId, x: number, y: number): boolean;
+  /** 놀이방 꾸미기: 소품 치우기 */
+  removeProp(id: PropId): void;
   /** 오늘의 미션 보상 받기 */
   claimMission(id: MissionKind, now?: Date): { ok: true; coins: number } | { ok: false; reason: string };
   /** 미션 3개를 모두 받은 뒤 추가 보너스 받기. 받은 코인(없으면 0)을 돌려준다. */
@@ -182,7 +194,7 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
             partnerId: characterId,
             // 시작 말랑이는 직접 골랐으니 캡슐 없이 바로 매트에
             unboxed: [characterId],
-            playroom: { out: [characterId] },
+            playroom: { ...get().playroom, out: [characterId] },
           });
           return true;
         },
@@ -291,7 +303,7 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (!first && !canPlace) return false;
           set({
             unboxed: first ? [...state.unboxed, characterId] : state.unboxed,
-            playroom: canPlace ? { out: [...out, characterId] } : state.playroom,
+            playroom: canPlace ? { ...state.playroom, out: [...out, characterId] } : state.playroom,
           });
           return first;
         },
@@ -301,14 +313,43 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           if (!state.ownedMalangs[characterId] || !state.unboxed.includes(characterId)) return false;
           const out = state.playroom.out;
           if (out.includes(characterId) || out.length >= clampCap(cap)) return false;
-          set({ playroom: { out: [...out, characterId] } });
+          set({ playroom: { ...state.playroom, out: [...out, characterId] } });
           return true;
         },
 
         putBackMalang(characterId) {
-          const out = get().playroom.out;
-          if (!out.includes(characterId)) return;
-          set({ playroom: { out: out.filter((id) => id !== characterId) } });
+          const playroom = get().playroom;
+          if (!playroom.out.includes(characterId)) return;
+          set({ playroom: { ...playroom, out: playroom.out.filter((id) => id !== characterId) } });
+        },
+
+        soloMalang(characterId) {
+          const state = get();
+          const ok = characterId !== null && !!state.ownedMalangs[characterId] && state.unboxed.includes(characterId);
+          const out = ok ? [characterId] : [];
+          if (out.length === state.playroom.out.length && out.every((id, i) => state.playroom.out[i] === id)) return;
+          set({ playroom: { ...state.playroom, out } });
+        },
+
+        setPlayroomMat(mat) {
+          if (!isMatPatternId(mat)) return;
+          const playroom = get().playroom;
+          if (playroom.mat !== mat) set({ playroom: { ...playroom, mat } });
+        },
+
+        placeProp(id, x, y) {
+          if (!isPropId(id)) return false;
+          const playroom = get().playroom;
+          const props = withProp(playroom.props, id, x, y);
+          if (!props.some((p) => p.id === id)) return false;
+          set({ playroom: { ...playroom, props } });
+          return true;
+        },
+
+        removeProp(id) {
+          const playroom = get().playroom;
+          if (!playroom.props.some((p) => p.id === id)) return;
+          set({ playroom: { ...playroom, props: withoutProp(playroom.props, id) } });
         },
 
         claimMission(id, now = new Date()) {
