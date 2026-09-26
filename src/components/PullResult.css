@@ -1,58 +1,902 @@
+/* ──────────────────────────────────────────────────────────────
+ * 뽑기 결과 모달
+ * 애니메이션은 transform/opacity만 움직인다 (빛/테두리는 미리 그려 둔 층의 투명도로).
+ * ────────────────────────────────────────────────────────────── */
+.pull-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .pull-title {
   text-align: center;
-  font-size: 1.4rem;
-  margin-bottom: 10px;
+  font-size: 1.3rem;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+.modal.pull-modal--multi {
+  width: min(440px, calc(100vw - 16px));
+}
+
+.pull-modal--multi .modal__body {
+  padding: 14px 12px 12px;
+}
+
+/* 등급별 모달 테두리: 열린 카드 중 최고 등급을 따라 바뀐다 */
+.pull-modal--epic {
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 5px var(--rarity-epic);
 }
 
 .pull-modal--legendary {
   box-shadow:
     0 6px 0 var(--ink),
-    0 0 0 6px var(--rarity-legendary);
+    0 0 0 5px var(--rarity-legendary),
+    0 0 0 9px var(--ink),
+    0 0 36px 12px rgba(255, 192, 46, 0.6);
 }
 
 .pull-modal--mythic {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--paper), var(--paper)) padding-box,
+    conic-gradient(from var(--spin, 0deg), #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff, #ff9fbd) border-box;
+  border-width: 6px;
   box-shadow:
     0 6px 0 var(--ink),
-    0 0 0 6px var(--rarity-mythic),
-    0 0 40px 10px rgba(195, 166, 255, 0.8);
+    0 0 40px 12px rgba(205, 178, 255, 0.7);
 }
 
-/* 1회 결과 */
+@property --spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.pull-modal--mythic[open] {
+  animation:
+    modal-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1),
+    border-spin 3s linear infinite;
+}
+
+@keyframes border-spin {
+  to {
+    --spin: 360deg;
+  }
+}
+
+/* 시크릿: 모달 전체가 밤하늘 */
+.pull-modal--secret {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 60% 80%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 30% 60%, rgba(255, 224, 122, 0.9) 0 1.2px, transparent 1.8px),
+    radial-gradient(ellipse at 50% 35%, #5a3bb0 0%, #2d1b5e 45%, #120a2e 100%);
+  color: #fff;
+  box-shadow:
+    0 6px 0 var(--ink),
+    0 0 0 4px #ffe07a,
+    0 0 0 8px var(--ink),
+    0 0 60px 20px rgba(143, 107, 255, 0.8);
+}
+
+.pull-modal--secret .pull-title,
+.pull-modal--secret .pull-single__name {
+  color: #ffe07a;
+  -webkit-text-stroke: 6px var(--ink);
+  paint-order: stroke fill;
+}
+
+.pull-modal--secret .pull-single__desc,
+.pull-modal--secret .pull-detail__desc,
+.pull-modal--secret .pull-actions__short {
+  color: #e6dcff;
+}
+
+.pull-modal--secret .pull-actions__short a {
+  color: #ffe07a;
+}
+
+.pull-modal--single.pull-modal--secret .modal__body {
+  animation: secret-arrive 1.2s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+
+@keyframes secret-arrive {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
+}
+
+/* ── 획득 태그 ─────────────────────────────────────────────── */
+.pull-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pull-tag--new {
+  background: var(--berry);
+  color: #fff;
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+}
+
+.pull-tag--dup {
+  background: var(--cream-deep);
+}
+
+.pull-tag--note {
+  background: var(--lemon);
+}
+
+/* 반짝 태그: 호일 광택이 옆으로 흐른다 (배경 위치 대신 transform) */
+.pull-tag--shiny {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffb8e0 60%, #b8e8ff);
+}
+
+.pull-tag--shiny::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.95) 50%, transparent 70%);
+  animation: sheen 1.6s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(110%);
+  }
+}
+
+/* ── 10연: 캡슐 카드 5×2 ──────────────────────────────────── */
+.pull-grid {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 6px;
+}
+
+.pull-card {
+  --r: var(--rarity-common);
+  --tint: var(--paper);
+  --pop: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.pull-card--rare {
+  --r: var(--rarity-rare);
+  --tint: #e6f5ff;
+}
+
+.pull-card--epic {
+  --r: var(--rarity-epic);
+  --tint: #f3eaff;
+}
+
+.pull-card--legendary {
+  --r: var(--rarity-legendary);
+  --tint: #fff3cf;
+}
+
+.pull-card--mythic {
+  --r: var(--rarity-mythic);
+  --tint: #ffe9f1;
+}
+
+.pull-card--secret {
+  --r: #8f6bff;
+  --tint: #2d1b5e;
+}
+
+.pull-card__btn {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 116px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  perspective: 500px;
+  border-radius: 14px;
+}
+
+.pull-card__btn:focus-visible {
+  outline-offset: 2px;
+}
+
+.pull-card__flip {
+  position: relative;
+  display: block;
+  height: 100%;
+  min-height: 116px;
+  transform-style: preserve-3d;
+  transition: transform 0.36s cubic-bezier(0.3, 1.35, 0.5, 1);
+}
+
+.pull-card__back,
+.pull-card__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: var(--line) solid var(--ink);
+  border-radius: 14px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+}
+
+/* 뒷면: 크림색 캡슐. 누를 수 있다는 뜻으로 아랫단 그림자 */
+.pull-card__back {
+  justify-content: center;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.9) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 75% 80%, rgba(255, 122, 162, 0.5) 0 2px, transparent 2.5px),
+    var(--cream-deep);
+  box-shadow: inset 0 -5px 0 rgba(43, 34, 51, 0.1);
+}
+
+.pull-card__capsule {
+  width: 78%;
+  height: auto;
+}
+
+.pull-card__cap-top {
+  fill: #f3e6cf;
+  stroke: #2b2233;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  transition: fill 0.12s linear;
+}
+
+/* 앞면 */
+.pull-card__face {
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 12px 2px 5px;
+  background: var(--tint);
+  color: var(--ink);
+  transform: rotateY(180deg);
+  text-align: center;
+}
+
+.pull-card__face > .malang {
+  flex-shrink: 0;
+}
+
+.pull-card__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.3em;
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+.pull-card .rarity-badge--compact {
+  gap: 2px;
+  padding: 0 4px;
+  border-width: 2px;
+  font-size: 0.6875rem;
+}
+
+.pull-card .rarity-badge svg {
+  width: 9px;
+  height: 9px;
+}
+
+.pull-card .pull-tag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 0 4px;
+  font-size: 0.625rem;
+  line-height: 1.3;
+  transform: rotate(6deg);
+}
+
+.pull-card .pull-tag svg {
+  width: 10px;
+  height: 10px;
+}
+
+.pull-card--secret .pull-card__face {
+  background:
+    radial-gradient(circle at 20% 20%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 80% 35%, #ffe07a 0 1.2px, transparent 1.8px),
+    radial-gradient(ellipse at 50% 30%, #5a3bb0, #1b1040);
+  color: #fff;
+}
+
+.pull-card--mythic .pull-card__face {
+  background: linear-gradient(160deg, #ffe3ec, #fff6cc, #dcfff3, #e3f1ff, #efe6ff);
+}
+
+/* 등급 테두리: 레어부터 안쪽 색 테두리, 에픽부터 바깥 빛 */
+.pull-card--rare .pull-card__face,
+.pull-card--epic .pull-card__face,
+.pull-card--legendary .pull-card__face,
+.pull-card--mythic .pull-card__face,
+.pull-card--secret .pull-card__face {
+  box-shadow: inset 0 0 0 3px var(--r);
+}
+
+.pull-card--legendary .pull-card__face,
+.pull-card--secret .pull-card__face {
+  box-shadow:
+    inset 0 0 0 3px var(--r),
+    inset 0 0 0 5px var(--ink);
+}
+
+/* 빛(glow)은 카드 뒤에 미리 그려 두고 투명도만 바꾼다 */
+.pull-card::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  border-radius: 30px;
+  background: radial-gradient(closest-side, var(--r) 30%, transparent);
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+}
+
+.pull-card--epic.is-face::before {
+  opacity: 0.55;
+  transform: none;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.pull-card--legendary.is-face::before,
+.pull-card--mythic.is-face::before,
+.pull-card--secret.is-face::before {
+  opacity: 0.9;
+  transform: none;
+  animation: glow-pulse 1.6s ease-in-out 0.4s infinite alternate;
+}
+
+@keyframes glow-pulse {
+  to {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+}
+
+/* 차례가 온 카드: 뒷면이 등급 색으로 물들고 떨린다 (모으기) */
+.pull-card.is-charge .pull-card__cap-top,
+.pull-card.is-hold .pull-card__cap-top {
+  fill: var(--r);
+}
+
+.pull-card.is-charge::before,
+.pull-card.is-hold::before {
+  opacity: 1;
+  transform: scale(1.1);
+  transition:
+    opacity 0.25s ease,
+    transform 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.pull-card.is-charge .pull-card__flip {
+  animation: charge-shake 0.09s linear infinite;
+}
+
+/* 숨 멈춤: 떨림이 멈추고 살짝 눌린 채로 정지 */
+.pull-card.is-hold .pull-card__flip {
+  transform: scale(0.92);
+  transition: transform 0.06s ease-out;
+}
+
+@keyframes charge-shake {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(0.96);
+  }
+  25% {
+    transform: translate(-1.5px, 0.5px) scale(0.96) rotate(-2deg);
+  }
+  75% {
+    transform: translate(1.5px, -0.5px) scale(0.96) rotate(2deg);
+  }
+}
+
+/* 뒤집기 + 튀어오름. 튀는 세기(--pop)는 등급별 */
+.pull-card.is-face .pull-card__flip {
+  transform: rotateY(180deg);
+}
+
+.pull-card.is-face {
+  animation: card-pop 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes card-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(var(--pop));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 최고 결과: 리본 + 살짝 크게 */
+.pull-card.is-best {
+  z-index: 1;
+}
+
+.pull-card__ribbon {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  z-index: 2;
+  padding: 0 6px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--lemon);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  transform: translateX(-50%) rotate(-4deg);
+  pointer-events: none;
+}
+
+/* 고른 카드: 잉크 밑줄 점 */
+.pull-card.is-selected .pull-card__btn::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 16px;
+  height: 5px;
+  margin-left: -8px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.pull-modal--secret .pull-card.is-selected .pull-card__btn::after {
+  background: #ffe07a;
+}
+
+/* 반짝 카드: 무지개 호일이 비스듬히 지나간다 */
+.pull-card.is-shiny .pull-card__face {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--tint), var(--tint)) padding-box,
+    linear-gradient(135deg, #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff) border-box;
+}
+
+.pull-card.is-shiny .pull-card__face::after,
+.pull-detail.is-shiny::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -60%;
+  width: 60%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.85) 40%,
+    rgba(255, 190, 230, 0.6) 55%,
+    rgba(160, 230, 255, 0.5) 65%,
+    transparent
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: holo 2.2s ease-in-out infinite;
+}
+
+@keyframes holo {
+  0% {
+    transform: translateX(0) skewX(-12deg);
+  }
+  60%,
+  100% {
+    transform: translateX(380%) skewX(-12deg);
+  }
+}
+
+/* 에픽 이상이 뒤집힐 때 튀는 빛 조각 */
+.pull-burst {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.pull-burst > span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  background: var(--r, var(--lemon));
+  opacity: 0;
+  animation: burst 0.7s cubic-bezier(0.1, 0.7, 0.3, 1) calc(var(--d) * 40ms) both;
+}
+
+.pull-burst > span:nth-child(3n) {
+  background: #fff;
+}
+
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(0) scale(0.4) rotate(0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(calc(-1 * var(--dist, 58px))) scale(1) rotate(180deg);
+  }
+}
+
+.pull-card--legendary .pull-burst > span,
+.pull-card--mythic .pull-burst > span,
+.pull-card--secret .pull-burst > span {
+  animation-duration: 0.9s;
+}
+
+/* 전설 이상 공개 순간 모달 안이 한 번 번쩍 */
+.pull-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 35%, #fff 0%, var(--flash, rgba(255, 201, 77, 0.8)) 35%, transparent 75%);
+  animation: pull-flash 0.55s ease-out both;
+}
+
+.pull-flash--mythic {
+  --flash: rgba(255, 159, 189, 0.85);
+}
+
+.pull-flash--secret {
+  --flash: rgba(143, 107, 255, 0.85);
+}
+
+@keyframes pull-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── 자세히 보기 줄 ─────────────────────────────────────────── */
+.pull-detail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;
+  padding: 6px 10px 6px 6px;
+  border: 2px solid rgba(43, 34, 51, 0.25);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+
+.pull-modal--secret .pull-detail {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.pull-detail--empty {
+  justify-content: center;
+  border-style: dashed;
+}
+
+.pull-detail__placeholder {
+  color: var(--ink-soft);
+  font-size: var(--fs-s);
+}
+
+.pull-detail > .malang {
+  flex-shrink: 0;
+}
+
+.pull-detail__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pull-detail__name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.pull-detail__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pull-detail__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+/* ── 아래쪽: 공개 중에는 "모두 열기", 끝나면 요약 + 버튼 ──────── */
+.pull-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pull-footer--revealing {
+  min-height: 150px;
+  justify-content: flex-end;
+}
+
+.pull-skip-hint {
+  margin-bottom: auto;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: var(--fs-s);
+}
+
+.pull-modal--secret .pull-skip-hint {
+  color: #e6dcff;
+}
+
+.pull-progress {
+  height: 10px;
+  margin: 4px 8px 0;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream-deep);
+  overflow: hidden;
+}
+
+.pull-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--grape);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.pull-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.pull-summary > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+}
+
+.pull-summary > div + div {
+  border-left: 2px dashed rgba(43, 34, 51, 0.25);
+}
+
+.pull-summary dt {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.pull-summary dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.pull-summary > .is-lit dd {
+  color: var(--berry-deep);
+}
+
+.pull-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pull-actions__again,
+.pull-actions__more {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pull-actions .btn {
+  padding-inline: 8px;
+  gap: 4px;
+}
+
+.pull-actions__cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.8125rem;
+}
+
+.pull-actions__short {
+  text-align: center;
+  color: var(--berry-deep);
+}
+
+.pull-actions__short a {
+  color: var(--ink);
+}
+
+/* ── 1회 결과 ─────────────────────────────────────────────── */
 .pull-single {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-align: center;
 }
 
 .pull-single__stage {
+  --r: var(--rarity-rare);
   position: relative;
   display: grid;
   place-items: center;
-  width: 220px;
+  width: 190px;
   max-width: 100%;
   aspect-ratio: 1;
-  animation: pop-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 
-.pull-single__stage > .malang {
+.pull-single--epic .pull-single__stage {
+  --r: var(--rarity-epic);
+}
+
+.pull-single--legendary .pull-single__stage {
+  --r: var(--rarity-legendary);
+}
+
+.pull-single--mythic .pull-single__stage {
+  --r: var(--rarity-mythic);
+}
+
+.pull-single--secret .pull-single__stage {
+  --r: #ffe07a;
+}
+
+.pull-single__malang {
   position: relative;
   z-index: 1;
+  animation: pop-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+/* 전설 이상: 작게 웅크렸다가 → 멈춤 → 크게 튀어나옴 */
+.pull-single--legendary .pull-single__malang,
+.pull-single--mythic .pull-single__malang,
+.pull-single--secret .pull-single__malang {
+  animation: big-pop 0.95s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.pull-single--legendary .pull-burst > span,
+.pull-single--mythic .pull-burst > span,
+.pull-single--secret .pull-burst > span {
+  animation-delay: calc(0.5s + var(--d) * 40ms);
+}
+
+.pull-single .pull-burst > span {
+  --dist: 118px;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px;
+  animation-duration: 0.9s;
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes big-pop {
+  0% {
+    transform: scale(0.2) rotate(-8deg);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(0.55) rotate(6deg);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(0.5) rotate(-6deg);
+  }
+  52% {
+    transform: scale(0.5) rotate(0);
+  }
+  72% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .pull-single__name {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.pull-single__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  align-items: center;
 }
 
 .pull-single__desc {
+  max-width: 30ch;
   color: var(--ink-soft);
-  font-size: 0.95rem;
-}
-
-.pull-note {
-  background: var(--lemon);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  word-break: keep-all;
 }
 
 /* 희귀도별 후광 */
@@ -80,202 +924,6 @@
   animation-duration: 4s;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pop-in {
-  from {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-}
-
-/* 획득 태그 */
-.pull-tag {
-  display: inline-block;
-  max-width: 100%;
-  padding: 0 7px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pull-tag--new {
-  background: var(--pink);
-}
-
-.pull-tag--dup {
-  background: var(--cream-deep);
-}
-
-/* 10연 결과 */
-.pull-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.pull-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 8px 4px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-m);
-  background: var(--paper);
-  text-align: center;
-  animation: card-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) both;
-  animation-delay: calc(var(--i) * 110ms);
-}
-
-.pull-card__name {
-  font-family: var(--font-display);
-  font-size: 0.85rem;
-  line-height: 1.2;
-  word-break: keep-all;
-}
-
-.pull-card--rare {
-  background: #eaf4ff;
-}
-
-.pull-card--epic {
-  background: #f4ebff;
-  box-shadow: 0 0 0 3px var(--rarity-epic);
-}
-
-.pull-card--legendary {
-  background: #fff5d9;
-  box-shadow:
-    0 0 0 3px var(--rarity-legendary),
-    0 0 16px 2px rgba(255, 182, 39, 0.7);
-}
-
-.pull-card--mythic {
-  background: linear-gradient(160deg, #ffe3ec, #fff6cc, #dcfff3, #e3f1ff, #efe6ff);
-  box-shadow:
-    0 0 0 3px var(--rarity-mythic),
-    0 0 18px 4px rgba(195, 166, 255, 0.8);
-}
-
-@keyframes card-in {
-  from {
-    transform: rotateY(90deg) scale(0.6);
-    opacity: 0;
-  }
-}
-
-.pull-summary {
-  margin: 12px 0 10px;
-  text-align: center;
-  color: var(--ink-soft);
-}
-
-.pull-close {
-  margin-top: 14px;
-}
-
-/* ── 등급 차별화 ─────────────────────────────────────────────── */
-.pull-single__badges {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.pull-tag--shiny {
-  background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffb8e0 60%, #b8e8ff);
-  animation: tag-shimmer 1.6s linear infinite;
-  background-size: 200% 100%;
-}
-
-@keyframes tag-shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-/* 에픽: 보라 테두리 */
-.pull-modal--epic {
-  box-shadow:
-    0 6px 0 var(--ink),
-    0 0 0 5px var(--rarity-epic);
-}
-
-/* 전설: 금빛 이중 테두리 + 빛 */
-.pull-modal--legendary {
-  box-shadow:
-    0 6px 0 var(--ink),
-    0 0 0 5px var(--rarity-legendary),
-    0 0 0 9px var(--ink),
-    0 0 36px 12px rgba(255, 192, 46, 0.6);
-}
-
-/* 신화: 무지개가 테두리를 따라 흐른다 */
-.pull-modal--mythic {
-  border-color: transparent;
-  background:
-    linear-gradient(var(--paper), var(--paper)) padding-box,
-    conic-gradient(from var(--spin, 0deg), #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff, #ff9fbd) border-box;
-  border-width: 6px;
-  box-shadow:
-    0 6px 0 var(--ink),
-    0 0 40px 12px rgba(205, 178, 255, 0.7);
-}
-
-/* 시크릿: 모달 전체가 밤하늘로 바뀐다 */
-.pull-modal--secret {
-  background:
-    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 60% 80%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 30% 60%, rgba(255, 224, 122, 0.9) 0 1.2px, transparent 1.8px),
-    radial-gradient(ellipse at 50% 35%, #5a3bb0 0%, #2d1b5e 45%, #120a2e 100%);
-  color: #fff;
-  box-shadow:
-    0 6px 0 var(--ink),
-    0 0 0 4px #ffe07a,
-    0 0 0 8px var(--ink),
-    0 0 60px 20px rgba(143, 107, 255, 0.8);
-}
-
-.pull-modal--secret .pull-title,
-.pull-modal--secret .pull-single__name {
-  color: #ffe07a;
-  -webkit-text-stroke: 6px var(--ink);
-  paint-order: stroke fill;
-}
-
-.pull-modal--secret .pull-single__desc,
-.pull-modal--secret .pull-summary {
-  color: #e6dcff;
-}
-
-.pull-modal--secret .modal__body {
-  animation: secret-arrive 1.2s cubic-bezier(0.2, 1.2, 0.3, 1) both;
-}
-
-@keyframes secret-arrive {
-  0% {
-    filter: brightness(3) blur(6px);
-    transform: scale(0.9);
-  }
-  100% {
-    filter: none;
-    transform: none;
-  }
-}
-
 .pull-single--secret .pull-rays {
   background: repeating-conic-gradient(
     #ffe07a 0 6deg,
@@ -287,6 +935,12 @@
   );
   animation-duration: 6s;
   opacity: 0.95;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .pull-starfield {
@@ -315,64 +969,19 @@
   inset: 12%;
   z-index: 2;
   border-radius: 50%;
-  pointer-events: none;
-  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.85) 46%, rgba(255, 190, 230, 0.6) 52%, rgba(160, 230, 255, 0.5) 56%, transparent 70%);
-  background-size: 250% 100%;
-  mix-blend-mode: screen;
-  animation: shiny-sweep-card 1.8s ease-in-out infinite;
-}
-
-@keyframes shiny-sweep-card {
-  from {
-    background-position: 130% 0;
-  }
-  to {
-    background-position: -130% 0;
-  }
-}
-
-/* 10연 카드 등급별 */
-.pull-card--secret {
-  background:
-    radial-gradient(circle at 20% 20%, #fff 0 1px, transparent 1.5px),
-    radial-gradient(circle at 80% 35%, #ffe07a 0 1.2px, transparent 1.8px),
-    radial-gradient(ellipse at 50% 30%, #5a3bb0, #1b1040);
-  color: #fff;
-  box-shadow:
-    0 0 0 3px #ffe07a,
-    0 0 20px 6px rgba(143, 107, 255, 0.85);
-}
-
-.pull-card.is-shiny {
-  position: relative;
   overflow: hidden;
+  pointer-events: none;
 }
 
-.pull-card.is-shiny::after {
+.pull-shine::after {
   content: '';
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.8) 48%, rgba(255, 200, 235, 0.5) 54%, transparent 66%);
-  background-size: 250% 100%;
+  top: -10%;
+  bottom: -10%;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.8) 45%, rgba(255, 190, 230, 0.5) 55%, rgba(160, 230, 255, 0.4) 62%, transparent);
   mix-blend-mode: screen;
-  animation: shiny-sweep-card 2s ease-in-out infinite;
-}
-
-@property --spin {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-
-.pull-modal--mythic[open] {
-  animation:
-    modal-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1),
-    border-spin 3s linear infinite;
-}
-
-@keyframes border-spin {
-  to {
-    --spin: 360deg;
-  }
+  opacity: 0.8;
+  animation: holo 1.8s ease-in-out infinite;
 }

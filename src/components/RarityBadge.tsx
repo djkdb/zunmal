@@ -19,6 +19,14 @@ function RarityShape({ rarity }: { rarity: Rarity }) {
           {...common}
         />
       );
+    case 'secret':
+      // 초승달 + 작은 별
+      return (
+        <>
+          <path d="M7.6 1.2 A5 5 0 1 0 10.8 8.4 A4 4 0 1 1 7.6 1.2 Z" {...common} />
+          <path d="M9.6 1 L10.2 2.6 L11.8 3.2 L10.2 3.8 L9.6 5.4 L9 3.8 L7.4 3.2 L9 2.6 Z" {...common} />
+        </>
+      );
   }
 }
 
