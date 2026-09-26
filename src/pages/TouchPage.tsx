@@ -13,6 +13,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import * as squish from '../audio/squish';
 import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
+import { VIEWBOX } from '../components/malang/helpers';
+import type { JellyFace, JellyView } from '../components/touch3d/jellyScene';
+import {
+  getLoadedJelly3d,
+  isJelly3dUnsupported,
+  markJelly3dUnsupported,
+  preloadJelly3d,
+} from '../components/touch3d/loadJelly3d';
 import { getCharacter, type Character, type MalangEyes } from '../data/characters';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useGameStore } from '../store/useGameStore';
@@ -34,6 +42,22 @@ import {
   wobbleHz,
   type TouchState,
 } from '../touch/physics';
+import {
+  composePose,
+  createSoftState,
+  isSoftAtRest,
+  setSoftReducedMotion,
+  snapSoft,
+  softPoke,
+  softPress,
+  softPull,
+  softRelease,
+  softTickle,
+  softTouch,
+  stepSoft,
+  type SoftHit,
+  type SoftState,
+} from '../touch/softbody';
 import './TouchPage.css';
 
 /** 애정 이만큼마다 한 단계. 애정은 코인을 주지 않는 순수한 교감 수치다. */
@@ -49,6 +73,19 @@ const SLEEPY_MS = 2600;
 const MAX_HEARTS = 8;
 /** 화살표 키 한 번에 당기는 양 (몸 반지름 단위) */
 const KEY_DRAG_STEP = 0.3;
+
+/** 3D 모듈을 이 시간 안에 못 받으면 이번에는 2D 로 (ms) */
+const LOAD_WAIT_MS = 1500;
+/** physics 정규화 단위(말랑이 상자 반폭)를 3D 몸 좌표로 */
+const BODY_UNIT = VIEWBOX.w / 2;
+/** 눈 깜빡임 간격 (ms) 과 길이 */
+const BLINK_MIN_MS = 2600;
+const BLINK_RANGE_MS = 3200;
+const BLINK_MS = 140;
+/** 3D 에서 구워 두는 얼굴 */
+const JELLY_FACES: readonly JellyFace[] = ['default', 'happy', 'sleepy', 'wide'];
+
+type RenderMode = 'loading' | '3d' | '2d';
 
 const ARROWS: Partial<Record<string, { x: number; y: number }>> = {
   ArrowUp: { x: 0, y: -1 },
@@ -78,6 +115,11 @@ interface Gesture {
   reversals: number[];
   /** 키보드로 끄는 누적량 */
   keyDisp: { x: number; y: number };
+  /** 3D 몸에서 닿은 곳 (몸 밖이거나 2D 면 null) */
+  hit: SoftHit | null;
+  /** 손가락 속도 (px/ms, 부드럽게) — 튕기듯 놓기 */
+  vx: number;
+  vy: number;
 }
 
 interface Heart {
@@ -176,10 +218,19 @@ function TouchPlay({ character }: { character: Character }) {
   const faceTimerRef = useRef<number | null>(null);
   const heartIdRef = useRef(0);
   const reducedRef = useRef(reduced);
+  // 3D 젤리
+  const softRef = useRef<SoftState>(createSoftState({ reducedMotion: reduced }));
+  const viewRef = useRef<JellyView | null>(null);
+  const glRef = useRef<HTMLSpanElement>(null);
+  const srcRef = useRef<HTMLDivElement>(null);
 
   const [face, setFace] = useState<Face>('default');
+  const [blink, setBlink] = useState(false);
   const [hearts, setHearts] = useState<Heart[]>([]);
   const [celebrate, setCelebrate] = useState<number | null>(null);
+  const [mode, setMode] = useState<RenderMode>(() => (reduced || isJelly3dUnsupported() ? '2d' : 'loading'));
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   const level = levelOf(affection);
   const progress = affection % AFFECTION_PER_LEVEL;
@@ -187,6 +238,7 @@ function TouchPlay({ character }: { character: Character }) {
   useEffect(() => {
     reducedRef.current = reduced;
     physRef.current = setReducedMotion(physRef.current, reduced);
+    softRef.current = setSoftReducedMotion(softRef.current, reduced);
     // 움직임 줄이기에서는 하트 애니메이션이 없어 animationend 가 오지 않으므로 바로 비운다
     if (reduced) setHearts([]);
   }, [reduced]);
@@ -255,6 +307,7 @@ function TouchPlay({ character }: { character: Character }) {
         const held = now - g.startT;
         const pressure = Math.min(1, held / 900);
         physRef.current = press(physRef.current, g.point, pressure);
+        softRef.current = softPress(softRef.current, pressure);
         if (g.squishCount === 0 && held > TAP_MS) {
           g.squishCount = 1;
           squish.squishPress(0.45);
@@ -268,9 +321,16 @@ function TouchPlay({ character }: { character: Character }) {
       if (g) pet(now);
 
       physRef.current = step(physRef.current, ts - last);
-      const resting = !g && isAtRest(physRef.current);
-      if (resting) physRef.current = snapToTargets(physRef.current);
-      applyTransform();
+      const view = modeRef.current === '3d' ? viewRef.current : null;
+      if (view) softRef.current = stepSoft(softRef.current, ts - last);
+      // 3D 는 숨쉬기·출렁임까지 멈춰야 쉰다 → 멈추면 그리기도 멈춘다 (배터리)
+      const resting = !g && isAtRest(physRef.current) && (!view || isSoftAtRest(softRef.current));
+      if (resting) {
+        physRef.current = snapToTargets(physRef.current);
+        softRef.current = snapSoft(softRef.current);
+      }
+      if (view) view.draw(composePose(physRef.current, softRef.current, BODY_UNIT), softRef.current);
+      else applyTransform();
 
       if (!resting) {
         rafRef.current = requestAnimationFrame(frame);
@@ -299,6 +359,120 @@ function TouchPlay({ character }: { character: Character }) {
     },
     [],
   );
+
+  // ── 3D 젤리: 모듈을 받고(최대 1.5초), 장면을 만들고, 준비되면 2D 와 바꾼다 ──
+  const shapeKey = character.shape;
+  useEffect(() => {
+    if (reduced || isJelly3dUnsupported()) {
+      setMode('2d');
+      return undefined;
+    }
+    setMode('loading');
+    let cancelled = false;
+    let view: JellyView | null = null;
+    let timer: number | undefined;
+
+    const fallback = () => {
+      cancelled = true;
+      if (viewRef.current === view) viewRef.current = null;
+      view?.dispose();
+      view = null;
+      setMode('2d');
+    };
+
+    const start = (mod: NonNullable<ReturnType<typeof getLoadedJelly3d>>) => {
+      const container = glRef.current;
+      const anchor = jellyRef.current;
+      if (cancelled || !container || !anchor) return;
+      try {
+        view = mod.createJellyView({
+          container,
+          anchor,
+          shape: shapeKey,
+          face: 'default',
+          getSource: (f) => srcRef.current?.querySelector<SVGSVGElement>(`[data-face="${f}"] svg`) ?? null,
+          onLost: fallback,
+        });
+      } catch {
+        // WebGL 을 만들 수 없는 기기 → 이번 방문 동안 2D
+        markJelly3dUnsupported();
+        fallback();
+        return;
+      }
+      view.ready.then(
+        () => {
+          if (cancelled || !view) return;
+          viewRef.current = view;
+          setMode('3d');
+        },
+        () => {
+          if (!cancelled) fallback();
+        },
+      );
+    };
+
+    const loaded = getLoadedJelly3d();
+    if (loaded) start(loaded);
+    else {
+      timer = window.setTimeout(fallback, LOAD_WAIT_MS);
+      void preloadJelly3d().then((m) => {
+        window.clearTimeout(timer);
+        if (cancelled) return;
+        if (m) start(m);
+        else fallback();
+      });
+    }
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (viewRef.current === view) viewRef.current = null;
+      view?.dispose();
+    };
+  }, [reduced, shapeKey]);
+
+  // 3D 로 바뀌면 2D 변형을 지우고 첫 장면부터 숨쉬기 시작
+  useEffect(() => {
+    const jelly = jellyRef.current;
+    if (mode !== '3d') return undefined;
+    if (jelly) jelly.style.transform = '';
+    const view = viewRef.current;
+    const onResize = () => view?.layout();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null;
+    if (glRef.current) ro?.observe(glRef.current);
+    window.addEventListener('resize', onResize);
+    ensureLoop();
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', onResize);
+    };
+  }, [mode, ensureLoop]);
+
+  // 가끔 눈을 깜빡인다 (원래 눈을 감은 말랑이는 제외)
+  const eyesClosed = character.eyes === 'happy' || character.eyes === 'sleepy';
+  useEffect(() => {
+    if (reduced || eyesClosed) return undefined;
+    let t: number;
+    let open: number | undefined;
+    const schedule = () => {
+      t = window.setTimeout(() => {
+        if (!document.hidden) {
+          setBlink(true);
+          open = window.setTimeout(() => setBlink(false), BLINK_MS);
+        }
+        schedule();
+      }, BLINK_MIN_MS + Math.random() * BLINK_RANGE_MS);
+    };
+    schedule();
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(open);
+    };
+  }, [reduced, eyesClosed]);
+
+  const jellyFace: JellyFace = face === 'default' ? (blink ? 'sleepy' : 'default') : face;
+  useEffect(() => {
+    if (mode === '3d') viewRef.current?.setFace(jellyFace);
+  }, [mode, jellyFace]);
 
   // 애정 레벨 업 축하
   const prevLevelRef = useRef(level);
@@ -335,8 +509,15 @@ function TouchPlay({ character }: { character: Character }) {
         radius = Math.max(1, jelly.offsetWidth / 2);
       }
       const now = performance.now();
+      // 3D: 손가락이 닿은 몸 표면에 자국을 낸다 (키보드는 앞면 가운데)
+      const view = modeRef.current === '3d' ? viewRef.current : null;
+      const hit = view ? (source === 'pointer' ? view.hit(clientX, clientY) : view.frontHit()) : null;
+      if (hit) softRef.current = softTouch(softRef.current, hit);
       gestureRef.current = {
         source,
+        hit,
+        vx: 0,
+        vy: 0,
         pointerId,
         startX: clientX,
         startY: clientY,
@@ -382,6 +563,7 @@ function TouchPlay({ character }: { character: Character }) {
         pokeTimesRef.current = recent;
         const strength = Math.min(1, 0.45 + 0.18 * (recent.length - 1));
         physRef.current = poke(release(physRef.current), g.point, strength);
+        softRef.current = softPoke(softRelease(softRef.current), g.hit, strength);
         squish.poke(strength);
         vibrate(12, reducedRef.current);
         showFace(recent.length >= 3 ? 'wide' : 'happy', 700);
@@ -392,6 +574,13 @@ function TouchPlay({ character }: { character: Character }) {
           wobbleEnergy(physRef.current),
         );
         physRef.current = release(physRef.current);
+        // 튕기듯 놓으면(손가락이 아직 움직이는 중) 그 속도로 출렁인다
+        const flicking = g.source === 'pointer' && g.moved && now - g.lastT < 80;
+        const toBody = (BODY_UNIT / g.radius) * 1000; // px/ms → 몸 단위/s
+        softRef.current = softRelease(
+          softRef.current,
+          flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined,
+        );
         if (!silent) squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz() * 2);
         showFace('happy', 900);
       }
@@ -421,6 +610,9 @@ function TouchPlay({ character }: { character: Character }) {
 
     const dt = Math.max(1, now - g.lastT);
     const vx = (e.clientX - g.lastX) / dt; // px/ms
+    const vy = (e.clientY - g.lastY) / dt;
+    g.vx = g.vx * 0.4 + vx * 0.6;
+    g.vy = g.vy * 0.4 + vy * 0.6;
     // 1.5px/ms(빠른 문지르기) 이상이면 최대 속도
     const speed = Math.min(1, Math.hypot(e.clientX - g.lastX, e.clientY - g.lastY) / dt / 1.5);
     g.lastX = e.clientX;
@@ -429,6 +621,12 @@ function TouchPlay({ character }: { character: Character }) {
 
     if (!g.moved) return;
     physRef.current = drag(physRef.current, { x: dxTotal / g.radius, y: dyTotal / g.radius });
+    if (g.hit) {
+      softRef.current = softPull(softRef.current, {
+        x: (dxTotal / g.radius) * BODY_UNIT,
+        y: (-dyTotal / g.radius) * BODY_UNIT,
+      });
+    }
     g.stretch?.update(stretchAmount(physRef.current), speed);
 
     // 간질이기: 빠르게 좌우로 문지르면 방향이 자주 바뀐다
@@ -441,6 +639,7 @@ function TouchPlay({ character }: { character: Character }) {
         lastTickleRef.current = now;
         g.reversals = [];
         physRef.current = tickle(physRef.current, dir);
+        softRef.current = softTickle(softRef.current, dir);
         squish.giggle();
         showFace('happy', 900);
         spawnHeart();
@@ -486,6 +685,9 @@ function TouchPlay({ character }: { character: Character }) {
     const k = mag > 2 ? 2 / mag : 1;
     g.keyDisp = { x: nx * k, y: ny * k };
     physRef.current = drag(physRef.current, g.keyDisp);
+    if (g.hit) {
+      softRef.current = softPull(softRef.current, { x: g.keyDisp.x * BODY_UNIT, y: -g.keyDisp.y * BODY_UNIT });
+    }
     g.stretch?.update(Math.min(1, Math.hypot(g.keyDisp.x, g.keyDisp.y) / 1.5), 0.5);
     ensureLoop();
   };
@@ -500,9 +702,9 @@ function TouchPlay({ character }: { character: Character }) {
   };
 
   const shown = useMemo(() => {
-    const eyes: MalangEyes | undefined = face === 'default' ? undefined : face;
+    const eyes: MalangEyes | undefined = face === 'default' ? (blink ? 'sleepy' : undefined) : face;
     return eyes ? { ...character, eyes } : character;
-  }, [character, face]);
+  }, [character, face, blink]);
 
   return (
     <>
@@ -531,6 +733,7 @@ function TouchPlay({ character }: { character: Character }) {
           ref={stageRef}
           type="button"
           className="touch__stage"
+          data-mode={mode}
           aria-label={`${character.name} 만지기. 스페이스로 꾹 누르고, 화살표로 당겨요.`}
           aria-describedby="touch-hint"
           onPointerDown={onPointerDown}
@@ -554,6 +757,8 @@ function TouchPlay({ character }: { character: Character }) {
               shiny={shiny}
             />
           </span>
+          {/* 3D 젤리 캔버스 (준비되면 2D 말랑이 대신 보인다). 늘어날 자리를 위해 무대 위로 넉넉하게 */}
+          {mode !== '2d' && <span ref={glRef} className="touch3d" aria-hidden="true" />}
           <span className="touch__hearts" aria-hidden="true">
             {hearts.map((h) => (
               <HeartShape
@@ -571,6 +776,23 @@ function TouchPlay({ character }: { character: Character }) {
           </p>
         )}
       </div>
+
+      {/* 3D 텍스처로 구울 원본 그림 (화면 밖). 실제 <Malang> 을 그대로 쓰므로 모든 말랑이가 똑같이 보인다 */}
+      {mode !== '2d' && (
+        <div ref={srcRef} className="touch3d-src" aria-hidden="true">
+          {JELLY_FACES.map((f) => (
+            <span key={f} data-face={f}>
+              <Malang
+                character={f === 'default' ? character : { ...character, eyes: f }}
+                size={148}
+                animation="none"
+                decorative
+                shiny={shiny}
+              />
+            </span>
+          ))}
+        </div>
+      )}
 
       <p id="touch-hint" className="touch__hint">
         꾹 누르고, 쭉 당기고, 콕 찔러 보세요.
