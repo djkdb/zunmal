@@ -1,62 +1,85 @@
-/* 카페24 써라운드: 동글동글 두꺼운 획이 말랑이와 어울리는 게임용 글꼴 (무료 폰트, 눈누 CDN) */
-@font-face {
-  font-family: 'Cafe24 Ssurround';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
+/* 글꼴은 npm 패키지로 번들한다(main.tsx에서 import) — 해시 이름 파일이라 서비스 워커가 캐시 우선으로 보관한다.
+ *  - 제목: 고운돋움 Gowun Dodum (@fontsource/gowun-dodum, 한글은 유니코드 범위별 조각으로 필요한 것만 받는다)
+ *  - 본문: Pretendard Variable (pretendard 패키지의 dynamic-subset) */
 
 /* ------------------------------------------------------------------
- * 말랑 뽑기방 디자인 토큰 — "젤리 과자 가게"
- * 재질: 반투명하고 광택 있는 젤리. 누르면 찌그러진다.
+ * 말랑 뽑기방 디자인 토큰 — "스카이 소다" (시안 G)
+ * 맑은 하늘색 그라데이션 바탕 + 흰 카드 + 딸기우유 포인트.
+ * 굵은 잉크 테두리 없이 부드러운 그림자로 층을 나눈다. 말랑이 그림(잉크 외곽선)만 캐릭터 쪽에 남는다.
  * ------------------------------------------------------------------ */
 :root {
-  /* 바탕 */
-  --cream: #fff4e0; /* 우유푸딩 */
-  --cream-deep: #ffe6bf;
-  --paper: #fffcf5;
-  --ink: #2b2233; /* 보랏빛 잉크 외곽선 */
-  --ink-soft: #7a6b80;
+  /* ── 바탕 ── */
+  --sky-top: #cfe6ff; /* 화면 맨 위 */
+  --sky-mid: #eaf4ff; /* 60% 지점 */
+  --sky-bottom: #ffffff;
+  --bg-gradient: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 60%, var(--sky-bottom) 100%);
 
-  /* 젤리 색 */
-  --berry: #ff7aa2; /* 딸기 */
-  --berry-deep: #e8527f;
-  --soda: #5cc8ff; /* 소다 */
-  --lemon: #ffd23f; /* 레몬 */
-  --matcha: #7ed957; /* 메론 */
-  --grape: #b98cff; /* 포도 */
-  --peach: #ffa36b; /* 복숭아 */
-  --shelf: #e9c99a;
-  --danger: #ff5b5b;
+  /* ── 글자 ── */
+  --ink: #22304a; /* 본문·제목 (흰 바탕 13:1) */
+  --sub: #56657f; /* 보조 글자 (흰 바탕 5.9:1, 하늘 맨 위 4.6:1 — AA) */
+  --link: #2f6dbf; /* 링크·작은 강조 글자 (흰 바탕 5.2:1) */
 
-  /* 이전 이름 호환 */
-  --pink: var(--berry);
-  --pink-deep: var(--berry-deep);
-  --mint: var(--matcha);
-  --sky: var(--soda);
-  --lavender: var(--grape);
+  /* ── 포인트 색 ── */
+  --primary: #ff9fb8; /* 딸기우유: 주 행동 버튼 채움(글자는 --ink) */
+  --primary-deep: #f27a9a; /* 눌림·활성 테두리·진행 강조 */
+  --primary-tint: #ffe3ec; /* 옅은 딸기우유 바탕 */
+  --primary-text: #b8456f; /* 흰 바탕 위 딸기우유 글자 (5.1:1) */
+  --lemon: #ffd66b; /* 레몬: 작은 칩·보상 */
+  --lemon-tint: #fff4cc;
+  --sky: #8fc3ff; /* 소다: 진행 막대·보조 채움 */
+  --sky-tint: #dcebff;
+  --mint: #9fe0b8; /* 성공·완료 */
+  --mint-deep: #4fb57d;
+  --grape: #c9b6ff;
+  --peach: #ffc2a0;
+  --danger: #f0506e;
+  --gold: #f2c14e; /* 천장 막대·코인 */
 
-  --rarity-common: #cfc5b6;
-  --rarity-rare: #5cc8ff;
-  --rarity-epic: #b98cff;
-  --rarity-legendary: #ffc02e;
-  --rarity-mythic: #ff7aa2;
-  --rarity-secret: #2d1b5e;
+  /* ── 면 ── */
+  --surface: #ffffff; /* 카드·패널·보조 버튼 */
+  --surface-2: #f3f8fe; /* 카드 안의 칸, 비활성 버튼, 진행 막대 바탕 */
+  --border: #e3edf8; /* 필요한 곳의 가는 선(1px) */
+  --scrim: rgba(24, 38, 66, 0.45); /* 모달 뒤 */
 
-  --line: 3px;
-  --radius-panel: 26px;
-  --radius-slot: 18px;
+  /* ── 모서리 ── */
+  --radius-card: 22px;
+  --radius-btn: 18px;
   --radius-s: 12px;
-  --radius-m: var(--radius-slot);
-  --radius-l: var(--radius-panel);
-  --keycap: 0 5px 0 var(--ink);
-  --keycap-s: 0 3px 0 var(--ink);
-  --shadow-pop: var(--keycap);
-  --shadow-pop-s: var(--keycap-s);
+  --radius-pill: 999px;
 
-  --font-display: 'Cafe24 Ssurround', 'Jua', 'Apple SD Gothic Neo', system-ui, sans-serif;
-  --font-body: var(--font-display);
+  /* ── 그림자 (파란 기운의 부드러운 그림자만. 잉크색 아랫단 금지) ── */
+  --shadow-card: 0 4px 14px rgba(26, 64, 128, 0.08);
+  --shadow-btn: 0 6px 14px rgba(26, 64, 128, 0.16);
+  --shadow-btn-press: 0 2px 5px rgba(26, 64, 128, 0.16);
+  --shadow-float: 0 18px 44px rgba(26, 64, 128, 0.22); /* 모달·말풍선 메뉴 */
+  --shadow-up: 0 -6px 20px rgba(26, 64, 128, 0.08); /* 하단 탭 바 */
+
+  /* ── 희귀도: 대표 색(채움·빛) / 옅은 바탕(배지) / 글자 색(배지 글자, 옅은 바탕 위 AA) ── */
+  --rarity-common: #c3cddb;
+  --rarity-rare: #7db8ff;
+  --rarity-epic: #b592ff;
+  --rarity-legendary: #ffc53d;
+  --rarity-mythic: #ff8fb5;
+  --rarity-secret: #2d1b5e;
+  --rarity-common-tint: #eef2f7;
+  --rarity-rare-tint: #dcebff;
+  --rarity-epic-tint: #eee6ff;
+  --rarity-legendary-tint: #fff0c2;
+  --rarity-mythic-tint: #ffe3ec;
+  --rarity-common-ink: #56657f;
+  --rarity-rare-ink: #2a64b0;
+  --rarity-epic-ink: #6d42c9;
+  --rarity-legendary-ink: #8a5b00;
+  --rarity-mythic-ink: #a83d68;
+
+  /* ── 글꼴 ── */
+  --font-display: 'Gowun Dodum', 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  --font-body: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
+    system-ui, sans-serif;
+  /* 버튼·칩·숫자 같은 UI 글자 = 본문 글꼴의 굵은 두께 */
+  --font-ui: var(--font-body);
+  --fw-ui: 700;
+  --tracking-title: -0.02em;
 
   /* 타입 스케일 (1.25) */
   --fs-xs: 0.8125rem;
@@ -66,7 +89,7 @@
   --fs-xl: 1.9375rem;
   --fs-xxl: 2.4375rem;
 
-  /* 젤리 눌림 모션: 누르면 짧게 찌그러지고(70ms), 떼면 스프링으로 튀어 오른다(300ms, 약 15% 오버슈트) */
+  /* 눌림 모션: 누르면 짧게 줄어들고 그림자가 눌리며(70ms), 떼면 스프링으로 돌아온다(300ms) */
   --press-in: 70ms;
   --press-out: 300ms;
   --ease-press: cubic-bezier(0.3, 0, 0.5, 1);
@@ -74,14 +97,37 @@
   /* 화면 전환: 들어오는 쪽 감속 (M3 emphasized) */
   --ease-enter: cubic-bezier(0.2, 0, 0, 1);
 
-  --nav-h: 84px;
+  --nav-h: 76px;
   --max-w: 480px;
   --gutter: 16px;
+
+  /* ── 이전 이름 호환 (놀이방·미니게임 내부 그림이 아직 쓴다. 새 코드에서는 위 이름을 쓴다) ── */
+  --cream: var(--sky-mid);
+  --cream-deep: var(--sky-tint);
+  --paper: var(--surface);
+  --ink-soft: var(--sub);
+  --berry: var(--primary);
+  --berry-deep: var(--primary-deep);
+  --soda: var(--sky);
+  --matcha: var(--mint);
+  --shelf: #d7e6f7;
+  --pink: var(--primary);
+  --pink-deep: var(--primary-deep);
+  --lavender: var(--grape);
+  --line: 1.5px; /* (옛 테두리 두께) */
+  --radius-panel: var(--radius-card);
+  --radius-slot: var(--radius-btn);
+  --radius-m: var(--radius-btn);
+  --radius-l: var(--radius-card);
+  --keycap: var(--shadow-btn);
+  --keycap-s: var(--shadow-btn-press);
+  --shadow-pop: var(--shadow-btn);
+  --shadow-pop-s: var(--shadow-btn-press);
 
   color-scheme: light;
 }
 
-/* 감쇠 스프링(감쇠비 0.52)을 굽은 곡선 — 젤리가 한 번 튕기고 멈춘다 */
+/* 감쇠 스프링(감쇠비 0.52)을 굽은 곡선 — 한 번 튕기고 멈춘다 */
 @supports (transition-timing-function: linear(0, 1)) {
   :root {
     --ease-jelly: linear(
@@ -103,11 +149,16 @@ body {
   padding: 0;
 }
 
+html {
+  /* 캔버스 바탕(당겨서 넘칠 때·그라데이션 전 한 프레임). body에는 배경을 두지 않는다 —
+     두면 아래 z-index:-1 하늘·방울 층을 덮는다 */
+  background: var(--sky-top);
+  /* 두 번 탭 확대 방지 (연타 미니게임에서 화면이 커지지 않게) */
+  touch-action: manipulation;
+}
+
 body {
-  /* 스프링클(설탕 가루) 무늬 — 과자 가게 바닥 */
-  background-color: var(--cream);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg stroke-linecap='round' stroke-width='5' opacity='0.35'%3E%3Cpath d='M14 20l8 5' stroke='%23ff7aa2'/%3E%3Cpath d='M70 12l-3 9' stroke='%235cc8ff'/%3E%3Cpath d='M100 46l8-3' stroke='%23ffd23f'/%3E%3Cpath d='M40 60l3 8' stroke='%237ed957'/%3E%3Cpath d='M86 90l-8 5' stroke='%23b98cff'/%3E%3Cpath d='M20 98l8 2' stroke='%23ffa36b'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 120px 120px;
+  position: relative;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -125,6 +176,45 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* 하늘 바탕 + 비눗방울: 화면에 고정된 한 장(스크롤해도 다시 그리지 않음). iOS가 무시하는
+   background-attachment: fixed 대신 고정 위치 가상 요소를 쓴다. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  background: var(--bg-gradient);
+}
+
+/* 비눗방울 몇 개: 흰 45% 채움 + 1.5px 흰 테두리. 원 하나 = 그라데이션 하나 (그림 파일·JS 없음) */
+body::after {
+  --b-fill: rgba(255, 255, 255, 0.45);
+  --b-edge: rgba(255, 255, 255, 0.95);
+  background:
+    radial-gradient(circle at calc(100% - 44px) 96px, var(--b-fill) 0 15px, var(--b-edge) 15.5px 17px, transparent 17.5px),
+    radial-gradient(circle at calc(100% - 22px) 250px, var(--b-fill) 0 26px, var(--b-edge) 26.5px 28px, transparent 28.5px),
+    radial-gradient(circle at 16px 330px, var(--b-fill) 0 16px, var(--b-edge) 16.5px 18px, transparent 18.5px),
+    radial-gradient(circle at calc(100% - 30px) 430px, var(--b-fill) 0 10px, var(--b-edge) 10.5px 12px, transparent 12.5px),
+    radial-gradient(circle at 26px 640px, var(--b-fill) 0 20px, var(--b-edge) 20.5px 22px, transparent 22.5px);
+  background-repeat: no-repeat;
+  /* 넓은 화면에서는 앱 폭 안쪽에 둔다 */
+  left: max(0px, calc(50% - var(--max-w) / 2));
+  right: max(0px, calc(50% - var(--max-w) / 2));
+  /* 아주 느리게 떠오르기 (transform만 — 다시 그리지 않고 합성만) */
+  animation: bubbles-float 12s ease-in-out infinite alternate;
+}
+
+@keyframes bubbles-float {
+  to {
+    transform: translateY(-10px);
+  }
+}
+
 input,
 textarea,
 [contenteditable='true'],
@@ -140,19 +230,15 @@ svg {
   -webkit-user-drag: none;
 }
 
-/* 두 번 탭 확대 방지 (연타 미니게임에서 화면이 커지지 않게) */
-html {
-  touch-action: manipulation;
-}
-
 h1,
 h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: normal;
+  font-weight: 400;
   margin: 0;
   line-height: 1.25;
+  letter-spacing: var(--tracking-title);
   text-wrap: balance;
 }
 
@@ -161,17 +247,18 @@ p {
   text-wrap: pretty;
 }
 
-button {
+button,
+input {
   font: inherit;
   color: inherit;
 }
 
 strong {
-  font-weight: normal;
+  font-weight: 700;
 }
 
 :focus-visible {
-  outline: 3px dashed var(--berry-deep);
+  outline: 3px solid var(--link);
   outline-offset: 3px;
 }
 
@@ -197,7 +284,7 @@ strong {
 
 .app-main {
   flex: 1;
-  padding: 0 var(--gutter) calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));
+  padding: 0 var(--gutter) calc(var(--nav-h) + 20px + env(safe-area-inset-bottom));
 }
 
 .app-main--game {
@@ -211,52 +298,63 @@ strong {
 .page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-top: 8px;
+  gap: 16px;
+  padding-top: 4px;
 }
 
-/* 풍선 글씨 제목: 흰 글자 + 잉크 외곽선 + 아래로 떨어지는 그림자 */
+/* 화면 제목: 고운돋움, 잉크색, 외곽선·그림자 없음 */
 .page-title {
   align-self: center;
   text-align: center;
-  font-size: var(--fs-xl);
-  line-height: 1.15;
-  color: var(--paper);
-  -webkit-text-stroke: 8px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 5px 0 var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: var(--tracking-title);
+  color: var(--ink);
   text-wrap: balance;
 }
 
 .page-subtitle {
   text-align: center;
-  color: var(--ink-soft);
-  font-size: var(--fs-s);
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
+
+/* 영문 작은 머리글 — 시안에 있는 곳(홈 간판)에만 쓴다 */
+.eyebrow {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  letter-spacing: 0.28em;
+  color: var(--link);
+  text-transform: uppercase;
 }
 
 .section-title {
-  font-size: var(--fs-m);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
   text-align: center;
 }
 
 /* ------------------------------------------------------------------
- * 하단 탭 바: 떠 있는 젤리 바, 선택된 탭은 위로 솟은 젤리 방울
+ * 하단 탭 바: 흰 바, 위 모서리 22, 위로 퍼지는 옅은 그림자. 선택된 탭은 딸기우유 칸.
  * ------------------------------------------------------------------ */
 .bottom-nav {
   position: fixed;
   z-index: 20;
   left: 50%;
-  bottom: calc(8px + env(safe-area-inset-bottom));
+  bottom: 0;
   transform: translateX(-50%);
-  width: calc(100% - 16px);
-  max-width: calc(var(--max-w) - 16px);
+  width: 100%;
+  max-width: var(--max-w);
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 6px;
-  background: var(--paper);
-  border: var(--line) solid var(--ink);
-  border-radius: 28px;
-  box-shadow: 0 5px 0 var(--ink);
+  padding: 8px 6px calc(6px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--shadow-up);
 }
 
 .bottom-nav__item {
@@ -264,142 +362,121 @@ strong {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  min-height: 58px;
-  border-radius: 22px;
-  color: var(--ink-soft);
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  border-radius: 16px;
+  color: var(--sub);
   text-decoration: none;
-  font-family: var(--font-display);
-  font-size: var(--fs-xs);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 500;
 }
 
 .bottom-nav__icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 38px;
-  border-radius: 999px;
+  width: 44px;
+  height: 32px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--sub);
   transition:
     transform var(--press-out) var(--ease-jelly),
-    background 0.15s ease;
+    background-color 0.15s ease;
 }
 
 .bottom-nav__item.is-active {
   color: var(--ink);
+  font-weight: 700;
 }
 
 .bottom-nav__item.is-active .bottom-nav__icon {
-  width: 52px;
-  height: 52px;
-  margin-top: -20px;
-  background: linear-gradient(180deg, #fff3a8 0%, var(--lemon) 60%);
-  box-shadow:
-    inset 0 -4px 0 rgba(0, 0, 0, 0.12),
-    0 0 0 3px var(--ink),
-    0 5px 0 3px var(--ink);
-  transform: translateY(-2px);
+  background: var(--primary);
+  color: var(--ink);
 }
 
 .bottom-nav__item:active .bottom-nav__icon {
-  transform: scale(0.94, 0.84);
+  transform: scale(0.9);
   transition-duration: var(--press-in);
   transition-timing-function: var(--ease-press);
 }
 
-.bottom-nav__item.is-active:active .bottom-nav__icon {
-  transform: translateY(1px) scale(0.96, 0.86);
+/* 받을 보상이 있을 때 탭 아이콘 위 빨간 점 */
+.bottom-nav__dot {
+  position: absolute;
+  top: -3px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--danger);
+  animation: dot-pop 1.4s ease-in-out infinite;
+}
+
+@keyframes dot-pop {
+  50% {
+    transform: scale(1.25);
+  }
 }
 
 /* ------------------------------------------------------------------
- * 젤리 버튼: 광택 하이라이트 + 같은 색 계열의 두꺼운 아랫단 + 눌리면 찌그러짐
+ * 버튼: 흰(보조) / 딸기우유(주) 채움, 모서리 18, 부드러운 그림자.
+ * 누르면 살짝 줄고 내려앉으며 그림자가 눌린다 → 떼면 스프링으로 돌아온다.
  * ------------------------------------------------------------------ */
 .btn {
-  --c: var(--paper);
+  --c: var(--surface);
   --fg: var(--ink);
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 54px;
-  padding: 10px 22px 13px;
-  border: var(--line) solid var(--ink);
-  border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 55%, #fff) 0%, var(--c) 55%);
-  box-shadow:
-    inset 0 -6px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
-    var(--keycap);
-  font-family: var(--font-display);
-  font-size: 1.125rem;
+  min-height: 52px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background-color: var(--c);
+  /* 위쪽이 아주 살짝 밝은 광 — 평평하지 않게 */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%);
+  box-shadow: var(--shadow-btn);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--fg);
   cursor: pointer;
   text-decoration: none;
-  /* 뗄 때: 스프링으로 튀어 오름. 누를 때는 :active 쪽 전환(70ms)이 쓰인다 */
+  /* 뗄 때: 스프링. 누를 때는 :active 쪽 전환(70ms)이 쓰인다 */
   transition:
     transform var(--press-out) var(--ease-jelly),
-    box-shadow 0.14s var(--ease-press);
+    box-shadow 0.16s var(--ease-press),
+    background-color 0.15s ease;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
-  isolation: isolate;
-}
-
-/* 광택: 글자 뒤, 버튼 배경 위 */
-.btn::before {
-  z-index: -1;
-  content: '';
-  position: absolute;
-  top: 5px;
-  left: 16%;
-  right: 16%;
-  height: 28%;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-  pointer-events: none;
 }
 
 .btn:active:not(:disabled) {
-  /* 젤리 찌그러짐: 전체 약 0.94배, 가로보다 세로가 더 눌린다 + 아랫단이 납작해진다 */
-  transform: translateY(4px) scale(0.97, 0.91);
+  transform: translateY(2px) scale(0.97);
   transition-duration: var(--press-in);
   transition-timing-function: var(--ease-press);
-  box-shadow:
-    inset 0 -3px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
-    0 1px 0 var(--ink);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  --c: #e9dfd0;
-  --fg: var(--ink-soft);
-  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.06);
-  transform: translateY(4px);
-  -webkit-text-stroke: 0;
-}
-
-.btn:disabled::before {
-  opacity: 0.4;
-}
-
-
-/* 진한 젤리 버튼은 흰 글씨 + 잉크 외곽선 (게임 버튼 글씨) */
-.btn--primary,
-.btn--sky,
-.btn--mint,
-.btn--grape {
-  --fg: #fff;
-  -webkit-text-stroke: 5px var(--ink);
-  paint-order: stroke fill;
+  box-shadow: var(--shadow-btn-press);
 }
 
 .btn--primary {
-  --c: var(--berry);
+  --c: var(--primary);
+}
+
+.btn--secondary {
+  --c: var(--surface);
 }
 
 .btn--mint {
-  --c: var(--matcha);
+  --c: var(--mint);
 }
 
 .btn--lemon {
@@ -407,38 +484,35 @@ strong {
 }
 
 .btn--sky {
-  --c: var(--soda);
+  --c: var(--sky);
 }
 
 .btn--grape {
   --c: var(--grape);
 }
 
+/* 비활성: 색 버튼 규칙보다 뒤·더 구체적으로 */
+.btn.btn:disabled {
+  --c: var(--surface-2);
+  --fg: var(--sub);
+  cursor: not-allowed;
+  background-image: none;
+  /* 하늘 바탕 위에서도 모양이 보이도록 가는 테두리만 남긴다 */
+  box-shadow: inset 0 0 0 1.5px var(--border);
+  color: var(--sub);
+}
+
 .btn--small {
   min-height: 44px;
-  padding: 6px 16px 9px;
+  padding: 6px 16px;
+  border-radius: 14px;
   font-size: var(--fs-s);
-  box-shadow:
-    inset 0 -4px 0 color-mix(in srgb, var(--c) 72%, #3a1f2f),
-    var(--keycap-s);
-}
-
-.btn--primary.btn--small,
-.btn--sky.btn--small,
-.btn--mint.btn--small,
-.btn--grape.btn--small {
-  -webkit-text-stroke-width: 4px;
-}
-
-/* 비활성 버튼은 색 버튼 규칙(흰 글씨 + 외곽선)보다 뒤·더 구체적으로 — 외곽선이 회색 글씨를 뭉개지 않게 */
-.btn.btn:disabled {
-  -webkit-text-stroke: 0;
-  color: var(--ink-soft);
+  box-shadow: 0 4px 10px rgba(26, 64, 128, 0.12);
 }
 
 .btn--big {
-  min-height: 66px;
-  font-size: var(--fs-l);
+  min-height: 58px;
+  font-size: 1.1875rem;
 }
 
 .btn--block {
@@ -449,6 +523,7 @@ strong {
   flex-shrink: 0;
 }
 
+/* 동그란 아이콘 버튼 (소리, 닫기) */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -456,12 +531,11 @@ strong {
   width: 44px;
   height: 44px;
   padding: 0;
-  border: var(--line) solid var(--ink);
+  border: 0;
   border-radius: 50%;
-  background: linear-gradient(180deg, #fff 0%, var(--paper) 60%);
-  box-shadow:
-    inset 0 -4px 0 rgba(43, 34, 51, 0.1),
-    var(--keycap-s);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   touch-action: manipulation;
   transition:
@@ -470,22 +544,21 @@ strong {
 }
 
 .icon-btn:active {
-  transform: translateY(3px) scale(0.97, 0.88);
+  transform: scale(0.92);
   transition-duration: var(--press-in);
   transition-timing-function: var(--ease-press);
-  box-shadow: none;
+  box-shadow: var(--shadow-btn-press);
 }
 
 .icon-btn[aria-pressed='true'] {
-  background: var(--cream-deep);
+  background: var(--sky-tint);
 }
 
-/* 패널: 푸딩 접시 — 아래쪽에 살짝 그늘 */
+/* 패널: 흰 카드, 테두리 없음, 부드러운 그림자 */
 .card {
-  background: var(--paper);
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-panel);
-  box-shadow: inset 0 -6px 0 rgba(43, 34, 51, 0.06);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   padding: 16px;
 }
 
@@ -493,17 +566,26 @@ strong {
   padding: 12px;
 }
 
+/* 작은 칩: 흰 알약 (보조 정보). 강조할 때는 .chip--lemon */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 10px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
-  font-family: var(--font-display);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 600;
   font-size: var(--fs-xs);
   white-space: nowrap;
+}
+
+.chip--lemon {
+  background: var(--lemon);
+  box-shadow: none;
+  font-weight: 700;
 }
 
 .row {
@@ -527,7 +609,7 @@ strong {
 }
 
 .muted {
-  color: var(--ink-soft);
+  color: var(--sub);
 }
 
 .small {
@@ -535,63 +617,68 @@ strong {
 }
 
 /* ------------------------------------------------------------------
- * 희귀도 배지 (색 + 기호 + 텍스트)
+ * 희귀도 배지 (색 + 기호 + 텍스트): 옅은 등급색 바탕 + 진한 등급색 글자·기호
  * ------------------------------------------------------------------ */
 .rarity-badge {
+  --rb-bg: var(--rarity-common-tint);
+  --rb-fg: var(--rarity-common-ink);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 10px 1px;
-  border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  font-family: var(--font-display);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-weight: 700;
   font-size: var(--fs-xs);
   line-height: 1.5;
+  letter-spacing: 0;
   white-space: nowrap;
-  background: var(--rarity-common);
-  color: var(--ink);
+  background: var(--rb-bg);
+  color: var(--rb-fg);
 }
 
 .rarity-badge--compact {
-  padding: 0 7px;
+  padding: 0 8px;
   font-size: 0.75rem;
 }
 
 .rarity-badge__stars {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   letter-spacing: -1px;
 }
 
 .rarity-badge--rare {
-  background: var(--rarity-rare);
+  --rb-bg: var(--rarity-rare-tint);
+  --rb-fg: var(--rarity-rare-ink);
 }
 
 .rarity-badge--epic {
-  background: var(--rarity-epic);
+  --rb-bg: var(--rarity-epic-tint);
+  --rb-fg: var(--rarity-epic-ink);
 }
 
 .rarity-badge--legendary {
-  background: var(--rarity-legendary);
+  --rb-bg: var(--rarity-legendary-tint);
+  --rb-fg: var(--rarity-legendary-ink);
 }
 
 .rarity-badge--mythic {
-  background: linear-gradient(90deg, #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff);
+  --rb-fg: var(--rarity-mythic-ink);
+  background: linear-gradient(90deg, #ffe3ec, #fff2cc, #e2f7df, #def0ff, #efe6ff);
 }
 
-/* 시크릿: 밤하늘 바탕 + 무지개 반짝 테두리 + 흰 글씨 */
+/* 시크릿: 밤하늘 바탕 + 금빛 테두리 + 흰 글씨 */
 .rarity-badge--secret {
+  --rb-fg: #fff;
   background:
     radial-gradient(circle at 20% 40%, #fff 0 1px, transparent 1.5px),
     radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 1.5px),
     linear-gradient(135deg, #1b1040, #4b2a8f 60%, #1b1040);
-  color: #fff;
-  border-color: var(--ink);
-  box-shadow: 0 0 0 2px #ffe07a;
+  box-shadow: inset 0 0 0 1.5px #ffe07a;
 }
 
-.rarity-badge--secret svg path,
-.rarity-badge--secret svg circle {
-  fill: #ffe07a;
+.rarity-badge--secret svg {
+  color: #ffe07a;
 }
 
 /* ------------------------------------------------------------------
@@ -605,9 +692,10 @@ strong {
   padding: 8px 14px;
   border: none;
   background: var(--ink);
-  color: var(--cream);
+  color: #fff;
   border-radius: var(--radius-s);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -622,22 +710,22 @@ strong {
   width: min(440px, calc(100vw - 24px));
   max-height: calc(100dvh - 32px);
   padding: 0;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-panel);
-  background: var(--paper);
+  border: 0;
+  border-radius: 24px;
+  background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 6px 0 var(--ink);
+  box-shadow: var(--shadow-float);
   overflow: hidden;
 }
 
 .modal[open] {
   display: flex;
   flex-direction: column;
-  animation: modal-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
+  animation: modal-in 0.32s var(--ease-jelly);
 }
 
 .modal::backdrop {
-  background: rgba(43, 34, 51, 0.55);
+  background: var(--scrim);
 }
 
 .modal__body {
@@ -648,7 +736,7 @@ strong {
 
 @keyframes modal-in {
   from {
-    transform: scale(0.8);
+    transform: translateY(12px) scale(0.94);
     opacity: 0;
   }
 }
@@ -665,28 +753,9 @@ strong {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
 
-.bottom-nav__icon {
-  position: relative;
-}
-
-/* 받을 보상이 있을 때 탭 아이콘 위 빨간 점 */
-.bottom-nav__dot {
-  position: absolute;
-  top: 0;
-  right: 4px;
-  width: 12px;
-  height: 12px;
-  border: 2.5px solid var(--ink);
-  border-radius: 50%;
-  background: var(--danger);
-  animation: dot-pop 1.4s ease-in-out infinite;
-}
-
-@keyframes dot-pop {
-  50% {
-    transform: scale(1.25);
+  body::after {
+    animation: none;
   }
 }
 
@@ -694,6 +763,6 @@ strong {
 .page-loading {
   margin: 40vh 0 0;
   text-align: center;
-  color: var(--ink-soft);
+  color: var(--sub);
   font-size: var(--fs-s);
 }

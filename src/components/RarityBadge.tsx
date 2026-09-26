@@ -2,7 +2,7 @@ import { RARITY_META, type Rarity } from '../data/rarity';
 
 /** 희귀도별 모양 기호 (색만으로 구분하지 않도록). 글꼴에 없는 문자 대신 SVG로 그린다. */
 function RarityShape({ rarity }: { rarity: Rarity }) {
-  const common = { fill: '#2b2233' };
+  const common = { fill: 'currentColor' };
   switch (rarity) {
     case 'common':
       return <circle cx="6" cy="6" r="3.6" {...common} />;

@@ -27,7 +27,7 @@ export function BottomNav() {
       {NAV_ITEMS.map(({ to, label, Icon, end }) => (
         <NavLink key={to} to={to} end={end} className={({ isActive }) => `bottom-nav__item${isActive ? ' is-active' : ''}`}>
           <span className="bottom-nav__icon">
-            <Icon size={26} />
+            <Icon size={22} />
             {to === '/' && missionAlert && <span className="bottom-nav__dot" />}
           </span>
           <span>

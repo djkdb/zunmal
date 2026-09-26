@@ -2,10 +2,10 @@
  * 말랑 뽑기방 서비스 워커 — 홈 화면 앱이 오프라인에서도 열리도록 한다.
  *  - 페이지(index.html): 네트워크 우선, 실패하면 캐시 (새 버전이 바로 반영되도록)
  *  - 빌드 파일(assets/…, 해시 이름): 캐시 우선 (이름이 바뀌면 새 파일)
- *  - 글꼴(jsdelivr): 캐시 우선
+ *  - 글꼴: 번들에 포함된 해시 이름 파일(assets/…)이라 빌드 파일과 같이 캐시 우선
  * 구조를 바꾸면 VERSION을 올린다. 이전 버전 캐시는 activate 때 지운다.
  */
-const VERSION = 'v1';
+const VERSION = 'v2'; // v2: 외부 글꼴(jsdelivr) 대신 번들 글꼴
 const CACHE = `malang-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
@@ -46,8 +46,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   const sameOrigin = url.origin === self.location.origin;
-  const isFont = url.hostname === 'cdn.jsdelivr.net';
-  if (!sameOrigin && !isFont) return;
+  if (!sameOrigin) return;
 
   event.respondWith(
     caches.match(req).then(

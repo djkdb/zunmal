@@ -24,7 +24,7 @@ export function TopBar() {
       <div className="hud__wallet">
         <div ref={pillRef} className={`hud__pill${coinCounter.short ? ' is-short' : ''}`}>
           <span className="hud__icon" aria-hidden="true">
-            <CoinIcon size={40} />
+            <CoinIcon size={24} />
           </span>
           <span className="hud__value" aria-hidden="true">
             {coinCounter.display.toLocaleString()}

@@ -3,7 +3,7 @@
   flex: none;
 }
 
-/* 말풍선: 소리 버튼에서 내려온 평평한 외곽선 패널 (눌리는 건 안의 스위치뿐) */
+/* 말풍선: 소리 버튼에서 내려온 흰 카드 (눌리는 건 안의 스위치뿐) */
 .sound__panel {
   position: absolute;
   top: calc(100% + 12px);
@@ -11,30 +11,29 @@
   z-index: 30;
   width: min(248px, calc(100vw - 32px));
   padding: 12px 10px 10px;
-  border: var(--line) solid var(--ink);
-  border-radius: var(--radius-slot);
-  background: var(--paper);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
 }
 
 /* 버튼을 가리키는 꼬리 */
 .sound__panel::before {
   content: '';
   position: absolute;
-  top: -10px;
-  right: 18px;
-  width: 16px;
-  height: 16px;
-  border-top: var(--line) solid var(--ink);
-  border-left: var(--line) solid var(--ink);
-  border-radius: 4px 0 0 0;
-  background: var(--paper);
+  top: -6px;
+  right: 20px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px 0 0 0;
+  background: var(--surface);
   transform: rotate(45deg);
 }
 
 .sound__title {
-  margin: 0 6px 6px;
+  margin: 0 6px 4px;
   font-family: var(--font-display);
-  font-size: var(--fs-m);
+  font-size: 1.125rem;
+  letter-spacing: var(--tracking-title);
 }
 
 .sound__row {
@@ -50,23 +49,25 @@
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-s);
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
 
 .sound__row + .sound__row {
-  border-top: 2px dashed rgba(43, 34, 51, 0.18);
+  border-top: 1px solid var(--border);
   border-radius: 0 0 var(--radius-s) var(--radius-s);
 }
 
 .sound__row:focus-visible {
-  outline: 3px solid var(--soda);
+  outline: 3px solid var(--link);
   outline-offset: 1px;
 }
 
 .sound__icon {
   display: grid;
   flex: none;
+  color: var(--sub);
 }
 
 .sound__label {
@@ -75,41 +76,39 @@
 
 .sound__state {
   font-size: var(--fs-xs);
-  color: var(--ink-soft);
+  font-weight: 500;
+  color: var(--sub);
 }
 
-/* 젤리 스위치: 켜지면 메론색으로 차오르고 손잡이가 오른쪽으로 */
+/* 스위치: 켜지면 딸기우유로 차오르고 손잡이가 오른쪽으로 */
 .sound__switch {
   position: relative;
   flex: none;
-  width: 48px;
+  width: 46px;
   height: 28px;
-  border: var(--line) solid var(--ink);
-  border-radius: 999px;
-  background: #e9dfd0;
-  box-shadow: inset 0 3px 0 rgba(43, 34, 51, 0.12);
+  border-radius: var(--radius-pill);
+  background: #dbe5f1;
   transition: background-color 0.15s;
 }
 
 .sound__knob {
   position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--ink);
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 0 var(--ink);
-  transition: transform 0.18s cubic-bezier(0.3, 1.6, 0.5, 1);
+  box-shadow: 0 2px 5px rgba(26, 64, 128, 0.25);
+  transition: transform 0.2s var(--ease-jelly);
 }
 
 .sound__row[aria-pressed='true'] .sound__switch {
-  background: var(--matcha);
+  background: var(--primary);
 }
 
 .sound__row[aria-pressed='true'] .sound__knob {
-  transform: translateX(20px);
+  transform: translateX(18px);
 }
 
 .sound__row[aria-pressed='true'] .sound__state {
@@ -117,18 +116,18 @@
 }
 
 .sound__row:active .sound__knob {
-  transform: scale(1.15, 0.85);
+  transform: scale(1.12, 0.9);
 }
 
 .sound__row[aria-pressed='true']:active .sound__knob {
-  transform: translateX(20px) scale(1.15, 0.85);
+  transform: translateX(18px) scale(1.12, 0.9);
 }
 
 .sound__hint {
   margin: 6px 6px 0;
   font-size: var(--fs-xs);
-  line-height: 1.4;
-  color: var(--ink-soft);
+  line-height: 1.45;
+  color: var(--sub);
   word-break: keep-all;
 }
 
