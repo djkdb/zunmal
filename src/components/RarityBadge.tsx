@@ -49,7 +49,8 @@ export function RarityBadge({ rarity, compact = false }: { rarity: Rarity; compa
       </svg>
       <span>{meta.label}</span>
       {!compact && (
-        <span className="rarity-badge__stars" aria-label={`별 ${meta.stars}개`}>
+        // 별은 등급 글자와 같은 뜻의 장식 — 화면 읽기는 등급 이름만 읽는다 (일반 span 의 aria-label 은 읽히지 않는다)
+        <span className="rarity-badge__stars" aria-hidden="true">
           {'★'.repeat(meta.stars)}
         </span>
       )}

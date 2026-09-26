@@ -9,7 +9,7 @@ import type { ResolvedPull } from '../gacha/engine';
 import { releaseDeferredCoins } from '../lib/coinFx';
 import { pullShareContent } from '../lib/share';
 import { useReducedMotion } from '../hooks/useReducedMotion';
-import { CapsuleIcon, CapsuleStackIcon, CoinIcon } from './icons';
+import { CapsuleIcon, CapsuleStackIcon, CoinIcon, JoystickIcon, PetIcon } from './icons';
 import { Malang } from './Malang';
 import { Modal } from './Modal';
 import { buzz } from './pullHaptics';
@@ -292,26 +292,18 @@ function SummaryLine({
   );
 }
 
-/** 코인이 모자라 다시 못 뽑을 때: 얼마나 모자란지 + 미니게임으로 */
-function ShortNote({ need, id }: { need: number; id: string }) {
-  return (
-    <div className="pull-short">
-      <p id={id} className="pull-short__text">
-        <CoinIcon size={16} />
-        {need.toLocaleString()}코인 더 모으면 다시 뽑을 수 있어요
-      </p>
-      <Link to="/play" className="btn btn--primary btn--small pull-short__go" onClick={() => sfx.button()}>
-        미니게임에서 코인 모으기
-      </Link>
-    </div>
-  );
-}
-
-/** 다시 뽑기(같은 방식) + 자랑하기(자랑거리가 있을 때) + 닫기 */
-function Actions({
+/**
+ * 다 연 뒤 행동 한 곳. 위계는 하나:
+ *  - 주인공(꽉 찬 딸기우유) = 새 말랑이가 있으면 "지금 만지러 가기", 없고 코인이 모자라면 "미니게임에서 코인 모으기",
+ *    둘 다 아니면 따로 두지 않고 줄의 "다시 뽑기"가 주인공 색이 된다.
+ *  - 아래 줄 = 다시 뽑기(방금과 같은 방식 · 모자라면 비활성 + 이유 연결) · 자랑하기(있을 때) · 닫기.
+ *  - 코인이 모자라면 줄 아래 한 줄로 이유. 주인공이 만지러 가기라서 코인 모으기가 가려졌으면 그 줄에 작은 링크로 남긴다.
+ */
+function ResultActions({
   kind,
   coins,
-  shortId,
+  newItem,
+  newCount,
   share,
   onPullAgain,
   onClose,
@@ -319,7 +311,8 @@ function Actions({
 }: {
   kind: PullKind;
   coins: number;
-  shortId: string;
+  newItem: ResolvedPull | undefined;
+  newCount: number;
   share: (() => ReturnType<typeof pullShareContent>) | null;
   onPullAgain(kind: PullKind): void;
   onClose(): void;
@@ -327,31 +320,72 @@ function Actions({
 }) {
   const price = PULL_PRICE[kind];
   const need = coinsNeededForPull(coins, kind);
+  const short = need > 0;
   const what = kind === 'multi' ? `${PULL_COUNT.multi}연` : '1회';
+  const reasonId = 'pull-short-reason';
+  const earnLink = (
+    <Link to="/play" onClick={() => sfx.button()}>
+      미니게임에서 코인 모으기
+    </Link>
+  );
   return (
-    <div className={`pull-actions${share ? ' has-share' : ''}`}>
-      <button
-        type="button"
-        className={`btn btn--small pull-actions__again ${need > 0 ? 'btn--secondary' : 'btn--primary'}`}
-        disabled={need > 0}
-        aria-describedby={need > 0 ? shortId : undefined}
-        onClick={() => {
-          sfx.button();
-          onPullAgain(kind);
-        }}
-        aria-label={`${what} 다시 뽑기, ${price.toLocaleString()}코인`}
-      >
-        {kind === 'multi' ? <CapsuleStackIcon size={20} /> : <CapsuleIcon size={20} />}
-        다시 뽑기
-        <span className="pull-actions__cost" aria-hidden="true">
-          <CoinIcon size={14} />
-          {price.toLocaleString()}
-        </span>
-      </button>
-      {share && <ShareButton content={share} squeeze />}
-      <button ref={closeRef} type="button" className="btn btn--small btn--secondary pull-actions__close" onClick={onClose}>
-        닫기
-      </button>
+    <div className={`pull-cta${share ? ' has-share' : ''}`}>
+      {newItem ? (
+        <>
+          <p className="pull-cta__note">
+            {newCount > 1 ? `새 말랑이 ${newCount}마리가` : '새 말랑이는'} 놀이방에서 캡슐째 기다려요
+          </p>
+          <Link
+            to={`/touch/${newItem.character.id}`}
+            className="btn btn--primary btn--block pull-cta__main"
+            onClick={() => sfx.button()}
+            aria-label={`지금 만지러 가기, ${newItem.character.name}`}
+          >
+            <PetIcon size={22} />
+            지금 만지러 가기
+          </Link>
+        </>
+      ) : (
+        short && (
+          <Link to="/play" className="btn btn--primary btn--block pull-cta__main" onClick={() => sfx.button()}>
+            <JoystickIcon size={22} />
+            미니게임에서 코인 모으기
+          </Link>
+        )
+      )}
+      <div className="pull-cta__row">
+        <button
+          type="button"
+          className={`btn btn--small pull-cta__again ${newItem || short ? 'btn--secondary' : 'btn--primary'}`}
+          disabled={short}
+          aria-describedby={short ? reasonId : undefined}
+          onClick={() => {
+            sfx.button();
+            onPullAgain(kind);
+          }}
+          aria-label={`${what} 다시 뽑기, ${price.toLocaleString()}코인`}
+        >
+          {kind === 'multi' ? <CapsuleStackIcon size={20} /> : <CapsuleIcon size={20} />}
+          다시 뽑기
+          <span className="pull-cta__cost" aria-hidden="true">
+            <CoinIcon size={14} />
+            {price.toLocaleString()}
+          </span>
+        </button>
+        {share && <ShareButton content={share} squeeze />}
+        <button ref={closeRef} type="button" className="btn btn--small btn--secondary pull-cta__close" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+      {short && (
+        <p className="pull-cta__reason">
+          <span id={reasonId}>
+            <CoinIcon size={14} />
+            {need.toLocaleString()}코인 더 모으면 다시 뽑을 수 있어요
+          </span>
+          {newItem && earnLink}
+        </p>
+      )}
     </div>
   );
 }
@@ -380,26 +414,6 @@ function SingleResult({ item, animate }: { item: ResolvedPull; animate: boolean 
         {item.byPity && <span className="pull-tag pull-tag--note">천장 확정</span>}
       </div>
       <p className="pull-single__desc">{item.character.description}</p>
-    </div>
-  );
-}
-
-/**
- * 새 말랑이를 만났으면: 놀이방에서 캡슐로 기다린다는 한 줄 + "지금 만지러 가기" (가장 좋은 새 말랑이로).
- * 놀이방은 주소의 말랑이가 아직 캡슐이면 그 캡슐을 매트에 떨어뜨린다.
- */
-function TouchNow({ item }: { item: ResolvedPull }) {
-  return (
-    <div className="pull-touch">
-      <p className="pull-touch__text">새 말랑이는 놀이방에서 캡슐째 기다려요</p>
-      <Link
-        to={`/touch/${item.character.id}`}
-        className="btn btn--lemon btn--small pull-touch__go"
-        onClick={() => sfx.button()}
-        aria-label={`지금 만지러 가기, ${item.character.name}`}
-      >
-        지금 만지러 가기
-      </Link>
     </div>
   );
 }
@@ -590,7 +604,6 @@ export function PullResult({
         ? REVEAL_TITLE[shownTop]
         : `${n}연 뽑기 결과`;
   const detailItem = selected !== null && phases[selected] === 'face' ? items[selected] : undefined;
-  const need = coinsNeededForPull(coins, kind);
   const newItem = items[summary.bestNewIndex];
   const shareItem = items[shareHighlightIndex(items)];
   const share = shareItem
@@ -656,12 +669,11 @@ export function PullResult({
           {done ? (
             <>
               <SummaryLine items={items} ownedCount={ownedCount} pityLeft={pityLeft} refundRef={refundRef} />
-              {newItem && <TouchNow item={newItem} />}
-              {need > 0 && <ShortNote need={need} id="pull-short-reason" />}
-              <Actions
+              <ResultActions
                 kind={kind}
                 coins={coins}
-                shortId="pull-short-reason"
+                newItem={newItem}
+                newCount={summary.newCount}
                 share={share}
                 onPullAgain={onPullAgain}
                 onClose={onClose}

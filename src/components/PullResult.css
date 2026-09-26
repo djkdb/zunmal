@@ -990,18 +990,39 @@
   color: #ffe07a;
 }
 
-/* 다시 뽑기 · 자랑하기 · 닫기 */
-.pull-actions {
+/* 다 연 뒤 행동 한 곳(ResultActions): [한 줄 안내] + 주인공 버튼 + 다시 뽑기·자랑하기·닫기 줄 + [모자란 코인 한 줄] */
+.pull-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pull-cta__note {
+  margin: 2px 0 0;
+  text-align: center;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-ui);
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.pull-cta__main {
+  min-height: 48px;
+  gap: 8px;
+}
+
+.pull-cta__row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 6px;
 }
 
-.pull-actions.has-share {
+.pull-cta.has-share .pull-cta__row {
   grid-template-columns: 1fr auto auto;
 }
 
-.pull-actions .btn {
+.pull-cta__row .btn {
   min-height: 44px;
   padding-inline: 12px;
   gap: 6px;
@@ -1009,84 +1030,57 @@
   white-space: nowrap;
 }
 
-.pull-actions .pull-actions__close {
+.pull-cta__row .pull-cta__close {
   min-width: 56px;
   padding-inline: 14px;
 }
 
-/* 코인이 모자라 다시 못 뽑을 때 */
-.pull-short {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
-  padding: 4px 4px 4px 12px;
-  border-radius: var(--radius-btn);
-  background: var(--primary-tint);
-}
-
-.pull-short__text {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  line-height: 1.35;
-  word-break: keep-all;
-}
-
-.pull-short__go {
-  flex: 1 0 auto;
-  white-space: nowrap;
-}
-
-.pull-modal--secret .pull-short {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.pull-modal--secret .pull-short__text {
-  color: #fff;
-}
-
-/* 새 말랑이: 놀이방에서 기다린다는 한 줄 + 지금 만지러 가기 */
-.pull-touch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 4px 4px 12px;
-  border-radius: var(--radius-btn);
-  background: var(--lemon-tint);
-}
-
-.pull-touch__text {
-  margin: 0;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  line-height: 1.35;
-  word-break: keep-all;
-}
-
-.pull-touch__go {
-  flex: none;
-  white-space: nowrap;
-}
-
-.pull-modal--secret .pull-touch {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.pull-modal--secret .pull-touch__text {
-  color: #fff;
-}
-
-.pull-actions__cost {
+.pull-cta__cost {
   display: inline-flex;
   align-items: center;
   gap: 1px;
   font-size: 0.75rem;
+}
+
+/* 코인이 모자라 다시 못 뽑을 때: 이유(다시 뽑기의 aria-describedby) + 필요하면 코인 모으기 링크 */
+.pull-cta__reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 10px;
+  margin: 0;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.pull-cta__reason > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pull-cta__reason a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: -12px;
+  color: var(--link);
+  font-weight: var(--fw-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pull-modal--secret .pull-cta__note,
+.pull-modal--secret .pull-cta__reason {
+  color: #e6dcff;
+}
+
+.pull-modal--secret .pull-cta__reason a {
+  color: #ffe07a;
 }
 
 /* ── 1회: 큰 캡슐 하나 ──────────────────────────────────────── */
