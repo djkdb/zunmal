@@ -1792,7 +1792,8 @@
   left: 0;
   bottom: calc(var(--pr-sprite) * 0.52);
   width: max-content;
-  max-width: min(260px, 80vw);
+  max-width: min(340px, 90vw);
+  word-break: keep-all;
   padding: 6px 14px 7px;
   border-radius: var(--radius-pill);
   background: var(--surface);
