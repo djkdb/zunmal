@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
+import { nudgeInsufficient } from '../lib/coinFx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
 import { PullResult } from '../components/PullResult';
 import { EpicReveal, isEpicRarity, preloadScene3d } from '../components/epic/EpicReveal';
@@ -61,6 +62,7 @@ export function GachaPage() {
     if (!result.ok) {
       lockRef.current = false;
       sfx.fail();
+      nudgeInsufficient();
       setMessage('코인이 모자라요.');
       return;
     }
