@@ -689,3 +689,11 @@ strong {
     transform: scale(1.25);
   }
 }
+
+/* 지연 로딩 화면(미니게임·놀이방) — 잠깐 보이는 안내 */
+.page-loading {
+  margin: 40vh 0 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: var(--fs-s);
+}
