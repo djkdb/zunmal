@@ -1,0 +1,19 @@
+/* 코인 비행 층: 화면을 덮지만 입력은 통과시킨다. 위치는 transform만 쓴다 (합성 전용). */
+.coin-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+
+.coin-burst__coin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  opacity: 0;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 2px 0 var(--ink));
+}
