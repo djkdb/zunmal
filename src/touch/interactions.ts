@@ -143,16 +143,15 @@ export function forgetBody(state: InteractState, id: string): void {
 
 export interface InteractInput {
   now: number;
-  dtMs: number;
   bodies: readonly InteractBody[];
   contacts: readonly WorldContact[];
   events: readonly WorldEvent[];
 }
 
 /**
- * 한 프레임의 말랑이끼리 반응. 같은 입력·RNG 면 결과가 같다.
+ * 한 프레임의 말랑이끼리 반응 (맞닿음·부딪힘). 같은 입력이면 결과가 같다.
  */
-export function stepInteractions(state: InteractState, input: InteractInput, rng: RNG): InteractEvent[] {
+export function stepInteractions(state: InteractState, input: InteractInput): InteractEvent[] {
   const T = INTERACT_TUNING;
   const { now } = input;
   const out: InteractEvent[] = [];
@@ -243,9 +242,23 @@ export function stepInteractions(state: InteractState, input: InteractInput, rng
     }
   }
 
-  // 3) 가만히 있는 이웃: 흘끔·같이 졸기
-  const bodies = input.bodies;
-  const p = 1 - Math.exp(-T.glancePerSec * Math.max(0, input.dtMs) / 1000);
+  return out;
+}
+
+/**
+ * 가만히 있는 이웃끼리: 흘끔·같이 졸기. 매트가 멈춰 그리기를 쉬는 동안에도 부르도록 맞닿음 판정과 따로 둔다
+ * (페이지는 1초마다 부른다). dtMs 는 지난 호출 뒤 흐른 시간.
+ */
+export function idleInteractions(
+  state: InteractState,
+  bodies: readonly InteractBody[],
+  now: number,
+  dtMs: number,
+  rng: RNG,
+): InteractEvent[] {
+  const T = INTERACT_TUNING;
+  const out: InteractEvent[] = [];
+  const p = 1 - Math.exp(-T.glancePerSec * Math.max(0, dtMs) / 1000);
   for (const me of bodies) {
     if (me.touched) continue;
     let nearest: InteractBody | null = null;
@@ -273,3 +286,21 @@ export function stepInteractions(state: InteractState, input: InteractInput, rng
   }
   return out;
 }
+
+// ── 방법 보기 표 ─────────────────────────────────────────────
+
+export type PairPlayId = 'cheekRub' | 'stack' | 'bump' | 'rest';
+
+/** 말랑이끼리 놀기 (방법 보기 시트의 "함께 놀기" 줄). 두 마리 이상 꺼내야 한다 */
+export interface PairPlay {
+  id: PairPlayId;
+  label: string;
+  howTo: string;
+}
+
+export const PAIR_PLAYS: readonly PairPlay[] = [
+  { id: 'cheekRub', label: '볼 비비기', howTo: '한 말랑이를 끌어 옆 말랑이 옆구리에 대고 1초 꾹 눌러요' },
+  { id: 'stack', label: '쌓기', howTo: '들어서 다른 말랑이 위로 천천히 올려놓아요. 높이서 떨어뜨리면 둘 다 통 튀어요' },
+  { id: 'bump', label: '쿵 부딪히기', howTo: '휙 던져 부딪혀요. 젤리끼리는 멀리 튕기고 찐득이끼리는 잠깐 붙어요' },
+  { id: 'rest', label: '나란히 쉬기', howTo: '가까이 두고 가만히 두면 서로 흘끔 보다가 같이 졸아요' },
+];

@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { getCharacter } from '../../data/characters';
+import { materialOf } from '../../data/materials';
 import { RARITY_META } from '../../data/rarity';
 import type { ShelfEntry } from '../../touch/shelf';
 import { CloseIcon } from '../icons';
 import { Malang } from '../Malang';
 import { CapsuleArt } from './CapsuleArt';
+import { MaterialIcon } from './MaterialIcon';
 
 interface ShelfProps {
   open: boolean;
@@ -70,9 +72,10 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
           {entries.map((e) => {
             const c = getCharacter(e.id);
             if (!c) return null;
+            const mat = materialOf(c);
             const label = e.sealed
               ? `${RARITY_META[c.rarity].label} 새 캡슐 ${e.out ? '넣기' : '꺼내기'}`
-              : `${c.name} ${e.out ? '선반에 넣기' : '꺼내기'}`;
+              : `${c.name}(${mat.label}) ${e.out ? '선반에 넣기' : '꺼내기'}`;
             return (
               <li key={e.id} className="pr-shelf__cell">
                 <button
@@ -91,8 +94,14 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
                       </span>
                     </>
                   ) : (
-                    <Malang character={c} size={52} animation="none" decorative shiny={shinyIds.has(e.id)} />
+                    <>
+                      <Malang character={c} size={52} animation="none" decorative shiny={shinyIds.has(e.id)} />
+                      <span className="pr-shelf__feel" data-material={mat.id} aria-hidden="true">
+                        <MaterialIcon material={mat.id} size={16} />
+                      </span>
+                    </>
                   )}
+
                 </button>
               </li>
             );

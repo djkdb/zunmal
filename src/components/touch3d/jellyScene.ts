@@ -40,6 +40,7 @@ import {
   Triangle,
   Vector2,
   Vector3,
+  Vector4,
   WebGLRenderer,
   type Texture,
 } from 'three';
@@ -71,6 +72,11 @@ export interface JellyBodyOptions {
   glow?: { color: string; strength: number };
   /** 반짝 말랑이 무지갯빛 (0~1) */
   iridescence?: number;
+  /**
+   * 몸속 특별한 속 (전설 이상): kind = touch/filling 의 fillKindIndex (1 반짝이 가루, 2 물방울 속 별, 3 은하, 4 무지개 젤).
+   * 셰이더 uniform 만으로 그린다 (새 텍스처·렌더 타깃 없음).
+   */
+  filling?: { kind: number; colors: readonly [string, string] };
 }
 
 /** 몸을 놓을 자리 (client px) */
@@ -101,6 +107,8 @@ export interface JellyBodyView {
   setGaze(x: number, y: number): void;
   /** 만질 때 몸 뒤 빛과 가장자리 빛이 잠깐 부푼다 (0~1) */
   pulse(amount: number): void;
+  /** 몸속 속의 밝기(0~1)와 소용돌이 각도(rad) */
+  setFill(glow: number, swirl: number): void;
   /** 빛이 아직 부풀어 있다 → 페이지가 그리기를 계속해야 한다 */
   busy(): boolean;
   setVisible(v: boolean): void;
@@ -256,6 +264,10 @@ interface JellyUniforms {
   uRimColor: { value: Color };
   uShiny: { value: number };
   uTime: { value: number };
+  /** 몸속 속: x 종류(0 없음), y 켜짐, z 소용돌이, w 밝기 */
+  uFill: { value: Vector4 };
+  uFillA: { value: Color };
+  uFillB: { value: Color };
 }
 
 function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): MeshPhysicalMaterial {
@@ -286,8 +298,70 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
       uniform vec3 uRimColor;
       uniform float uShiny;
       uniform float uTime;
+      uniform vec4 uFill;
+      uniform vec3 uFillA;
+      uniform vec3 uFillB;
       vec3 jellyHue(float h) {
         return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      }
+      float jellyHash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      // 몸속 특별한 속: 앞면 가운데에서만, 얼굴은 비켜서, 눌린 만큼(uFill.w) 밝게, 소용돌이(uFill.z)만큼 돈다
+      // 반환: rgb = 속 색, a = 덮는 정도 (밝은 몸에서도 보이게 더하지 않고 섞는다)
+      vec4 jellyFilling(vec2 uv, float nv) {
+        vec2 p = (uv - vec2(0.5, 0.42)) * vec2(2.0, 2.2);
+        float r = length(p);
+        float body = 1.0 - smoothstep(0.6, 1.0, r);
+        float face = 1.0 - smoothstep(0.75, 1.2, length((uv - uFaceUv) / uFaceR));
+        float mask = body * nv * (1.0 - 0.85 * face);
+        if (mask <= 0.001) return vec4(0.0);
+        float ang = atan(p.y, p.x) + uFill.z * (1.2 - r);
+        vec2 q = vec2(cos(ang), sin(ang)) * r;
+        float k = uFill.x;
+        vec3 col = vec3(0.0);
+        float cover = 0.0;
+        if (k < 1.5) {
+          vec2 g = q * 6.5;
+          vec2 cell = floor(g);
+          float h = jellyHash(cell);
+          vec2 f = fract(g) - 0.5 - (vec2(jellyHash(cell + 3.1), jellyHash(cell + 7.7)) - 0.5) * 0.5;
+          float tw = 0.55 + 0.45 * sin(uTime * 4.0 + h * 40.0);
+          float s = smoothstep(0.26, 0.05, length(f)) * step(0.3, h) * tw;
+          s += smoothstep(0.05, 0.0, abs(f.x)) * smoothstep(0.34, 0.0, abs(f.y)) * step(0.75, h) * tw * 0.8;
+          col = mix(uFillA, uFillB, h);
+          cover = s;
+        } else if (k < 2.5) {
+          vec2 g = (q + vec2(0.0, uTime * 0.04)) * 2.4;
+          vec2 cell = floor(g);
+          float h = step(0.3, jellyHash(cell));
+          vec2 f = fract(g) - 0.5 - (vec2(jellyHash(cell + 1.3), jellyHash(cell + 5.9)) - 0.5) * 0.4;
+          float d = length(f);
+          float bead = smoothstep(0.32, 0.27, d) * h;
+          float ring = (smoothstep(0.33, 0.29, d) - smoothstep(0.28, 0.22, d)) * h;
+          float a = atan(f.y, f.x) + uFill.z;
+          float star = smoothstep(0.13 + 0.08 * cos(a * 5.0), 0.07, d) * h;
+          // 방울: 속은 옅게, 테두리는 진하게 (밝은 몸에서도 동그라미가 보이게) + 가운데 별
+          col = mix(mix(uFillA, uFillA * 0.55, ring), uFillB, star);
+          cover = max(max(bead * 0.5, ring * 0.95), star);
+        } else if (k < 3.5) {
+          float arm = pow(0.5 + 0.5 * cos(ang * 2.0 - r * 9.0), 3.0);
+          float core = exp(-r * r * 9.0);
+          vec2 g = q * 14.0;
+          float st = smoothstep(0.16, 0.0, length(fract(g) - 0.5)) * step(0.78, jellyHash(floor(g)));
+          col = mix(mix(uFillA, uFillB, clamp(r * 1.4, 0.0, 1.0)), vec3(1.0, 0.96, 1.0), clamp(core + st, 0.0, 1.0));
+          cover = clamp(arm * (1.0 - r) * 0.9 + core * 0.6 + st, 0.0, 1.0);
+        } else {
+          // 무지개 젤: 색색의 말랑한 젤 알갱이가 몸속에서 돈다
+          vec2 g = q * 2.2 + vec2(0.0, uTime * 0.03);
+          vec2 cell = floor(g);
+          float h = jellyHash(cell);
+          vec2 f = fract(g) - 0.5 - (vec2(jellyHash(cell + 2.3), jellyHash(cell + 4.1)) - 0.5) * 0.35;
+          float blob = smoothstep(0.42, 0.18, length(f));
+          col = mix(jellyHue(fract(h + uFill.z * 0.05)) * 0.85 + 0.15, mix(uFillA, uFillB, h), 0.25);
+          cover = blob * 0.8;
+        }
+        return vec4(col, clamp(cover * mask * (0.65 + 0.35 * uFill.w) * uFill.y, 0.0, 0.92));
       }
       void main() {`,
       )
@@ -316,6 +390,14 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
         outgoingLight += jellyHue(fract(nv * 1.3 + vViewPosition.y * 0.004 + uTime * 0.12)) * pow(1.0 - nv, 1.6) * 0.3 * uShiny;
         // 가짜 속빛: 정면일수록 본래 색이 안에서 비치듯 밝게 (그림 색을 지킨다)
         outgoingLight = mix(outgoingLight, diffuseColor.rgb * 1.04 + 0.02, 0.42 * nv * nv);
+        #ifdef USE_MAP
+        if (uFill.x > 0.5) {
+          vec4 fill = jellyFilling(vMapUv, nv);
+          outgoingLight = mix(outgoingLight, fill.rgb, fill.a);
+          // 꾹 누르면 속이 안에서 반짝 빛난다
+          outgoingLight += fill.rgb * fill.a * uFill.w * 0.35;
+        }
+        #endif
       }
       #include <opaque_fragment>`,
       );
@@ -465,6 +547,9 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       uRimColor: { value: glowColor },
       uShiny: { value: Math.max(0, Math.min(1, bo.iridescence ?? 0)) },
       uTime: { value: 0 },
+      uFill: { value: new Vector4(bo.filling?.kind ?? 0, bo.filling ? 1 : 0, 0, 0) },
+      uFillA: { value: new Color(bo.filling?.colors[0] ?? '#ffffff') },
+      uFillB: { value: new Color(bo.filling?.colors[1] ?? '#ffffff') },
     };
     // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
     uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
@@ -743,9 +828,15 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
         pulseAmt = Math.min(1, pulseNow(now) + amount);
         pulseAt = now;
       },
+      setFill(glow, swirl) {
+        const f = uniforms.uFill.value;
+        f.z = Number.isFinite(swirl) ? swirl : 0;
+        f.w = Number.isFinite(glow) ? Math.max(0, Math.min(1, glow)) : 0;
+      },
       busy() {
         return pulseNow(performance.now()) > 0.005;
       },
+
       setVisible(v) {
         visible = v;
         root.visible = v;

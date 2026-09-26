@@ -4,10 +4,14 @@
  *
  * - 몸 전체 위치는 world.ts(페이지가 돌림), 몸 안쪽 출렁임은 이 객체의 physics.ts·softbody.ts 상태.
  * - 그리기는 하지 않는다: 페이지가 frame() 뒤 pose() 를 읽어 2D 스프라이트나 3D 몸에 반영한다.
- * - 2단계(말랑이마다 다른 재질·손맛)는 ActorEnv 에 재질 표를 더하고 여기의 반응 분기에서 읽으면 된다.
+ * - 촉감(`data/materials.ts`): 물리 상태에 feel 을 넣고(슬로우 라이징·젤리·쭉쭉이·찐득이), 소리는 촉감 맛(flavor),
+ *   찐득이는 손을 떼도 잠깐 붙어 있다가 "쩍" 떨어진다(`peelPlan`). 전설 이상은 몸속 특별한 속(filling)이 눌림에 반응.
+ * - 말랑이끼리 반응(볼 비비기·끙·깜짝·흘끔·같이 졸기)은 페이지가 `touch/interactions.ts` 로 골라 여기 메서드를 부른다.
  */
 import * as squish from '../../audio/squish';
 import type { Character } from '../../data/characters';
+import type { FillingSpec, MaterialSpec } from '../../data/materials';
+import { createFill, isFillAtRest, stepFill, type FillState } from '../../touch/filling';
 import type { TouchFxSpec } from '../../data/rarity';
 import { haptic } from '../../lib/haptics';
 import { VIEWBOX } from '../malang/helpers';
@@ -41,14 +45,17 @@ import {
   impact,
   isAtRest,
   melt,
+  peelPlan,
   poke,
   press,
+  recoverMs,
   release,
   setReducedMotion,
   snapToTargets,
   squashAmount,
   step,
   stretchAmount,
+  stretchLength,
   stretchUp,
   tickle,
   toTransform,
@@ -71,6 +78,7 @@ import {
   softTickle,
   softTouch,
   stepSoft,
+  SOFT_TUNING,
   type Pose,
   type SoftHit,
   type SoftState,
@@ -104,6 +112,10 @@ export interface ActorEnv {
   character: Character;
   shape: ShapeSpec;
   fxSpec: TouchFxSpec;
+  /** 촉감 */
+  material: MaterialSpec;
+  /** 몸속 특별한 속 (전설 이상, 없으면 null) */
+  filling: FillingSpec | null;
   shiny: boolean;
   reduced(): boolean;
   level(): number;
@@ -182,16 +194,31 @@ export class MalangActor {
   private yawned = false;
   private timers: number[] = [];
   private disposed = false;
+  /** 찐득이: 손가락을 뗐지만 아직 붙어 있다 */
+  private peeling = false;
+  /** 몸속 특별한 속의 밝기·소용돌이 */
+  fill: FillState = createFill();
 
   constructor(env: ActorEnv) {
     this.env = env;
     const reduced = env.reduced();
-    this.touch = createTouchState({ reducedMotion: reduced });
-    this.soft = createSoftState({ reducedMotion: reduced });
+    const feel = env.material.feel;
+    this.touch = createTouchState({ reducedMotion: reduced, feel });
+    this.soft = createSoftState({ reducedMotion: reduced, feel });
+  }
+
+  /** 소리 맛 = 촉감 */
+  get flavor(): squish.SquishFlavor {
+    return this.env.material.id;
   }
 
   get held(): boolean {
     return this.g !== null;
+  }
+
+  /** 손가락이 잡고 있거나 아직 붙어 있다 (말랑이끼리 판정용) */
+  get touched(): boolean {
+    return this.g !== null || this.peeling;
   }
 
   get carrying(): boolean {
@@ -286,6 +313,14 @@ export class MalangActor {
     return true;
   }
 
+  /** 옆 말랑이를 따라 졸기 시작. breathMs 를 주면 숨 위상을 그 말랑이와 맞춘다 */
+  dozeOff(breathMs?: number) {
+    if (this.dozing || this.g) return;
+    if (breathMs !== undefined && Number.isFinite(breathMs)) this.soft = { ...this.soft, timeMs: breathMs };
+    this.yawned = true;
+    this.startDoze();
+  }
+
   /** 1초마다: 가만히 두면 하품(8초) → 졸기(20초) */
   idleTick(now: number, hidden: boolean) {
     if (hidden || this.g) {
@@ -302,6 +337,68 @@ export class MalangActor {
     } else if (phase === 'doze') {
       this.startDoze();
     }
+  }
+
+  // ── 말랑이끼리 ──
+
+  /** 볼 비비기: 상대 쪽(dirX)으로 볼을 비비며 좌우로 살랑, 하트 */
+  cheekRub(dirX: number) {
+    const dir = dirX < 0 ? -1 : 1;
+    this.wake();
+    this.showFace('blush', 1500);
+    this.env.fx()?.react('hearts', 3);
+    this.lastActive = performance.now();
+    this.yawned = false;
+    // 움직임 줄이기: 비비는 흔들림은 없이 얼굴·하트만
+    if (!this.env.reduced()) {
+      [0, 150, 300, 450].forEach((ms, i) =>
+        this.later(() => {
+          const d = i % 2 === 0 ? dir : -dir;
+          this.touch = tickle(this.touch, d * 0.7);
+          this.soft = softTickle(this.soft, d);
+          this.env.requestFrame();
+        }, ms),
+      );
+    }
+    this.env.requestFrame();
+  }
+
+  /** 위에 누가 올라탔다: "끙" */
+  squishedUnder() {
+    this.wake();
+    this.showFace('strain', 1600);
+    this.touch = impact(this.touch, 0, 0.35);
+    this.lastActive = performance.now();
+    this.env.requestFrame();
+  }
+
+  /** 다른 말랑이 위에 올라탔다: 신난다 */
+  onTop() {
+    this.showFace('happy', 1400);
+    this.env.fx()?.react('hearts', 1);
+    this.lastActive = performance.now();
+  }
+
+  /** 세게 부딪혀 깜짝 + 머리 위 작은 별 (몸 출렁임은 세계 부딪힘 사건이 이미 bumped 로 준다) */
+  startled() {
+    this.wake();
+    this.showFace('wide', 900);
+
+    this.env.fx()?.react('dizzy', 3);
+    this.env.requestFrame();
+  }
+
+
+  /** 옆 말랑이 쪽을 잠깐 본다 (client 좌표) */
+  glanceAt(clientX: number, clientY: number, ms = 1300) {
+    if (this.g || this.dozing) return;
+    this.lookAt(clientX, clientY);
+    this.lookBack(ms);
+  }
+
+  /** 가만히 있은 시간 (ms) */
+  idleFor(now: number): number {
+    return this.g ? 0 : Math.max(0, now - this.lastActive);
   }
 
   /** 다른 말랑이가 부딪히거나 매트에 떨어졌다. dirX: 밀려나는 옆 방향 */
@@ -399,6 +496,7 @@ export class MalangActor {
   begin(source: 'pointer' | 'key', clientX: number, clientY: number, hit: SoftHit | null) {
     const { point, radius, zone } = this.locate(clientX, clientY, source === 'pointer');
     const now = performance.now();
+    this.peeling = false;
     this.lastActive = now;
     this.yawned = false;
     const woke = this.wake();
@@ -462,7 +560,7 @@ export class MalangActor {
     const dyTotal = clientY - g.startY - shiftY;
     if (!g.moved && Math.hypot(clientX - g.startX, clientY - g.startY) > DRAG_START_PX) {
       g.moved = true;
-      g.stretch = squish.startStretch();
+      g.stretch = squish.startStretch(this.flavor);
     }
     this.lookAt(clientX, clientY);
     const dt = Math.max(1, now - g.lastT);
@@ -481,7 +579,7 @@ export class MalangActor {
     const disp = { x: dxTotal / g.radius, y: dyTotal / g.radius };
     this.touch = drag(this.touch, disp);
     if (g.hit) this.soft = softPull(this.soft, { x: disp.x * BODY_UNIT, y: -disp.y * BODY_UNIT });
-    g.stretch?.update(stretchAmount(this.touch), speed);
+    g.stretch?.update(stretchAmount(this.touch), speed, stretchLength(this.touch));
     this.env.fx()?.trail(clientX, clientY);
 
     // 머리를 좌우로 문지르면 쓰다듬기 (애정 2단계). 옮기는 중에는 아니다
@@ -527,7 +625,7 @@ export class MalangActor {
     }
     if (!g.moved) {
       g.moved = true;
-      g.stretch = squish.startStretch();
+      g.stretch = squish.startStretch(this.flavor);
     }
     const nx = g.keyDisp.x + ax * KEY_DRAG_STEP;
     const ny = g.keyDisp.y + ay * KEY_DRAG_STEP;
@@ -536,7 +634,7 @@ export class MalangActor {
     g.keyDisp = { x: nx * k, y: ny * k };
     this.touch = drag(this.touch, g.keyDisp);
     if (g.hit) this.soft = softPull(this.soft, { x: g.keyDisp.x * BODY_UNIT, y: -g.keyDisp.y * BODY_UNIT });
-    g.stretch?.update(Math.min(1, Math.hypot(g.keyDisp.x, g.keyDisp.y) / 1.5), 0.5);
+    g.stretch?.update(Math.min(1, Math.hypot(g.keyDisp.x, g.keyDisp.y) / 1.5), 0.5, stretchLength(this.touch));
     this.env.requestFrame();
   }
 
@@ -572,7 +670,10 @@ export class MalangActor {
       const s = kind === 'pat' ? 0.25 : strength;
       this.touch = poke(release(this.touch), g.point, s);
       this.soft = softPoke(softRelease(this.soft), g.hit, s);
-      squish.poke(kind === 'pat' ? 0.3 : strength);
+      squish.poke(kind === 'pat' ? 0.3 : strength, this.flavor);
+      // 찐득이: 콕 찔러도 손가락에 살짝 붙었다 쩍
+      const tapPeel = peelPlan(this.env.material.feel, now - g.startT, true);
+      if (tapPeel.delayMs > 0) this.later(() => squish.peel(0.3), tapPeel.delayMs);
       squish.chime(spec.chime, recent.length - 1, { shiny });
       const px = g.source === 'pointer' ? g.lastX : undefined;
       const py = g.source === 'pointer' ? g.lastY : undefined;
@@ -608,14 +709,40 @@ export class MalangActor {
     }
 
     const intensity = Math.max(squashAmount(this.touch), stretchAmount(this.touch), wobbleEnergy(this.touch));
-    this.touch = release(this.touch);
     // 튕기듯 놓으면(손가락이 아직 움직이는 중) 그 속도로 출렁인다
     const flicking = g.source === 'pointer' && g.moved && now - g.lastT < 80;
     const toBody = (BODY_UNIT / g.radius) * 1000;
-    this.soft = softRelease(this.soft, flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined);
     fx?.endTrail();
+    const feel = this.env.material.feel;
+    // 찐득이: 손가락을 떼도 잠깐 붙어 위로 딸려 오다가 "쩍" 떨어진다 (옮기다 놓거나 튕기면 바로 떨어진다)
+    const plan = !silent && !g.carrying && !flicking ? peelPlan(feel, now - g.startT, false) : { delayMs: 0, lift: 0 };
+    if (plan.delayMs > 0) {
+      this.peeling = true;
+      // 움직임 줄이기: 딸려 오르는 늘어남 없이 잠깐 멈췄다 소리만
+      const lift = reduced ? 0 : plan.lift;
+      this.touch = drag(press(this.touch, g.point, 0.2), { x: 0, y: -lift });
+      if (g.hit && lift > 0) this.soft = softPull(this.soft, { x: 0, y: lift * BODY_UNIT });
+
+      this.showFace('wide', plan.delayMs + 200);
+      this.env.requestFrame();
+      this.later(() => {
+        if (!this.peeling) return;
+        this.peeling = false;
+        this.touch = release(this.touch);
+        this.soft = softRelease(this.soft);
+        squish.peel(0.4 + 0.6 * plan.lift);
+        squish.squishRelease(0.3 + 0.5 * intensity, wobbleHz(feel) * 2, this.flavor);
+        this.showFace('happy', 900);
+        this.env.requestFrame();
+      }, plan.delayMs);
+      return { ...none };
+    }
+    this.touch = release(this.touch);
+    this.soft = softRelease(this.soft, flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined);
     if (!silent) {
-      squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz() * 2);
+      squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz(feel) * 2, this.flavor);
+      // 슬로우 라이징: 천천히 차오르는 동안 작은 공기 소리
+      if (feel.riseTauMs > 0 && squashAmount(this.touch) > 0.3) squish.riseSigh(recoverMs(feel) / 1000);
       const px = g.source === 'pointer' ? g.startX : undefined;
       const py = g.source === 'pointer' ? g.startY : undefined;
       if (!g.carrying) fx?.emit('release', px, py, intensity);
@@ -649,11 +776,11 @@ export class MalangActor {
       const spec = this.env.fxSpec;
       if (g.squishCount === 0 && held > TAP_MS) {
         g.squishCount = 1;
-        squish.squishPress(0.45);
+        squish.squishPress(0.45, this.flavor);
         this.env.fx()?.emit('press', px, py, 0.45);
       } else if (g.squishCount === 1 && held > 900) {
         g.squishCount = 2;
-        squish.squishPress(1);
+        squish.squishPress(1, this.flavor);
         this.env.fx()?.emit('press', px, py, 1);
         squish.chime(spec.chime, 1, { shiny: this.env.shiny });
         this.env.view()?.pulse(spec.auraPulse);
@@ -676,12 +803,25 @@ export class MalangActor {
 
     this.touch = step(this.touch, dt);
     if (drawing3d) this.soft = stepSoft(this.soft, dt);
-    const resting = !g && !gazeMoving && isAtRest(this.touch) && (!drawing3d || isSoftAtRest(this.soft));
+    let filling = false;
+    if (this.env.filling) {
+      this.fill = stepFill(this.fill, this.squeezeLevel(), dt, this.env.reduced());
+      filling = !isFillAtRest(this.fill);
+    }
+    const resting =
+      !g && !this.peeling && !gazeMoving && !filling && isAtRest(this.touch) && (!drawing3d || isSoftAtRest(this.soft));
     if (resting) {
       this.touch = snapToTargets(this.touch);
       this.soft = snapSoft(this.soft);
     }
     return !resting;
+  }
+
+  /** 지금 눌리고 늘어난 정도 0..1 (몸속 속이 반응하는 양) */
+  squeezeLevel(): number {
+    let dent = 0;
+    for (const d of this.soft.dents) dent = Math.max(dent, d.depth.x / SOFT_TUNING.dentMax);
+    return Math.min(1, Math.max(squashAmount(this.touch), stretchAmount(this.touch), dent));
   }
 
   /** 졸면서 숨쉬기만 하는 중 (3D 는 20fps 로 충분) */
@@ -699,6 +839,8 @@ export class MalangActor {
 
   dispose() {
     this.disposed = true;
+    this.peeling = false;
+
     this.g?.stretch?.stop();
     this.g = null;
     if (this.faceTimer !== null) window.clearTimeout(this.faceTimer);

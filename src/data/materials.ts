@@ -183,12 +183,12 @@ export const FILLING_BY_ID: Readonly<Record<string, Omit<FillingSpec, 'label'>>>
   'sunset-king': { kind: 'glitter', colors: ['#ffd23f', '#ff8a5c'] },
   'aurora-angel': { kind: 'rainbowGel', colors: ['#8ff0d8', '#c7a6ff'] },
   'thunder-dragon': { kind: 'glitter', colors: ['#fff27a', '#7ad7ff'] },
-  'crystal-queen': { kind: 'starBeads', colors: ['#e9f7ff', '#b8a4ff'] },
+  'crystal-queen': { kind: 'starBeads', colors: ['#8fd8ff', '#ffd84d'] },
   'galaxy-malang': { kind: 'galaxy', colors: ['#8f6bff', '#ff8fd8'] },
   phoenix: { kind: 'glitter', colors: ['#ffb13d', '#ff5a3c'] },
   'dream-unicorn': { kind: 'rainbowGel', colors: ['#ffb3d9', '#9fd8ff'] },
   'milkyway-whale': { kind: 'galaxy', colors: ['#6fb8ff', '#d9c2ff'] },
-  'prism-seraph': { kind: 'starBeads', colors: ['#ffffff', '#ffd6f5'] },
+  'prism-seraph': { kind: 'starBeads', colors: ['#ff9fd9', '#fff27a'] },
 };
 
 function rarityRank(r: Rarity): number {

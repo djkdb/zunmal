@@ -4,6 +4,7 @@ import {
   INTERACT_TUNING as T,
   createInteractState,
   forgetBody,
+  idleInteractions,
   stepInteractions,
   takeRubPet,
   type InteractBody,
@@ -20,7 +21,6 @@ function side(overlap = 0.02, ageMs = 0): WorldContact {
   return { a: 'a', b: 'b', nx: -1, ny: 0, nz: 0.1, overlap, ageMs };
 }
 
-const never = () => 0.99;
 
 /** dt 간격으로 같은 입력을 ms 동안 넣고 모든 사건을 모은다 */
 function hold(
@@ -32,7 +32,7 @@ function hold(
 ): InteractEvent[] {
   const out: InteractEvent[] = [];
   for (let t = 0; t <= ms; t += dt) {
-    out.push(...stepInteractions(state, { now: from + t, dtMs: dt, events: [], ...input }, never));
+    out.push(...stepInteractions(state, { now: from + t, events: [], ...input }));
   }
   return out;
 }
@@ -90,52 +90,52 @@ describe('쌓기·덮치기·쿵', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { z: 0.5 }), body('b', 1)];
     const onTop: WorldContact = { a: 'a', b: 'b', nx: 0, ny: 0, nz: 0.95, overlap: 0.05, ageMs: 0 };
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies, contacts: [onTop], events: [] }, never)).toEqual([]);
-    const ev = stepInteractions(s, { now: 300, dtMs: 16, bodies, contacts: [{ ...onTop, ageMs: 300 }], events: [] }, never);
+    expect(stepInteractions(s, { now: 0, bodies, contacts: [onTop], events: [] })).toEqual([]);
+    const ev = stepInteractions(s, { now: 300, bodies, contacts: [{ ...onTop, ageMs: 300 }], events: [] });
     expect(ev).toEqual([{ kind: 'stack', top: 'a', bottom: 'b' }]);
-    expect(stepInteractions(s, { now: 400, dtMs: 16, bodies, contacts: [{ ...onTop, ageMs: 400 }], events: [] }, never)).toEqual([]);
+    expect(stepInteractions(s, { now: 400, bodies, contacts: [{ ...onTop, ageMs: 400 }], events: [] })).toEqual([]);
     const held = createInteractState();
     const carried = [body('a', 1, { z: 0.5, touched: true }), body('b', 1)];
-    expect(stepInteractions(held, { now: 300, dtMs: 16, bodies: carried, contacts: [{ ...onTop, ageMs: 300 }], events: [] }, never)).toEqual([]);
+    expect(stepInteractions(held, { now: 300, bodies: carried, contacts: [{ ...onTop, ageMs: 300 }], events: [] })).toEqual([]);
   });
 
   it('높이서 떨어지면 덮치기, 옆으로 세게 부딪히면 쿵 (같은 촉감 표시)', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { material: 'sticky' }), body('b', 1.5, { material: 'sticky' })];
     const drop: WorldEvent = { kind: 'bump', a: 'a', b: 'b', speed: 4, nx: 0, ny: 0, nz: -0.9 };
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies, contacts: [], events: [drop] }, never)).toContainEqual({
+    expect(stepInteractions(s, { now: 0, bodies, contacts: [], events: [drop] })).toContainEqual({
       kind: 'dropOn',
       top: 'b',
       bottom: 'a',
       speed: 4,
     });
     const hit: WorldEvent = { kind: 'bump', a: 'a', b: 'b', speed: 3, nx: 1, ny: 0, nz: 0 };
-    const ev = stepInteractions(s, { now: 2000, dtMs: 16, bodies, contacts: [], events: [hit] }, never);
+    const ev = stepInteractions(s, { now: 2000, bodies, contacts: [], events: [hit] });
     expect(ev).toContainEqual({ kind: 'bumpHard', a: 'a', b: 'b', speed: 3, nx: 1, same: 'sticky' as MaterialId });
     // 곧바로 또 부딪혀도 쉬는 동안은 조용
-    expect(stepInteractions(s, { now: 2100, dtMs: 16, bodies, contacts: [], events: [hit] }, never)).toEqual([]);
+    expect(stepInteractions(s, { now: 2100, bodies, contacts: [], events: [hit] })).toEqual([]);
     // 살살 부딪힌 것은 아무 일 없다
     const soft: WorldEvent = { ...hit, speed: 1 };
-    expect(stepInteractions(s, { now: 5000, dtMs: 16, bodies, contacts: [], events: [soft] }, never)).toEqual([]);
+    expect(stepInteractions(s, { now: 5000, bodies, contacts: [], events: [soft] })).toEqual([]);
   });
 
   it('다른 촉감끼리는 same 이 없다', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { material: 'jelly' }), body('b', 1.5, { material: 'slowRise' })];
     const hit: WorldEvent = { kind: 'bump', a: 'a', b: 'b', speed: 3, nx: 1, ny: 0, nz: 0 };
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies, contacts: [], events: [hit] }, never)[0]).toMatchObject({ same: null });
+    expect(stepInteractions(s, { now: 0, bodies, contacts: [], events: [hit] })[0]).toMatchObject({ same: null });
   });
 
   it('찐득이 둘은 닿으면 붙고 떨어질 때 한 번 쩍', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { material: 'sticky' }), body('b', 1.58, { material: 'sticky' })];
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies, contacts: [side()], events: [] }, never)).toContainEqual({
+    expect(stepInteractions(s, { now: 0, bodies, contacts: [side()], events: [] })).toContainEqual({
       kind: 'stickTogether',
       a: 'a',
       b: 'b',
     });
-    expect(stepInteractions(s, { now: 16, dtMs: 16, bodies, contacts: [side()], events: [] }, never)).toEqual([]);
-    expect(stepInteractions(s, { now: 32, dtMs: 16, bodies, contacts: [], events: [] }, never)).toEqual([
+    expect(stepInteractions(s, { now: 16, bodies, contacts: [side()], events: [] })).toEqual([]);
+    expect(stepInteractions(s, { now: 32, bodies, contacts: [], events: [] })).toEqual([
       { kind: 'unstick', a: 'a', b: 'b' },
     ]);
   });
@@ -146,29 +146,29 @@ describe('가만히 있는 이웃', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { idleMs: 5000 }), body('b', 1.9, { idleMs: 5000 }), body('far', 4, { idleMs: 5000 })];
     const always = () => 0;
-    const ev = stepInteractions(s, { now: 0, dtMs: 1000, bodies, contacts: [], events: [] }, always);
+    const ev = idleInteractions(s, bodies, 0, 1000, always);
     expect(ev).toContainEqual({ kind: 'glance', from: 'a', to: 'b' });
     expect(ev).toContainEqual({ kind: 'glance', from: 'b', to: 'a' });
     // 멀리 있는 말랑이는 이웃이 없다 (가장 가까운 b 도 반지름 합 2.6 배 밖)
     expect(ev.some((e) => e.kind === 'glance' && e.from === 'far')).toBe(false);
     // 한 번 보면 한동안 쉰다
-    expect(stepInteractions(s, { now: 1000, dtMs: 1000, bodies, contacts: [], events: [] }, always)).toEqual([]);
+    expect(idleInteractions(s, bodies, 1000, 1000, always)).toEqual([]);
     // 막 만진 말랑이는 두리번거리지 않는다
     const s2 = createInteractState();
     const busy = [body('a', 1, { idleMs: 100 }), body('b', 1.9, { idleMs: 100 })];
-    expect(stepInteractions(s2, { now: 0, dtMs: 1000, bodies: busy, contacts: [], events: [] }, always)).toEqual([]);
+    expect(idleInteractions(s2, busy, 0, 1000, always)).toEqual([]);
   });
 
   it('옆에서 졸면 따라 존다', () => {
     const s = createInteractState();
     const bodies = [body('a', 1, { dozing: true, idleMs: 30_000 }), body('b', 1.9, { idleMs: T.dozeSyncIdleMs })];
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies, contacts: [], events: [] }, never)).toContainEqual({
+    expect(idleInteractions(s, bodies, 0, 16, () => 0.99)).toContainEqual({
       kind: 'dozeTogether',
       id: 'b',
       with: 'a',
     });
     const early = [body('a', 1, { dozing: true, idleMs: 30_000 }), body('b', 1.9, { idleMs: 3000 })];
-    expect(stepInteractions(s, { now: 0, dtMs: 16, bodies: early, contacts: [], events: [] }, never)).toEqual([]);
+    expect(idleInteractions(s, early, 0, 16, () => 0.99)).toEqual([]);
   });
 
   it('사라진 말랑이 기록은 지운다', () => {

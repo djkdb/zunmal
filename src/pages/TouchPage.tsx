@@ -6,6 +6,8 @@
  *  - 그림: 3D 무대 하나(touch3d/jellyScene.ts, 렌더러 하나에 몸 N개) 또는 2D SVG 스프라이트 — 같은 세계 좌표(touch/matView.ts).
  *  - 입자: 캔버스 한 장(touch3d/fxLayer.ts), 말랑이마다 출처 하나.
  *  - 선반(아래), 봉인 캡슐 열기, 반응 방법 보기 + 손가락 시범, 사진(매트 전체).
+ *  - 촉감(data/materials.ts): 몸 재질(세계)·손맛(MalangActor)·소리가 말랑이마다 다르다. 전설 이상은 몸속 특별한 속.
+ *  - 말랑이끼리(touch/interactions.ts): 세계 맞닿음·부딪힘에서 볼 비비기·끙·덮치기·쿵·붙기·흘끔·같이 졸기.
  * 그리기는 무언가 움직일 때만 한다 (세계가 멈추고 모든 말랑이가 쉬면 루프를 멈춘다).
  */
 import {
@@ -30,6 +32,7 @@ import { CAPSULE_TOP, CapsuleArt } from '../components/playroom/CapsuleArt';
 import { MalangActor, TAP_MS } from '../components/playroom/malangActor';
 import { MatBody, bodyFrac, type RenderMode } from '../components/playroom/MatBody';
 import { MatCapsule } from '../components/playroom/MatCapsule';
+import { FillingIcon, MaterialIcon } from '../components/playroom/MaterialIcon';
 import {
   GhostFinger,
   ReactionGuide,
@@ -49,6 +52,7 @@ import {
 } from '../components/touch3d/loadJelly3d';
 import type { PhotoLayer } from '../components/touch3d/photo';
 import { getCharacter, type Character } from '../data/characters';
+import { fillingOf, materialOf } from '../data/materials';
 import { RARITY_META, TOUCH_FX } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { haptic } from '../lib/haptics';
@@ -61,6 +65,15 @@ import {
   registerCapsuleTap,
   type Pt,
 } from '../touch/capsule';
+import {
+  INTERACT_TUNING,
+  createInteractState,
+  forgetBody,
+  idleInteractions,
+  stepInteractions,
+  type InteractBody,
+  type InteractEvent,
+} from '../touch/interactions';
 import { computeMatLayout, matBounds, squeezePose, toScreen, toWorld, type MatLayout } from '../touch/matView';
 import { createPerf, looksLikePhone, samplePerf, type PerfState } from '../touch/perfGovernor';
 import { photoFileName } from '../touch/photoCard';
@@ -101,9 +114,7 @@ const LOAD_WAIT_MS = 1500;
 const DROP_Z = 1.3;
 /** 캡슐 반지름 (세계 단위) */
 const CAPSULE_R = 0.2;
-/** 누른 뒤 이만큼(말랑이 크기 비율) 끌면 들어서 옮긴다 */
-const CARRY_FRAC = 0.5;
-/** 캡슐은 조금만 끌어도 옮긴다 */
+/** 캡슐은 조금만 끌어도 옮긴다 (말랑이는 촉감 표의 carryFrac) */
 const CAPSULE_CARRY_FRAC = 0.3;
 /** 꾹 누르기 열기는 이만큼 누른 뒤부터 센다 (톡과 구분) */
 const CAPSULE_HOLD_DELAY = 220;
@@ -262,6 +273,7 @@ function Playroom() {
   const timersRef = useRef<number[]>([]);
   const burstIdRef = useRef(0);
   const photoLockRef = useRef(false);
+  const interactRef = useRef(createInteractState());
 
   const matRef = useRef<HTMLElement>(null);
   const stageElRef = useRef<HTMLDivElement>(null);
@@ -345,6 +357,8 @@ function Playroom() {
           character,
           shape,
           fxSpec,
+          material: materialOf(character),
+          filling: fillingOf(character),
           shiny: rec.shiny,
           reduced: () => reducedRef.current,
           level: () => levelOf(affectionRef.current[id] ?? 0),
@@ -435,7 +449,10 @@ function Playroom() {
     setWorldCap(world, Math.max(capRef.current, wantedKeys.length));
     const want = new Set(wantedKeys);
     for (const b of [...world.bodies]) {
-      if (!want.has(b.id)) removeBody(world, b.id);
+      if (!want.has(b.id)) {
+        removeBody(world, b.id);
+        forgetBody(interactRef.current, b.id);
+      }
     }
     for (const [key, rec] of [...recsRef.current]) {
       if (want.has(key)) continue;
@@ -455,7 +472,8 @@ function Playroom() {
       const spawn = spawnRef.current.get(key);
       spawnRef.current.delete(key);
       const spot = spawn ?? { ...findDropSpot(world, r, Math.random), z: reducedRef.current ? 0 : DROP_Z, pop: false };
-      addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r, h });
+      const material = kind === 'malang' ? materialOf(rec.character).world : undefined;
+      addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r, h, material });
       if (spawn?.pop) {
         if (!reducedRef.current) popBody(world, key, 4.2);
         later(() => rec.actor?.hello(), 80);
@@ -598,13 +616,13 @@ function Playroom() {
         const s = clamp01((ev.speed - 1) / 7);
         if (rec?.actor) rec.actor.bumped(0, s);
         if (rec?.kind === 'capsule') squish.capsuleTick();
-        squish.land(rec?.kind === 'capsule' ? s * 0.5 : s);
+        squish.land(rec?.kind === 'capsule' ? s * 0.5 : s, rec?.actor?.flavor ?? 'plain');
         if (s > 0.55 && !reducedRef.current) haptic('tap');
       } else if (ev.kind === 'bump') {
         const s = clamp01(ev.speed / 6);
         recs.get(ev.a)?.actor?.bumped(ev.nx, s * 0.7);
         recs.get(ev.b)?.actor?.bumped(-ev.nx, s * 0.7);
-        squish.bump(s);
+        squish.bump(s, recs.get(ev.a)?.actor?.flavor ?? 'plain');
       } else {
         const s = clamp01(ev.speed / 8);
         recs.get(ev.id)?.actor?.bumped(ev.nx, s * 0.6);
@@ -612,6 +630,152 @@ function Playroom() {
       }
     }
   }, []);
+
+  // ── 말랑이끼리 ──────────────────────────────────────────
+
+  /** 판정용 몸 목록 (말랑이만) */
+  const interactBodies = useCallback((now: number): InteractBody[] => {
+    const world = worldRef.current;
+    const out: InteractBody[] = [];
+    for (const rec of recsRef.current.values()) {
+      const a = rec.actor;
+      const wb = getBody(world, rec.key);
+      if (!a || !wb) continue;
+      out.push({
+        id: rec.key,
+        material: a.env.material.id,
+        x: wb.x,
+        y: wb.y,
+        z: wb.z,
+        r: wb.r,
+        touched: a.touched || wb.held,
+        idleMs: a.idleFor(now),
+        dozing: a.dozing,
+      });
+    }
+    return out;
+  }, []);
+
+  /** 이 말랑이 얼굴 가운데 (client px) — 흘끔·볼 비비기 때 서로 쳐다본다 */
+  const faceSpot = useCallback(
+    (rec: BodyRec) => {
+      const box = spriteBox(rec);
+      if (!box) return null;
+      const k = box.size / VIEWBOX.w;
+      return { x: box.left + (60 - VIEWBOX.x) * k, y: box.top + (SHAPES[rec.character.shape].faceY - VIEWBOX.y) * k };
+    },
+    [spriteBox],
+  );
+
+  const lookEachOther = useCallback(
+    (a: BodyRec, b: BodyRec, ms?: number) => {
+      const fa = faceSpot(a);
+      const fb = faceSpot(b);
+      if (fb) a.actor?.glanceAt(fb.x, fb.y, ms);
+      if (fa) b.actor?.glanceAt(fa.x, fa.y, ms);
+    },
+    [faceSpot],
+  );
+
+  const handlePairs = useCallback(
+    (events: InteractEvent[]) => {
+      const recs = recsRef.current;
+      const world = worldRef.current;
+      const reducedNow = reducedRef.current;
+      for (const ev of events) {
+        switch (ev.kind) {
+          case 'cheekRub': {
+            const a = recs.get(ev.a);
+            const b = recs.get(ev.b);
+            if (!a?.actor || !b?.actor) break;
+            // a 는 b 에서 +nx 쪽에 있다 → a 의 짝은 −nx 쪽
+            a.actor.cheekRub(-ev.nx);
+            b.actor.cheekRub(ev.nx);
+            lookEachOther(a, b, 1500);
+            squish.cheekRub();
+            if (!reducedNow) haptic('tap');
+            const store = useGameStore.getState();
+            if (ev.petA) store.petMalang(a.id, INTERACT_TUNING.rubAffection);
+            if (ev.petB) store.petMalang(b.id, INTERACT_TUNING.rubAffection);
+            break;
+          }
+          case 'stack': {
+            recs.get(ev.bottom)?.actor?.squishedUnder();
+            recs.get(ev.top)?.actor?.onTop();
+            squish.groan();
+            break;
+          }
+          case 'dropOn': {
+            const top = recs.get(ev.top);
+            const bottom = recs.get(ev.bottom);
+            const s = clamp01(ev.speed / 7);
+            if (!reducedNow) {
+              popBody(world, ev.top, 2.4 + 2 * s);
+              popBody(world, ev.bottom, 1.6 + 1.6 * s);
+            }
+            bottom?.actor?.squishedUnder();
+            top?.actor?.onTop();
+            squish.boing(s);
+            break;
+          }
+          case 'bumpHard': {
+            const a = recs.get(ev.a);
+            const b = recs.get(ev.b);
+            a?.actor?.startled();
+            b?.actor?.startled();
+            const s = clamp01(ev.speed / 6);
+            if (ev.same === 'jelly') {
+              // 탱탱 젤리끼리: 더 멀리 튕겨 나간다
+              const wa = getBody(world, ev.a);
+              const wb = getBody(world, ev.b);
+              if (wa && wb && !reducedNow) {
+                const dx = wa.x - wb.x;
+                const dy = wa.y - wb.y;
+                const d = Math.hypot(dx, dy) || 1;
+                nudgeBody(world, ev.a, dx / d, dy / d, 0.6 + 0.6 * s);
+                nudgeBody(world, ev.b, -dx / d, -dy / d, 0.6 + 0.6 * s);
+              }
+              squish.boing(s);
+            } else {
+              squish.surprised();
+            }
+            break;
+          }
+          case 'stickTogether': {
+            const a = recs.get(ev.a);
+            const b = recs.get(ev.b);
+            a?.actor?.showFace('happy', 1200);
+            b?.actor?.showFace('happy', 1200);
+            if (a && b) lookEachOther(a, b, 1200);
+            squish.squishPress(0.3, 'sticky');
+            break;
+          }
+          case 'unstick': {
+            recs.get(ev.a)?.actor?.showFace('wide', 600);
+            recs.get(ev.b)?.actor?.showFace('wide', 600);
+            squish.peel(0.6);
+            break;
+          }
+          case 'glance': {
+            const from = recs.get(ev.from);
+            const to = recs.get(ev.to);
+            const f = to ? faceSpot(to) : null;
+            if (from?.actor && f) from.actor.glanceAt(f.x, f.y);
+            break;
+          }
+          case 'dozeTogether': {
+            const me = recs.get(ev.id)?.actor;
+            const other = recs.get(ev.with)?.actor;
+            // 숨 위상을 옆 말랑이와 맞춘다
+            if (me && other) me.dozeOff(other.soft.timeMs);
+            break;
+          }
+        }
+      }
+      requestFrame();
+    },
+    [faceSpot, lookEachOther, requestFrame],
+  );
 
   // ── 캡슐 모양·열기 ──────────────────────────────────────
 
@@ -683,7 +847,15 @@ function Playroom() {
     const dt = last === null ? 16 : Math.min(50, ts - last);
     const now = performance.now();
     const world = worldRef.current;
-    handleEvents(stepWorld(world, dt));
+    const worldEvents = stepWorld(world, dt);
+    handleEvents(worldEvents);
+    const pairEvents = stepInteractions(interactRef.current, {
+      now,
+      bodies: interactBodies(now),
+      contacts: world.touching,
+      events: worldEvents,
+    });
+    if (pairEvents.length > 0) handlePairs(pairEvents);
 
     let busy = false;
     let dozeOnly = true;
@@ -720,6 +892,7 @@ function Playroom() {
       }
       const moving = actor.frame(dt, now, rec.view !== null);
       busy = busy || moving;
+      const fill = actor.env.filling ? actor.fill : null;
       if (!actor.dozeOnly()) dozeOnly = false;
       const sq = Math.hypot(wb.squeezeX, wb.squeezeY, wb.squeezeZ);
       const sqChanged = Math.abs(sq - rec.lastSqueeze) > 1e-4;
@@ -740,6 +913,7 @@ function Playroom() {
           rec.still = !moving && !sqChanged;
         }
         rec.view.setGaze(gaze.x, gaze.y);
+        if (fill) rec.view.setFill(fill.glow, fill.swirl);
       }
       if (els.sprite && (!rec.view || modeRef.current !== '3d')) {
         const t = actor.transform2d();
@@ -751,6 +925,10 @@ function Playroom() {
           `scale(${(t.scaleX * sqp.scaleX).toFixed(4)}, ${(t.scaleY * sqp.scaleY).toFixed(4)})`;
         els.sprite.style.setProperty('--gaze-x', gaze.x.toFixed(2));
         els.sprite.style.setProperty('--gaze-y', gaze.y.toFixed(2));
+        if (fill) {
+          els.sprite.style.setProperty('--fill-glow', fill.glow.toFixed(3));
+          els.sprite.style.setProperty('--fill-swirl', `${fill.swirl.toFixed(3)}rad`);
+        }
       }
     }
     const worldMoving = !isWorldAtRest(world);
@@ -806,9 +984,10 @@ function Playroom() {
     [],
   );
 
-  // 가만히 두면 하품·졸기 (말랑이마다 따로), 졸면 z z
+  // 가만히 두면 하품·졸기 (말랑이마다 따로), 졸면 z z. 이웃끼리 흘끔·같이 졸기
   useEffect(() => {
     let tick = 0;
+    let last = performance.now();
     const t = window.setInterval(() => {
       tick++;
       const now = performance.now();
@@ -818,9 +997,14 @@ function Playroom() {
         a.idleTick(now, document.hidden);
         if (a.dozing && tick % 2 === 0 && !document.hidden) rec.fx?.react('zzz', 1);
       }
+      if (!document.hidden) {
+        const ev = idleInteractions(interactRef.current, interactBodies(now), now, now - last, Math.random);
+        if (ev.length > 0) handlePairs(ev);
+      }
+      last = now;
     }, 1000);
     return () => window.clearInterval(t);
-  }, []);
+  }, [handlePairs, interactBodies]);
 
   // ── 애정 단계 축하 + 새 반응 시범 ─────────────────────────
 
@@ -1010,7 +1194,8 @@ function Playroom() {
     };
     if (rec.kind === 'malang' && rec.actor) {
       const actor = rec.actor;
-      if (!actor.carrying && actor.travel(e.clientX, e.clientY) > L.sprite * CARRY_FRAC) {
+      // 쭉쭉이는 멀리 늘어난 뒤에야 따라온다 (촉감 표의 carryFrac)
+      if (!actor.carrying && actor.travel(e.clientX, e.clientY) > L.sprite * actor.env.material.carryFrac) {
         startCarry();
         actor.startCarry();
       }
@@ -1193,6 +1378,8 @@ function Playroom() {
   // ── 사진 ────────────────────────────────────────────────
 
   const focusChar = focusId ? getCharacter(focusId) : undefined;
+  const focusMaterial = focusChar ? materialOf(focusChar) : null;
+  const focusFilling = focusChar ? fillingOf(focusChar) : null;
 
   const takePhoto = async () => {
     if (photoLockRef.current) return;
@@ -1367,6 +1554,20 @@ function Playroom() {
                 Lv.{level}
               </span>
             </p>
+            {focusMaterial && (
+              <p className="pr-info__feel">
+                <span className="pr-chip" data-material={focusMaterial.id}>
+                  <MaterialIcon material={focusMaterial.id} size={14} />
+                  {focusMaterial.label}
+                </span>
+                {focusFilling && (
+                  <span className="pr-chip pr-chip--filling" title={focusFilling.label}>
+                    <FillingIcon kind={focusFilling.kind} colors={focusFilling.colors} size={14} />
+                    <span className="pr-chip__text">{focusFilling.label}</span>
+                  </span>
+                )}
+              </p>
+            )}
             <span
               className="pr-info__bar"
               role="progressbar"
@@ -1523,6 +1724,9 @@ function Playroom() {
         <ReactionGuide
           level={level}
           name={focusChar?.name ?? '말랑이'}
+          material={focusMaterial?.id ?? null}
+          filling={focusFilling}
+
           onClose={closeGuide}
           onShow={(d) => {
             setGuideOpen(false);

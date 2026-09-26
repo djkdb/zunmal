@@ -4,14 +4,15 @@
  *  - dizzy : 빙글빙글 소용돌이 눈
  *  - yawn  : 감은 눈 + 크게 벌린 입 (하품)
  *  - blush : 웃는 눈 + 진하게 빨개진 볼과 빗금
+ *  - strain: 꼭 감은 눈 + 꾹 다문 물결 입 + 땀방울 (위에 누가 올라타 "끙")
  */
 import type { MalangEyes } from '../data/characters';
 import type { ShapeSpec } from '../components/malang/shapes';
 
-export type ExtraFace = 'dizzy' | 'yawn' | 'blush';
+export type ExtraFace = 'dizzy' | 'yawn' | 'blush' | 'strain';
 export type TouchFace = 'default' | 'happy' | 'sleepy' | 'wide' | ExtraFace;
 
-export const EXTRA_FACES: readonly ExtraFace[] = ['dizzy', 'yawn', 'blush'];
+export const EXTRA_FACES: readonly ExtraFace[] = ['dizzy', 'yawn', 'blush', 'strain'];
 
 export interface FacePath {
   d: string;
@@ -30,6 +31,7 @@ export function baseEyes(face: TouchFace, own: MalangEyes): MalangEyes {
     case 'dizzy':
       return own;
     case 'yawn':
+    case 'strain':
       return 'sleepy';
     case 'blush':
       return 'happy';
@@ -85,7 +87,30 @@ export function faceExtras(face: TouchFace, shape: Pick<ShapeSpec, 'faceY' | 'ey
           width: 1.3,
         },
       ]);
+    case 'strain':
+      return [
+        // 꾹 다문 물결 입
+        {
+          d: `M${f(52)} ${f(y + 11)} q2 -2.4 4 0 t4 0 t4 0 t4 0`,
+          stroke: INK,
+          width: 1.8,
+        },
+        // 힘주는 눈가 주름
+        ...[left, right].map((x, i) => ({
+          d: `M${f(x + (i === 0 ? -8 : 8))} ${f(y - 4)} l${i === 0 ? 3 : -3} 2.6`,
+          stroke: INK,
+          width: 1.5,
+        })),
+        // 땀방울
+        {
+          d: `M${f(right + 12)} ${f(y - 14)} q-3.6 5.4 -3.6 7.6 a3.6 3.6 0 0 0 7.2 0 q0 -2.2 -3.6 -7.6 Z`,
+          fill: '#bfe8ff',
+          stroke: INK,
+          width: 1.4,
+        },
+      ];
     default:
       return [];
   }
 }
+
