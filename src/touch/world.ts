@@ -48,8 +48,10 @@ export interface WorldBody {
   vx: number;
   vy: number;
   vz: number;
-  /** 몸 반지름 (세계 단위) */
+  /** 몸 반지름 (세계 단위, 매트 방향) */
   r: number;
+  /** 몸 높이 (세계 단위). 말랑이는 보통 폭보다 낮다 → 몸끼리 위아래로는 이 높이로 닿는다 */
+  h: number;
   material: BodyMaterial;
   /** 손가락이 들고 옮기는 중 (스프링으로 목표를 따라간다, 중력 없음) */
   held: boolean;
@@ -177,6 +179,8 @@ export interface NewBody {
   /** 떨어뜨릴 높이 (기본 0 = 매트 위) */
   z?: number;
   r: number;
+  /** 몸 높이 (기본 2r) */
+  h?: number;
   material?: Partial<BodyMaterial>;
 }
 
@@ -194,6 +198,7 @@ export function addBody(world: World, nb: NewBody): boolean {
     vy: 0,
     vz: 0,
     r,
+    h: nb.h !== undefined && Number.isFinite(nb.h) && nb.h > 0 ? nb.h : 2 * r,
     material: { ...JELLY_MATERIAL, ...nb.material },
     held: false,
     holdX: 0,
@@ -370,9 +375,10 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
         const d = Math.hypot(b.x - o.x, b.y - o.y);
         const rr = b.r + o.r;
         if (d < rr * T.climbReach) {
-          // 가까워질수록 미리 올라가 옆으로 밀지 않고 넘어간다
-          const up = Math.sqrt(Math.max(0, rr * rr - d * d * 0.6));
-          targetZ = Math.max(targetZ, o.z + o.r + up - b.r + 0.03);
+          // 가까워질수록 미리 올라가 옆으로 밀지 않고 넘어간다 (위아래는 높이 비율로 줄여 잰다)
+          const zs = rr / ((b.h + o.h) / 2);
+          const up = Math.sqrt(Math.max(0, rr * rr - d * d * 0.6)) / zs;
+          targetZ = Math.max(targetZ, o.z + o.h / 2 + up - b.h / 2 + 0.03);
         }
       }
       b.vx += (T.holdK * (b.holdX - b.x) - c * b.vx) * h;
@@ -394,8 +400,9 @@ function subStep(world: World, h: number, events: WorldEvent[], touching: Set<st
       const b = bodies[j]!;
       const dx = a.x - b.x;
       const dy = a.y - b.y;
-      const dz = a.z + a.r - (b.z + b.r);
       const rr = a.r + b.r;
+      // 위아래는 두 몸 높이의 평균이 반지름 합이 되도록 늘려 잰다 (납작한 말랑이끼리 딱 붙어 쌓이게)
+      const dz = (a.z + a.h / 2 - (b.z + b.h / 2)) * (rr / ((a.h + b.h) / 2));
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 >= rr * rr) continue;
       const dist = Math.sqrt(d2);

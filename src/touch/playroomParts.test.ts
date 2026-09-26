@@ -42,6 +42,12 @@ describe('perf governor', () => {
     expect(s.cap).toBe(PERF_TUNING.minCap);
   });
 
+  it('아주 느린 기기(3fps)도 몇 초 안에 2D 로 내린다', () => {
+    let s = createPerf({ phone: true, quality: '3d' });
+    s = feed(s, 350, 12);
+    expect(s.quality).toBe('2d');
+  });
+
   it('보통 속도(45fps)면 그대로, 멈췄다 다시 그린 긴 간격은 버린다', () => {
     let s = createPerf({ phone: true, quality: '3d' });
     s = feed(s, 22, PERF_TUNING.minSamples * 2);

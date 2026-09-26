@@ -16,7 +16,7 @@ export const CAPSULE_TOP: Record<Rarity, string> = {
  * 놀이방은 CSS 변수(--cap-twist 각도, --cap-gap px, --cap-crack 0..1)로 비틀고 벌린다.
  */
 export function CapsuleArt({ rarity, className }: { rarity: Rarity; className?: string }) {
-  const id = useId().replace(/:/g, '');
+  const id = `cap${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const top = CAPSULE_TOP[rarity];
   const fill = top === 'rainbow' ? `url(#${id}-rainbow)` : top === 'cosmic' ? `url(#${id}-cosmic)` : top;
   return (

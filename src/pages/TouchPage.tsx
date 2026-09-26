@@ -451,10 +451,11 @@ function Playroom() {
       if (!rec) continue;
       const shape = SHAPES[rec.character.shape];
       const r = kind === 'capsule' ? CAPSULE_R : (((shape.right - shape.left) / 2) / VIEWBOX.w) * 0.95;
+      const h = kind === 'capsule' ? CAPSULE_R * 2 : ((shape.bottom - shape.top) / VIEWBOX.w) * 0.92;
       const spawn = spawnRef.current.get(key);
       spawnRef.current.delete(key);
       const spot = spawn ?? { ...findDropSpot(world, r, Math.random), z: reducedRef.current ? 0 : DROP_Z, pop: false };
-      addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r });
+      addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r, h });
       if (spawn?.pop) {
         if (!reducedRef.current) popBody(world, key, 4.2);
         later(() => rec.actor?.hello(), 80);
@@ -767,7 +768,7 @@ function Playroom() {
         const prev = perfRef.current;
         perfRef.current = next;
         if (next.cap !== prev.cap) setCap(next.cap);
-        if (next.quality === '2d' && prev.quality === '3d' && modeRef.current !== '2d') setMode('2d');
+        if (next.quality === '2d' && prev.quality === '3d' && modeRef.current !== '2d' && !keep3dForTests()) setMode('2d');
       }
     }
     if (busy || worldMoving || pointersRef.current.size > 0) {
@@ -781,6 +782,16 @@ function Playroom() {
   useEffect(() => {
     setWorldCap(worldRef.current, Math.max(cap, worldRef.current.bodies.length));
   }, [cap]);
+
+  // 개발 중 확인용: 브라우저 자동 검사에서 세계 상태를 읽는다
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    const w = window as unknown as { __playroomWorld?: unknown };
+    w.__playroomWorld = worldRef.current;
+    return () => {
+      delete w.__playroomWorld;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -992,7 +1003,8 @@ function Playroom() {
     const startCarry = () => {
       const wb = getBody(world, p.key);
       if (!wb) return;
-      const w = toWorld(L, e.clientX, e.clientY);
+      // 처음 누른 자리 기준: 몸은 제자리에 있었으니 손가락을 따라잡으며 "딸려 온다"
+      const w = toWorld(L, p.startX, p.startY);
       grabBody(world, p.key);
       p.grab = { dx: wb.x - w.x, dy: wb.y - w.y };
     };
@@ -1246,6 +1258,7 @@ function Playroom() {
         shiny: group ? false : recs[0]!.shiny,
         level: levelOf(affectionRef.current[main.id] ?? 0),
         caption: group ? '놀이방에서 함께 놀았어요' : undefined,
+        group,
         jelly: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) },
         bounds: matRect ? toRect(matRect) : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight },
         layers,
@@ -1337,6 +1350,70 @@ function Playroom() {
         <div className="playroom__cloth" />
       </div>
 
+      {/* 위 HUD 를 먼저 둔다: 키보드 Tab 순서가 나가기 → 정보 → 방법 → 사진 → 매트 위 말랑이 → 선반 */}
+      <div ref={hudRef} className="playroom__hud">
+        <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
+          <CloseIcon size={24} />
+        </button>
+        {focusChar ? (
+          <div className="pr-info" role="group" aria-label={`${josa(focusChar.name, '과/와')}의 애정`}>
+            <p className="pr-info__row">
+              <span className="pr-info__name">{focusChar.name}</span>
+              <span className="pr-info__level">
+                <HeartShape />
+                Lv.{level}
+              </span>
+            </p>
+            <span
+              className="pr-info__bar"
+              role="progressbar"
+              aria-label="다음 단계까지"
+              aria-valuemin={0}
+              aria-valuemax={AFFECTION_PER_LEVEL}
+              aria-valuenow={progress}
+            >
+              <span style={{ width: `${(progress / AFFECTION_PER_LEVEL) * 100}%` }} />
+            </span>
+            <p className="pr-info__next">
+              {upcoming ? (
+                <>
+                  <LockShape />
+                  <span>
+                    Lv.{upcoming.level} {upcoming.label}: {upcoming.howTo}
+                  </span>
+                </>
+              ) : (
+                '모든 반응을 열었어요'
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="pr-info pr-info--empty">
+            <p className="pr-info__next">말랑이를 꺼내 함께 놀아요</p>
+          </div>
+        )}
+        <button
+          type="button"
+          className="pr-round pr-guide-btn"
+          aria-label="만지는 방법 보기"
+          onClick={() => {
+            sfx.button();
+            setGuideOpen(true);
+          }}
+        >
+          <HandShape />
+        </button>
+        <button
+          type="button"
+          className="pr-round pr-camera"
+          aria-label="매트 사진 찍기"
+          disabled={photoBusy || onMat.length === 0}
+          onClick={() => void takePhoto()}
+        >
+          <CameraShape />
+        </button>
+      </div>
+
       <div
         ref={stageElRef}
         className="playroom__stage"
@@ -1406,69 +1483,6 @@ function Playroom() {
           <strong>{demo.spec.label}</strong> {demo.spec.howTo}
         </p>
       )}
-
-      <div ref={hudRef} className="playroom__hud">
-        <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
-          <CloseIcon size={24} />
-        </button>
-        {focusChar ? (
-          <div className="pr-info" role="group" aria-label={`${josa(focusChar.name, '과/와')}의 애정`}>
-            <p className="pr-info__row">
-              <span className="pr-info__name">{focusChar.name}</span>
-              <span className="pr-info__level">
-                <HeartShape />
-                Lv.{level}
-              </span>
-            </p>
-            <span
-              className="pr-info__bar"
-              role="progressbar"
-              aria-label="다음 단계까지"
-              aria-valuemin={0}
-              aria-valuemax={AFFECTION_PER_LEVEL}
-              aria-valuenow={progress}
-            >
-              <span style={{ width: `${(progress / AFFECTION_PER_LEVEL) * 100}%` }} />
-            </span>
-            <p className="pr-info__next">
-              {upcoming ? (
-                <>
-                  <LockShape />
-                  <span>
-                    Lv.{upcoming.level} {upcoming.label}: {upcoming.howTo}
-                  </span>
-                </>
-              ) : (
-                '모든 반응을 열었어요'
-              )}
-            </p>
-          </div>
-        ) : (
-          <div className="pr-info pr-info--empty">
-            <p className="pr-info__next">말랑이를 꺼내 함께 놀아요</p>
-          </div>
-        )}
-        <button
-          type="button"
-          className="pr-round pr-guide-btn"
-          aria-label="만지는 방법 보기"
-          onClick={() => {
-            sfx.button();
-            setGuideOpen(true);
-          }}
-        >
-          <HandShape />
-        </button>
-        <button
-          type="button"
-          className="pr-round pr-camera"
-          aria-label="매트 사진 찍기"
-          disabled={photoBusy || onMat.length === 0}
-          onClick={() => void takePhoto()}
-        >
-          <CameraShape />
-        </button>
-      </div>
 
       {toast && (
         <p className="pr-toast" data-rarity={toast.rarity} role="status">
@@ -1541,6 +1555,16 @@ function Playroom() {
       )}
     </section>
   );
+}
+
+/** 개발 서버에서만: 소프트웨어 WebGL(swiftshader)로 3D 화면을 확인할 때 자동 2D 전환을 끈다 */
+function keep3dForTests(): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return localStorage.getItem('playroom-keep-3d') === '1';
+  } catch {
+    return false;
+  }
 }
 
 function newCapState(): CapState {

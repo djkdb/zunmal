@@ -34,7 +34,7 @@ src/
   components/     Malang, TopBar, GachaMachine, PullResult, Collection, RateTable, MiniGameLobby, MiniGameResult …
   minigames/      types.ts, registry.ts, shared/(HUD·카운트다운), <game-id>/{index.tsx, logic.ts, logic.test.ts}
   missions/       missions.ts — 일일 미션 생성/진행/보상 (순수)
-  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage
+  pages/          HomePage, GachaPage, CollectionPage, MiniGamePage, TouchPage(놀이방)
 ```
 
 의존 방향 (위가 아래를 import 가능, 역방향 금지):
@@ -146,24 +146,57 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 진행은 store 액션(`finishMiniGame`, `pull`, `petMalang`)이 기록한다. 보상(`MISSION_REWARD_COINS`) + 올클리어 보너스.
 - 받을 보상이 있으면 홈 탭에 빨간 점.
 
-## 말랑 만지기 (`pages/TouchPage.tsx`, `touch/physics.ts`, `audio/squish.ts`)
+## 놀이방 — 말랑 만지기 (`pages/TouchPage.tsx`, `components/playroom/`, `touch/`, `audio/squish.ts`)
 
-- 스프링 기반 말랑 물리(순수 모듈, 테스트 있음) + WebAudio로 합성한 찰박·쭉·뽁 소리.
-- 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다.
-- 만지면 친밀도(`affection`)가 오른다. 친밀도는 코인을 주지 않는다.
-- **3D 젤리** (`components/touch3d/`, three.js): 윤곽 path를 부풀린 메시(`touch/jellyMesh.ts`) +
+- `/touch`, `/touch/:id`는 **화면 전체가 책상 위 깅엄 놀이 매트**인 독립 창이다. AppShell이 위 막대·아래 탭을 숨기고
+  (`useMatch('/touch/*')`), 왼쪽 위 나가기(이전 화면, 없으면 홈) · 집중한 말랑이 정보(애정 단계 + 다음 반응 방법) · 방법 보기 · 사진 버튼.
+- **말랑이 2~5마리를 함께** 꺼내 논다. 상한은 폰 3, 계속 55fps 이상이면 5(`touch/perfGovernor.ts`, 순수·테스트).
+  3D가 35fps 아래로 떨어지면 2D로, 2D도 30fps 아래면 상한을 줄인다(나와 있는 말랑이는 치우지 않음).
+- **두 층 물리** (모두 순수·dt 주입·테스트):
+  - 몸 전체 위치 = 매트 세계 하나 `touch/world.ts`: 매트 쪽 중력, 반지름 r 인 말랑한 공끼리 부드러운 밀어내기 + 쿨롱 마찰
+    (가운데 올리면 얹혀 쉬고 많이 비끼면 기대다 미끄러짐), 벽 튕김, 들어 옮기기(`grabBody`/`moveHeld`, 천천히 다른 말랑이 위로
+    가져가면 올라타 쌓이고 빠르면 밀어냄), 던지기(`releaseBody`), 화살표 툭(`nudgeBody`). 착지·부딪힘·벽 사건을 돌려준다.
+    재질(`BodyMaterial`: 튐·마찰·강성·질량)은 **2단계 말랑이별 재질**을 넣을 자리.
+  - 몸 안쪽 출렁임 = 말랑이마다 `components/playroom/malangActor.ts`(`MalangActor`): 예전 한 마리 코드 그대로 —
+    `physics.ts`(눌림·기울기, 착지·부딪힘은 `impact`) + `softbody.ts`(3D 자국·당김) + 반응·눈길·졸음·소리·입자·진동·애정.
+  - 화면 배치는 `touch/matView.ts`(3/4 시점: 깊이 y는 화면 아래, 높이 z는 위, 맞닿아 눌린 모양 `squeezePose`).
+- 손가락: 누르면 그 말랑이가 "집중"(정보 표시). 제자리에서 누르기·당기기·문지르기·콕은 예전과 같고, **말랑이 크기 절반 넘게 끌면 들어 옮긴다**
+  (늘어난 채 따라옴), 휙 놓으면 던진다. 말랑이마다 손가락 하나, 여러 손가락으로 여러 마리 동시에. 3D 는 레이캐스트로 가장 앞 몸,
+  2D 는 몸통 타원 + 폰용 넉넉한 거리. 키보드: Tab 으로 매트 위 말랑이(투명 버튼), Enter/Space = 콕(길게 = 꾹), 누른 채 화살표 = 당기기,
+  화살표만 = 그쪽으로 톡 밀기.
+- **선반**(`components/playroom/Shelf.tsx`, 순서는 `touch/shelf.ts`): 아래 손잡이를 올리면 나무 선반. 등급 높은 순 → 최근 얻은 순.
+  나와 있는 칸은 빈 받침, 누르면 넣기. 매트가 꽉 차면 알림.
+- **캡슐 열기** (`touch/capsule.ts`, 순수·테스트): v7부터 새로 얻은 말랑이는 선반에 봉인된 캡슐(등급 색 + NEW 딱지).
+  꺼내면 매트에 캡슐이 떨어지고 두 손가락 비틀기(70°) · 두 손가락으로 벌리기 · 톡 세 번 · 꾹 0.9초 중 아무거나로 연다.
+  비틀 때 톱니 딱(`squish.capsuleTick`) → 딸깍(`capsuleClick`) + 뽁(`popOut`) → 뚜껑이 날아가고 말랑이가 폴짝 튀어나와 철퍽 착지,
+  반짝이는 `TOUCH_FX.milestone`(등급별) + 등급 진동. 연 순간 `unboxMalang`으로 저장. 캡슐은 DOM(SVG)으로 3D 캔버스 위에 그린다.
+- **반응을 찾게 돕기**: 반응 표(`REACTION_UNLOCKS`)에 `howTo`(한 줄 방법)·`gesture`·`area`가 있고 기본 손짓은 `BASIC_GESTURES` —
+  방법 보기 시트(`ReactionGuide`, 그림 `GestureArt`: 실루엣 + 만질 곳 + 손짓 표시, 열림/잠김 단계), 반투명 손가락 시범(`GhostFinger`,
+  처음 방문·새 반응이 열릴 때·시트의 "보기", 만지면 사라짐, 움직임 줄이기면 움직이지 않는 그림), 열림 딱지 "새 반응: 이름" + 방법 줄,
+  정보 패널 아래 줄은 다음 반응의 방법. 본 시범은 `localStorage['malang-playroom-demos']`(저장 데이터 아님).
+  부위는 넉넉하게: 머리 = 몸 위 35%, 볼 = 그 아래 양옆 25% 띠. 머리 쓰다듬기는 1초 안에 좌우 두 번 오가거나(`rubStep`) 머리를 톡.
+- 소리는 `sfx.getOutput()`(효과음 버스)으로 같은 AudioContext와 효과음 설정을 공유한다. 자체 컨텍스트를 만들지 않는다. 착지·부딪힘 소리
+  (`squish.land`/`bump`)는 연타 간격 제한.
+- 만지면 친밀도(`affection`)가 오른다(만진 말랑이만). 친밀도는 코인을 주지 않는다.
+- **3단계(꾸미기·단체 사진) 자리**: 매트 위 물건 기록 `components/playroom/bodyRec.ts`(`kind`에 소품 추가), 3D 무대 `stage.scene`,
+  사진 `composePhoto`의 `caption`(단체 사진 한 줄).
+- **3D 젤리** (`components/touch3d/`, three.js): 무대 하나(`createJellyStage`: 렌더러·장면·카메라) 안에 몸 N개(`stage.addBody`).
+  몸은 화면을 보고 서 있고 매트 깊이는 z로 두되 원근만큼 위치·크기를 되돌려 DOM 좌표와 정확히 맞춘다. 멈춘 몸은 정점을 다시 계산하지 않는다.
+  윤곽 path를 부풀린 메시(`touch/jellyMesh.ts`) +
   순수 스프링 변형(`touch/softbody.ts`: 누른 자국·당김·비틀림·숨쉬기, 부피 보존, 테스트 있음).
   전체 눌림·기울기는 2D와 같은 `physics.ts` 값을 쓴다 → 소리·애정·미션이 두 버전에서 같다.
   - 겉모습은 화면 밖에 그린 실제 `<Malang>`을 구운 텍스처(`rasterMalang.ts`) — 새 말랑이·그림 수정이 자동 반영.
     몸 밖 장식은 몸 뒤/앞 평평한 카드, 외곽선은 뒤집힌 껍질. 얼굴(기쁨·졸림·놀람·깜빡임)은 텍스처 교체.
-  - `loadJelly3d.ts`로 만지기 화면에서만 받는 청크(three는 epic과 공유 청크). 1.5초 안에 못 받거나 WebGL이 없거나
-    움직임 줄이기면 기존 2D SVG. 렌더러 하나를 캐릭터 전환에도 재사용, 떠나면 dispose + forceContextLoss.
+  - `loadJelly3d.ts`로 놀이방에서만 받는 청크(three는 epic과 공유 청크). 1.5초 안에 못 받거나 WebGL이 없거나
+    움직임 줄이기면 같은 세계를 2D SVG 스프라이트로(간단한 눌림). 몸 하나의 텍스처가 아직 안 구워졌으면 그 몸만 2D로 보인다.
+    떠나면 dispose + forceContextLoss.
   - 멈추면 그리지 않는다(숨쉬기는 놓은 뒤 약 7초만). DPR 최대 2, 느리면 자동으로 낮춘다.
 - **등급별 손맛** (`data/rarity.ts`의 `TOUCH_FX`·`SHINY_TOUCH_FX` 표만 읽는다): 일반 거품 → 레어 반짝이 → 에픽 반짝이+끌기 꼬리
   → 전설 금별+몸 뒤 빛(찌르면 부푼다) → 신화·시크릿은 `epic/themes.ts` 모티프(은하 소용돌이 별, 불사조 불씨, 유니콘 무지개 하트,
   고래 거품·별 물방울·잔물결, 세라핌 빛 조각·깃털·후광 반짝). 시크릿은 가만히 있어도 모티프 입자가 떠다닌다.
   반짝은 무지개 반짝이 추가 + 3D 박막 무지갯빛. 방울 소리(`squish.chime`, 연타 간격 제한)·진동(`haptic`)도 등급 따라 커진다.
-  - 입자: 순수 모듈 `touch/touchFx.ts`(풀 120개, RNG·dt 주입, 테스트) + `touchFxDraw.ts` + 캔버스 한 장(`touch3d/fxLayer.ts`).
+  - 입자: 순수 모듈 `touch/touchFx.ts`(풀 120개, RNG·dt 주입, 테스트) + `touchFxDraw.ts` + 캔버스 한 장(`touch3d/fxLayer.ts`,
+    말랑이마다 `layer.source()` 하나 — 풀·루프는 함께).
     3D 캔버스 위에 얹고 2D 대체에서도 같다. 입자가 없으면 루프를 멈추고, 떠다니는 입자만 있으면 30fps. 움직임 줄이기면 캔버스 없음.
   - 3D 빛은 같은 렌더러 안의 텍스처 한 장 + 가장자리 빛 uniform (새 컨텍스트·후처리 없음).
 - **반응** (`touch/reactions.ts`, 순수·테스트): 머리 쓰다듬기(가르랑+하트), 볼 콕(빨개짐), 배 콕(킥킥 폴짝), 빠른 연타(깔깔 흔들기),
@@ -172,9 +205,9 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
   저장 구조는 그대로(애정 값에서 계산).
   - 눈길: 손가락/마우스 쪽으로 얼굴이 옮겨 간다(2D는 `.malang-face` CSS 변수, 3D는 셰이더 UV 당김). 떼면 다시 앞을 본다.
   - 만지기 전용 얼굴(`touch/faceExtras.ts`: 소용돌이 눈·하품 입·진한 볼)은 SVG path — 2D는 덧그린 `<svg>`, 3D는 구운 텍스처에 Path2D.
-  - 가만히 8초 → 하품, 20초 → 졸기(감은 눈, z 입자, 느린 숨 — 3D는 20fps로만 그림). 만지면 깜짝 놀라 폴짝.
-- **사진 찍기** (`touch3d/photo.ts` 동적 import, 배치는 순수 `touch/photoCard.ts`): 지금 모습(3D 캔버스 스냅샷 또는 2D SVG)+입자를
-  1080×1350 카드(이름 풍선 글씨·등급 딱지·애정 단계·가게 이름)로 PNG. 미리보기에서 한 번 더 눌러 공유(Web Share 파일) 또는 저장.
+  - 가만히 8초 → 하품, 20초 → 졸기(말랑이마다 따로. 감은 눈, z 입자, 느린 숨 — 3D는 20fps로만 그림). 만지거나 세게 부딪히면 깜짝 놀라 폴짝.
+- **사진 찍기** (`touch3d/photo.ts` 동적 import, 배치는 순수 `touch/photoCard.ts`): 매트 위 모든 말랑이(3D 무대 스냅샷 또는 2D SVG)+입자를
+  1080×1350 카드(이름 풍선 글씨·등급 딱지·애정 단계·가게 이름, 여럿이면 "말랑이 N마리" + 한 줄)로 PNG. 미리보기에서 한 번 더 눌러 공유(Web Share 파일) 또는 저장.
   셔터 소리 `squish.shutter`, 흰 번쩍임(움직임 줄이기면 없음).
 
 ## 소리 (`audio/`)
@@ -216,8 +249,11 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - Zustand `persist`, key `malang-gacha-save`, `version` 필드 + `migrate`.
 - 로드된 데이터는 항상 `sanitizeSave` 를 거친다: 잘못된 타입/음수/알 수 없는 캐릭터 id 제거, 기본값 보정.
   JSON 파싱 실패 시에도 초기 상태로 복구하며 앱이 크래시하지 않아야 한다.
-- 현재 v5: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
-  소리 설정 `settings: { sfxOn, musicOn }`(v4의 `muted: true`는 둘 다 끔으로 옮긴다. 새 플레이어는 둘 다 켬 — 음악은 첫 입력 뒤에 시작).
+- 현재 v7: 반짝 수(`shinyCount`), 받은 세트 보상(`claimedSets`), 친밀도(`affection`), 반짝 파트너 표시(`partnerShiny`), 일일 미션(`missions`),
+  소리 설정 `settings: { sfxOn, musicOn }`(v4의 `muted: true`는 둘 다 끔으로 옮긴다. 새 플레이어는 둘 다 켬 — 음악은 첫 입력 뒤에 시작),
+  받은 쿠폰(`redeemedCoupons`, v6), 놀이방(v7): `unboxed: string[]`(캡슐을 연 말랑이) + `playroom: { out: string[] }`(매트 위, 최대 `PLAYROOM_MAX_OUT` 5).
+  v6→v7은 이미 가진 말랑이를 모두 연 것으로 치고 매트에는 파트너 하나. 새 플레이어의 시작 말랑이는 열린 채 매트에.
+  `pull`로 새로 얻은 말랑이는 `unboxed`에 넣지 않는다(놀이방에서 캡슐로 연다). sanitize: `unboxed` ⊆ 보유, `out` ⊆ unboxed ∩ 보유, 중복 없음, 5개까지.
   v2→v3에서 남은 뽑기권은 장당 100코인(`LEGACY_TICKET_TO_COINS`)으로 바꿔 코인에 더한다.
 - 구조 변경 시: `SAVE_VERSION` 을 올리고 `persistence.ts` 의 `migrateSave` 에 단계별 변환을 추가 + 테스트.
 
@@ -227,6 +263,7 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
 - 가챠: 10만 회 확률 검증을 서로 다른 시드 여러 개로 수행(±5σ 허용), 천장/비율/10연 보장/환급.
 - 경제: 보상식, 판당·일일 상한, 서울 자정 경계.
 - 저장: 손상/구버전 데이터 migrate.
+- 놀이방: 매트 세계(충돌·쌓기 안정·에너지 감소·상한), 캡슐 손짓, 선반 순서, 성능 조절, 화면 배치, 반응 부위·쓰다듬기.
 - 미니게임: `logic.ts` 순수 함수 (점수, 콤보, 충돌, 스폰).
 - 소리: 콤보 음계·단위 변환·클리퍼 곡선(`tuning`), 스케줄러 박자 계산·악절 생성 결정성·경로→곡(`music`), 엔진 잠금/재개/덕킹(가짜 컨텍스트).
 

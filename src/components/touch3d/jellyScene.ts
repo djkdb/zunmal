@@ -398,7 +398,7 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
     const now = performance.now();
     const gap = now - lastDraw;
     lastDraw = now;
-    if (gap <= 0 || gap > 100) return;
+    if (gap <= 0 || gap > 600) return;
     emaMs = samples === 0 ? gap : emaMs * 0.9 + gap * 0.1;
     samples++;
     if (samples > 45 && emaMs > 25 && s.dpr > 1.25) {

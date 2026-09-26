@@ -188,6 +188,17 @@ describe('world: 쌓기', () => {
     expect(Math.abs(body(w, 'mover').x - body(w, 'bottom').x)).toBeLessThan(0.2);
   });
 
+  it('납작한 말랑이(높이 < 폭)는 자기 높이만큼 위에 얹힌다', () => {
+    const w = createWorld({ w: 3, d: 3 });
+    addBody(w, { id: 'bottom', x: 1.5, y: 1.5, r: R, h: 0.4 });
+    addBody(w, { id: 'top', x: 1.5, y: 1.5, z: 0.5, r: R, h: 0.4 });
+    run(w, 4000);
+    const z = body(w, 'top').z;
+    expect(z).toBeGreaterThan(0.32);
+    expect(z).toBeLessThan(0.41);
+    expect(isWorldAtRest(w)).toBe(true);
+  });
+
   it('쌓인 채로 오래 두어도 떨리거나 에너지가 늘지 않는다', () => {
     const w = createWorld({ w: 3, d: 3 });
     addBody(w, { id: 'bottom', x: 1.5, y: 1.5, r: R });

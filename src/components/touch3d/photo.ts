@@ -42,6 +42,8 @@ export interface PhotoInput {
   level: number;
   /** 여럿이 함께 찍었을 때 애정 단계 대신 쓰는 한 줄 (3단계 단체 사진 틀이 이 자리를 키운다) */
   caption?: string;
+  /** 여럿이 함께 (등급 딱지 없이, 밝은 바탕) */
+  group?: boolean;
   /** 말랑이 상자 (client 좌표) — 사진 칸을 여기에 맞춘다 */
   jelly: Rect;
   /** 잘라낼 수 있는 범위 (client 좌표, 무대) */
@@ -149,9 +151,9 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   }
   const color = rarityColor(input.rarity);
   // 일반 등급 색(베이지)은 번지면 탁해 보여서 딸기우유색으로
-  const glowColor = input.rarity === 'common' ? '#ffb3c8' : color;
+  const glowColor = input.rarity === 'common' || input.group ? '#ffb3c8' : color;
   const meta = RARITY_META[input.rarity];
-  const dark = input.rarity === 'secret';
+  const dark = input.rarity === 'secret' && !input.group;
 
   // 배경 + 스프링클
   ctx.fillStyle = CREAM;
@@ -229,7 +231,10 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   ctx.strokeStyle = INK;
   ctx.stroke();
 
-  // 등급 딱지: 색 + 별 + 글자
+  // 등급 딱지: 색 + 별 + 글자 (단체 사진은 없음)
+  if (!input.group) drawBadge();
+  function drawBadge() {
+  if (!ctx) return;
   const label = meta.label;
   ctx.font = `44px ${FONT}`;
   const starCount = Math.min(6, meta.stars);
@@ -272,6 +277,7 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
     ctx.fillStyle = INK;
     ctx.textAlign = 'center';
     ctx.fillText('반짝', sx + shinyRect.w / 2, shinyRect.y + shinyRect.h / 2 + 2);
+  }
   }
 
   // 이름 (풍선 글씨)

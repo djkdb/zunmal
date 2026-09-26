@@ -128,7 +128,7 @@ export function GestureArt({
   locked?: boolean;
   size?: number;
 }) {
-  const clipId = `ga${useId().replace(/:/g, '')}`;
+  const clipId = `ga${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   return (
     <svg
       className={`gesture-art${locked ? ' is-locked' : ''}`}
@@ -146,7 +146,7 @@ export function GestureArt({
       <path d="M10 44 C10 22 20 12 32 12 C44 12 54 22 54 44 C54 54 46 58 32 58 C18 58 10 54 10 44 Z" fill="#ffe1ea" />
       <g clipPath={`url(#${clipId}-body)`}>
         {AREA_CLIP[area].map((r, i) => (
-          <rect key={i} {...r} fill={area === 'body' ? '#ffc4d6' : '#ff9dbb'} opacity={0.85} />
+          <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill={area === 'body' ? '#ffb3cb' : '#ff85aa'} opacity={0.8} />
         ))}
       </g>
       <path

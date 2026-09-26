@@ -15,6 +15,8 @@ export interface PerfState {
   emaMs: number;
   /** 마지막 결정 뒤 모은 표본 수 */
   samples: number;
+  /** 마지막 결정 뒤 모은 표본 시간 합 (ms) — 아주 느린 기기도 몇 초 안에 결정하게 */
+  sampledMs: number;
   /** 한 번 올리면 다시 올리지 않는다 (왔다 갔다 방지) */
   upgraded: boolean;
 }
@@ -26,8 +28,10 @@ export const PERF_TUNING = {
   minCap: 2,
   /** 결정 전에 모을 연속 프레임 수 (약 2초) */
   minSamples: 120,
-  /** 이 간격보다 긴 프레임은 멈췄다 다시 그린 것 → 버린다 */
-  maxGapMs: 100,
+  /** 이 시간만큼 모이면 표본 수가 적어도 결정한다 */
+  minSampledMs: 3000,
+  /** 이 간격보다 긴 프레임은 멈췄다 다시 그린 것 → 버린다 (연속으로 그리는 중에만 넣는다) */
+  maxGapMs: 600,
   alpha: 0.05,
   /** ≥ 55fps */
   goodMs: 1000 / 55,
@@ -43,6 +47,7 @@ export function createPerf(options: { phone: boolean; quality: RenderQuality }):
     quality: options.quality,
     emaMs: 0,
     samples: 0,
+    sampledMs: 0,
     upgraded: false,
   };
 }
@@ -52,16 +57,18 @@ export function samplePerf(state: PerfState, gapMs: number): PerfState {
   if (!Number.isFinite(gapMs) || gapMs <= 0 || gapMs > PERF_TUNING.maxGapMs) return state;
   const emaMs = state.samples === 0 ? gapMs : state.emaMs + (gapMs - state.emaMs) * PERF_TUNING.alpha;
   const samples = state.samples + 1;
-  const next = { ...state, emaMs, samples };
-  if (samples < PERF_TUNING.minSamples) return next;
+  const sampledMs = state.sampledMs + gapMs;
+  const next = { ...state, emaMs, samples, sampledMs };
+  if (samples < PERF_TUNING.minSamples && sampledMs < PERF_TUNING.minSampledMs) return next;
+  const reset = { samples: 0, sampledMs: 0 };
   if (state.quality === '3d' && emaMs > PERF_TUNING.slow3dMs) {
-    return { ...next, quality: '2d', samples: 0 };
+    return { ...next, ...reset, quality: '2d' };
   }
   if (state.quality === '2d' && emaMs > PERF_TUNING.slow2dMs && state.cap > PERF_TUNING.minCap) {
-    return { ...next, cap: state.cap - 1, samples: 0 };
+    return { ...next, ...reset, cap: state.cap - 1 };
   }
-  if (!state.upgraded && emaMs <= PERF_TUNING.goodMs && state.cap < PERF_TUNING.maxCap) {
-    return { ...next, cap: PERF_TUNING.maxCap, upgraded: true, samples: 0 };
+  if (!state.upgraded && samples >= PERF_TUNING.minSamples && emaMs <= PERF_TUNING.goodMs && state.cap < PERF_TUNING.maxCap) {
+    return { ...next, ...reset, cap: PERF_TUNING.maxCap, upgraded: true };
   }
   return next;
 }
