@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { COLLECTIONS } from '../data/collections';
 import { DAILY_CAP, GOAL_THRESHOLDS, PULL_PRICE, STARTING_COINS } from '../economy/config';
+import { materialIdFor } from '../data/materialIds';
+import { affectionProgress } from '../economy/affection';
 import { generateDailyMissions } from '../missions/missions';
 import { readHub } from './hubState';
 import { GOAL_PRIORITY, goalCandidates, nextGoal, type GoalKind } from './nextGoal';
@@ -207,8 +209,19 @@ describe('세트', () => {
 describe('애정', () => {
   it('파트너의 다음 단계까지 남은 애정', () => {
     const g = goalCandidates(hub({ ...veteran, affection: { 'peach-mochi': 70 } })).find((x) => x.kind === 'affection');
-    expect(g).toMatchObject({ title: '복숭아 모찌와 더 놀아요', detail: '애정 30만 더 쌓으면 3단계예요', progressText: '2단계' });
+    // 70 = Lv.2 에서 20/50 — 다음 Lv.3 에 열리는 반응(볼 콕)을 알려 준다. 단계 글자는 도감·놀이방과 같은 "Lv.N"
+    expect(g).toMatchObject({ title: '복숭아 모찌와 더 놀아요', detail: 'Lv.3이 되면 새 반응 볼 콕', progressText: 'Lv.2' });
     expect(g?.progress).toBeCloseTo(0.4);
+  });
+
+  it('도감 상세·놀이방과 같은 친밀도 진행(affectionProgress)을 쓴다', () => {
+    for (const value of [0, 49, 50, 130, 420, 2000]) {
+      const g = goalCandidates(hub({ ...veteran, affection: { 'peach-mochi': value } })).find((x) => x.kind === 'affection');
+      const p = affectionProgress(value, { material: materialIdFor('peach-mochi') });
+      expect(g?.progress).toBeCloseTo(p.ratio);
+      expect(g?.progressText).toBe(`Lv.${p.level}`);
+      if (!p.next) expect(g?.detail).toContain(`${p.toNext}만 더`);
+    }
   });
 });
 

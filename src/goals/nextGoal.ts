@@ -22,9 +22,10 @@
  * 공짜로 바로 받는 것(선물·보상)을 먼저, 그다음 새 말랑이를 만나는 일, 그다음 뽑기·코인 모으기 순이다.
  * 첫걸음은 선물 다음 — 처음 온 사람은 흐름대로 따라가는 게 가장 좋다.
  */
-import { AFFECTION_PER_LEVEL, levelOf } from '../data/affection';
 import { getCharacter } from '../data/characters';
 import { GACHA_RULES, RARITY_META } from '../data/rarity';
+import { materialIdFor } from '../data/materialIds';
+import { affectionProgress, perkLines } from '../economy/affection';
 import { GOAL_THRESHOLDS, MISSION_ALL_CLEAR_BONUS, PULL_COUNT, PULL_PRICE, SET_REWARD_COINS } from '../economy/config';
 import { josa } from '../lib/josa';
 import { missionLabel, type Mission, type MissionKind } from '../missions/missions';
@@ -342,17 +343,17 @@ export function goalCandidates(hub: HubState): Goal[] {
   // 12. 파트너 애정
   const partner = hub.partner;
   if (partner) {
-    const aff = Math.max(0, hub.save.affection[partner.id] ?? 0);
-    const next = levelOf(aff) + 1;
-    // levelOf: 애정 (단계-1)×50 부터 그 단계
-    const left = (next - 1) * AFFECTION_PER_LEVEL - aff;
+    // 도감 상세·놀이방과 같은 친밀도 진행 하나(economy/affection.ts)에서 — 단계는 어디서나 "Lv.N"
+    const p = affectionProgress(hub.save.affection[partner.id] ?? 0, { material: materialIdFor(partner.id) });
+    const nextLv = `Lv.${p.level + 1}`;
+    const perk = p.next ? perkLines(p.next)[0] : undefined;
     out.push({
       kind: 'affection',
       icon: 'pet',
       title: `${josa(partner.name, '과/와')} 더 놀아요`,
-      detail: `애정 ${left}만 더 쌓으면 ${next}단계예요`,
-      progress: (aff % AFFECTION_PER_LEVEL) / AFFECTION_PER_LEVEL,
-      progressText: `${next - 1}단계`,
+      detail: perk ? `${josa(nextLv, '이/가')} 되면 ${perk.text}` : `친밀도 ${p.toNext}만 더 쌓으면 ${josa(nextLv, '이/가')} 돼요`,
+      progress: p.ratio,
+      progressText: `Lv.${p.level}`,
       cta: '만지기',
       action: ROUTE.touch,
     });

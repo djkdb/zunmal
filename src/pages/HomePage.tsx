@@ -28,10 +28,11 @@ import './HomePage.css';
 /**
  * 파트너가 건네는 한마디. 할 일은 아래 "다음 목표" 카드가 알려 주므로 여기서는 파트너 이야기만 한다.
  */
-function greetingFor(dailyLeft: number, bonus: number): string {
+function greetingFor(dailyLeft: number, bonus: number, firstDay: boolean): string {
   if (dailyLeft <= 0) return '오늘 게임 코인은 다 모았어요. 내일 또 놀아요!';
   if (bonus > 0) return `나랑 놀면 게임 코인이 ${bonus}% 더 나와요!`;
-  return '오늘도 와 줘서 반가워요!';
+  // 처음 온 날에는 "오늘도"라고 하지 않는다
+  return firstDay ? '만나서 반가워요!' : '오늘도 와 줘서 반가워요!';
 }
 
 /**
@@ -138,11 +139,10 @@ export function HomePage() {
   const [giftDone, setGiftDone] = useState<string | null>(null);
   const dailyGiver = hub.gift.available ? hub.gift.giver : null;
   const showCoupon = !!pendingCoupon && giftReady;
-  // 말풍선 자리: 선물 쿠폰 > 말랑 선물 > (받은 뒤 한 줄) > 인사
+  // 파트너는 한 번에 말풍선 하나만: 선물 쿠폰 > 말랑 선물 > (받은 뒤 한 줄) > "꾹 눌러 봐요" > 인사
   const showDailyGift = !showCoupon && !giftDone && dailyGiver !== null;
-  // 놀이방에 아직 안 가 본(아무도 안 쓰다듬은) 플레이어: 파트너를 누르면 만질 수 있다고 알려 준다.
-  // 선물 말풍선이 떠 있으면 "꾹 눌러 봐요"는 잠깐 쉰다 (한 번에 하나만 말을 건다)
-  const touchHint = !hub.petted && !showCoupon && !showDailyGift;
+  // 놀이방에 아직 안 가 본(아무도 안 쓰다듬은) 플레이어: 파트너를 누르면 만질 수 있다고 알려 준다. 이때 인사는 쉰다
+  const touchHint = !hub.petted && !showCoupon && !showDailyGift && !giftDone;
   useEffect(() => {
     if (!giftDone) return;
     const t = window.setTimeout(() => setGiftDone(null), 3200);
@@ -173,8 +173,8 @@ export function HomePage() {
             <p className="home__bubble" role="status">
               {giftDone}
             </p>
-          ) : (
-            <p className="home__bubble">{greetingFor(hub.dailyLeft, bonus)}</p>
+          ) : touchHint ? null : (
+            <p className="home__bubble">{greetingFor(hub.dailyLeft, bonus, hub.firstDay)}</p>
           )}
           <Link
             to="/touch"
