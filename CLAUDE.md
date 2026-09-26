@@ -62,18 +62,44 @@ minigames → (types, lib, data, audio 타입)   ※ store/economy import 금지
 - 글자 선택·길게 누르기 메뉴는 전역으로 막는다(`body` user-select/touch-callout none — iOS에서 터치를 삼킴). 입력칸과 `.selectable`만 예외.
 - 버튼·UI에 ◀▶ 같은 기호 글자를 쓰지 않는다(글꼴에 없어 iOS에서 빈칸). SVG 아이콘을 쓴다 (미니게임은 `minigames/shared/ArrowIcon`).
 
-## 디자인 시스템
+## 디자인 시스템 — 스카이 소다 (시안 G)
 
-UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉은 **젤리 과자 가게 같은 캐주얼 모바일 게임**이다.
+UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉은 **맑은 하늘색 바탕 + 흰 카드 + 딸기우유 포인트의
+깔끔하고 귀여운 모바일 게임**(Figma `LEC6GGqQ9ELZ5y0LNxTLaZ`, 프레임 "시안 G — 스카이 소다"). 말랑이 그림(잉크 외곽선)만 캐릭터 쪽에 남고,
+UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.css` `:root`에 있다 — 새 코드는 아래 이름만 쓴다.
 
-- **팔레트** (`global.css` `:root`): 크림 `--cream`, 잉크 `--ink #2b2233`, 딸기우유 `--berry`, 소다 `--soda`, 레몬 `--lemon`, 말차 `--matcha`, 선반 `--shelf`.
-- **글꼴**: 카페24 써라운드 한 가지(눈누 jsdelivr CDN). 제목은 `.page-title` 풍선 글씨(흰 글자 + 잉크 외곽선 + 그림자).
-- **재질은 젤리**: 버튼·게임 타일은 광택 하이라이트 + 같은 색 아랫단 + 눌리면 찌그러짐(`.btn`). 배경은 스프링클 무늬.
-- **과감한 장식**: 홈 간판(차양 + 풍선 글씨 로고)과 캡슐 머신. 등급이 높을수록 연출이 화려해진다.
-- **모양이 곧 정보**: 눌리는 것만 두꺼운 아랫단 그림자를 가진다. 패널은 평평한 외곽선이다.
-  확률표는 테이프로 붙인 안내문, 도감은 선반 위 캡슐 창이다.
-- **금지**: 이모지 아이콘(→ `components/icons.tsx`), 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`,
-  모든 요소에 같은 둥근 카드와 같은 그림자 반복, 섹션마다 등장 애니메이션.
+| 역할 | 토큰 | 값 |
+|---|---|---|
+| 바탕 그라데이션 | `--sky-top` → `--sky-mid`(60%) → `--sky-bottom`, `--bg-gradient` | #CFE6FF → #EAF4FF → #FFF |
+| 글자 / 보조 글자 / 링크 | `--ink` / `--sub` / `--link` | #22304A / #56657F / #2F6DBF (모두 흰 바탕 AA) |
+| 주 행동(딸기우유) | `--primary` (+ `--primary-deep` 눌림·링, `--primary-tint` 옅은 바탕, `--primary-text` 흰 바탕 위 글자) | #FF9FB8 |
+| 레몬 / 소다 / 민트 / 포도 / 복숭아 | `--lemon` `--sky` `--mint` `--grape` `--peach` (+ `--lemon-tint`, `--sky-tint`) | #FFD66B #8FC3FF #9FE0B8 #C9B6FF #FFC2A0 |
+| 면 / 칸 / 가는 선 | `--surface` / `--surface-2` / `--border` | #FFF / #F3F8FE / #E3EDF8 |
+| 금빛(천장·코인) / 위험 | `--gold` / `--danger` | #F2C14E / #F0506E |
+| 모서리 | `--radius-card` 22 · `--radius-btn` 18 · `--radius-s` 12 · `--radius-pill` 999 | |
+| 그림자 | `--shadow-card`(카드) · `--shadow-btn`(버튼) · `--shadow-btn-press`(눌림) · `--shadow-float`(모달·말풍선) · `--shadow-up`(하단 탭) | 파란 기운 rgba(26,64,128,…) |
+| 희귀도 | `--rarity-<r>`(대표색·빛) · `--rarity-<r>-tint`(배지 바탕) · `--rarity-<r>-ink`(배지 글자) | 일반 회색, 레어 파랑, 에픽 보라, 전설 금, 신화 분홍·무지개, 시크릿 밤하늘 |
+
+- **글꼴**: 제목·로고·말랑이 이름·큰 점수 = **고운돋움** `--font-display` (잉크색, 외곽선 없음, `--tracking-title` -0.02em).
+  나머지 = **Pretendard** `--font-body`; 버튼·칩·숫자는 `--font-ui` + `--fw-ui`(700). 둘 다 npm 패키지를 `main.tsx`에서 import해
+  번들한다(`@fontsource/gowun-dodum/400.css`, `pretendard/…/pretendardvariable-dynamic-subset.css`, 유니코드 범위 조각이라 쓰는 글자 조각만 받음).
+  해시 이름 `assets/` 파일이라 서비스 워커가 캐시 우선으로 보관한다. 캔버스 글자는 `"Gowun Dodum", "Pretendard Variable", sans-serif`.
+- **바탕**: `body::before`(고정 그라데이션) + `body::after`(비눗방울 몇 개: 흰 45% + 1.5px 흰 테두리, 아주 느린 떠오르기 — 움직임 줄이기면 멈춤).
+  `body`에는 배경을 두지 않는다(두면 z-index:-1 층을 덮는다). 캔버스 색은 `html`.
+- **면**: 카드·패널은 흰색 + `--shadow-card`, 테두리 없음. 카드 안의 칸·진행 막대 바탕·비활성은 `--surface-2`/`--sky-tint`.
+  **버튼**(`.btn`): 주 = `.btn--primary`(딸기우유 + 잉크 글자), 보조 = 기본/`.btn--secondary`(흰색 + 그림자), 작은 강조 = `.btn--lemon`.
+  누르면 `translateY(2px) scale(.97)` + 그림자가 눌리고, 떼면 `--ease-jelly` 스프링. 비활성은 `--surface-2` + `--sub` 글자 + 가는 테두리.
+  칩은 흰 알약(`.chip`) 또는 레몬(`.chip--lemon`). 하단 탭은 흰 바(위 모서리 22) + 선택 탭 딸기우유 칸. 코인은 반투명 흰 알약.
+- **아이콘**(`components/icons.tsx`): 둥근 선 + 파스텔 채움, 선 색은 `currentColor`(코인만 금빛).
+- **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 고운돋움 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
+- **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
+  등급이 높을수록 연출(빛·흔들림·신화 이상 전체 화면)이 화려해지는 건 그대로다.
+- **금지**: 굵은 잉크 UI 테두리·잉크색 아랫단 그림자, 흰 글자 + 잉크 외곽선(`-webkit-text-stroke`) 제목, 크림 바탕, 스프링클 무늬,
+  이모지 아이콘, `.eyebrow` 외의 제목 위 작은 라벨, `A · B · C` 가운데점 나열, 버튼 끝 `→`, 넓은 영역의 무거운 blur,
+  섹션마다 등장 애니메이션.
+- **이전 이름**(`--cream`, `--paper`, `--berry`, `--soda`, `--matcha`, `--ink-soft`, `--line`, `--keycap` …)은 호환용 별칭으로만 남아 있다
+  (놀이방 `/touch` 화면과 미니게임 속 그림이 아직 쓴다). 새 코드에서 쓰지 말고, 놀이방을 다시 칠할 때 위 토큰으로 옮긴다.
+  미니게임 안의 게임 그림(블록·컵·점수 튀어나옴 등)은 자기 그림을 유지해도 되지만 틀·버튼·HUD는 토큰을 따른다.
 - **조사**: 말랑이 이름 뒤 조사는 직접 쓰지 말고 `lib/josa.ts`의 `josa(name, '과/와')`로 받침에 맞춰 붙인다.
 - **문구**: 존댓말, 짧고 구체적으로. 행동 이름은 끝까지 같게 쓴다(예: "보상 받기" → "받았어요").
 
