@@ -3,6 +3,7 @@ import { Malang } from '../Malang';
 import { VIEWBOX, VIEWBOX_ATTR } from '../malang/helpers';
 import { SHAPES } from '../malang/shapes';
 import type { JellyFace, JellyStage } from '../touch3d/jellyScene';
+import { materialOf } from '../../data/materials';
 import { SHINY_TOUCH_FX, TOUCH_FX } from '../../data/rarity';
 import { baseEyes, faceExtras, isExtraFace } from '../../touch/faceExtras';
 import { fillKindIndex } from '../../touch/filling';
@@ -108,6 +109,8 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
       glow: glowStrength > 0 ? { color: glowColor, strength: glowStrength } : undefined,
       iridescence: shiny ? SHINY_TOUCH_FX.iridescence : 0,
       filling: filling ? { kind: fillKindIndex(filling.kind), colors: filling.colors } : undefined,
+      look: materialOf(character).look,
+      color: character.color,
     });
     view.ready.then(
       () => {
@@ -129,7 +132,7 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
       setReady3d(false);
       onView();
     };
-  }, [mode, stage, rec, character.shape, glowStrength, glowColor, shiny, onView, filling]);
+  }, [mode, stage, rec, character.shape, character.id, character.color, glowStrength, glowColor, shiny, onView, filling]);
 
   useEffect(() => {
     if (ready3d) rec.view?.setFace(jellyFace);

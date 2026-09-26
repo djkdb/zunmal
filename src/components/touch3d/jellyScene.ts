@@ -7,8 +7,14 @@
  *   정점은 CPU 에서 옮기고 법선을 다시 계산한다 (몸당 정점 약 2.6k) — 멈춰 있는 몸은 다시 계산하지 않는다.
  * - 겉모습: 실제 <Malang> SVG 를 구운 텍스처(얼굴·무늬·앞 장식 포함)를 앞면에 투영 → 찌그러지면 얼굴도 같이 찌그러진다.
  *   몸 밖으로 나온 장식은 몸 뒤/앞의 평평한 카드로 그려 같은 변형장을 따라 움직인다.
- * - 재질: 클리어코트 + 쉰(sheen) + 가장자리 빛(프레넬) + 가운데가 은은히 밝은 가짜 속빛 → 젤리.
- *   게임의 스티커 느낌을 위해 잉크색 뒤집힌 껍질 외곽선(epic 캡슐과 같은 방식).
+ * - 재질: 실제 말랑이 장난감 사진처럼. MeshPhysicalMaterial(클리어코트·쉰·박막) + 덧붙인 GLSL 하나를
+ *   촉감별 겉모습 값(`data/materials` 의 `look`)으로 바꿔 네 가지로 그린다 — 매트한 폼(모찌), 속이 비치는 구미 젤리,
+ *   새틴 실리콘, 젖은 슬라임. 빛: 스튜디오 방 반사(RoomEnvironment → PMREM, 렌더러당 한 번) + 주광·보조광·역광.
+ *   · 가짜 속 비침: 감싸는 빛 + 두꺼운 가운데는 진하게 + 얇은 가장자리로 새는 빛 + 바닥에 모이는 빛 (새 패스 없음)
+ *   · 잔결: 코드로 만든 값 노이즈를 화면 미분으로 법선에 얹는 범프 (텍스처 없음)
+ *   · 자국: 정점마다 법선을 다시 계산해 반사가 자국을 따라 미끄러지고, 자국 바닥은 가려진 만큼 어둡다(쉬는 자세 좌표 + 자국 uniform)
+ *   · 그림 텍스처의 2D 광택·그늘은 빼고 굽는다 (진짜 빛과 겹치지 않게). 외곽선은 몸색을 짙게 한 가는 뒤집힌 껍질.
+ *   · 바닥: 넓고 흐린 그림자 + 닿은 자리의 진한 접촉 그림자 (실제 발자국 폭을 따라 눌리면 넓고 진해지고, 들면 옅어진다)
  * - 3/4 시점: 몸은 화면을 보고 서 있고, 매트 깊이는 z(카메라 쪽)로 둔다. 원근 때문에 앞뒤 몸의 크기·위치가
  *   어긋나지 않도록 z 만큼 위치·크기를 되돌려(보정) DOM 좌표와 정확히 맞춘다.
  * - 성능: 렌더러 하나를 공유해 다시 만들지 않는다. DPR 최대 2 (느리면 1.5 → 1.25). 떠나면 dispose + 컨텍스트 해제.
@@ -28,6 +34,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  type MeshStandardMaterial,
   NeutralToneMapping,
   PerspectiveCamera,
   PlaneGeometry,
@@ -46,6 +53,7 @@ import {
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MalangShape } from '../../data/characters';
+import { DEFAULT_MATERIAL, MATERIALS, type MaterialLook } from '../../data/materials';
 import { SHAPES } from '../malang/shapes';
 import { VIEWBOX } from '../malang/helpers';
 import { buildCardGrid, buildJellyMesh, computeNormals, flattenPath, type JellyMesh } from '../../touch/jellyMesh';
@@ -77,6 +85,10 @@ export interface JellyBodyOptions {
    * 셰이더 uniform 만으로 그린다 (새 텍스처·렌더 타깃 없음).
    */
   filling?: { kind: number; colors: readonly [string, string] };
+  /** 촉감별 겉모습 (`materialOf(c).look`). 없으면 탱탱 젤리 */
+  look?: MaterialLook;
+  /** 몸 대표 색 — 가는 외곽선을 몸색을 짙게 한 색으로 */
+  color?: string;
 }
 
 /** 몸을 놓을 자리 (client px) */
@@ -135,6 +147,8 @@ const FOV = 20;
 const TEX_SIZE = 512;
 /** 외곽선 두께 (몸 좌표 단위, 1 ≈ 말랑이 크기 230px 에서 1.55px) */
 const OUTLINE = 2.8;
+/** 잔결 범프 세기 배수 (look.grain 1 일 때) */
+const GRAIN_BUMP = 1;
 /** 몸 밖 장식을 담는 영역 (VIEWBOX 보다 조금 넓게 — 후광·반짝이) */
 const CARD_RECT: RasterRect = { x: VIEWBOX.x - 10, y: VIEWBOX.y - 10, w: VIEWBOX.w + 20, h: VIEWBOX.h + 20 };
 const MAX_DPR = 2;
@@ -176,11 +190,17 @@ function acquireRenderer(): Shared {
   renderer.toneMappingExposure = 1;
   const pmrem = new PMREMGenerator(renderer);
   const envScene = new RoomEnvironment();
-  const env = pmrem.fromScene(envScene, 0.04).texture;
+  // 스튜디오 방을 하늘빛으로 물들인다: 회색 벽이 비치면 말랑이 가장자리가 쇠붙이처럼 보인다 → 매트와 같은 맑은 하늘 반사
   envScene.traverse((o) => {
     const m = o as Mesh;
-    m.geometry?.dispose();
+    const mat = m.isMesh ? (m.material as MeshStandardMaterial) : null;
+    if (!mat || !('color' in mat) || !mat.color) return;
+    if (mat.side === BackSide) mat.color.set('#d6e8ff');
+    else if (!mat.emissive || mat.emissive.getHex() === 0) mat.color.set('#f4f8ff');
   });
+  // 렌더러당 한 번만 굽는다 (무대·몸이 여럿이어도 같은 텍스처)
+  const env = pmrem.fromScene(envScene, 0.04).texture;
+  envScene.dispose();
   pmrem.dispose();
   shared = { renderer, env, users: 1, releaseTimer: null, dpr };
   return shared;
@@ -235,7 +255,11 @@ function glowTexture(): CanvasTexture {
   return t;
 }
 
-function shadowTexture(): CanvasTexture {
+/**
+ * 바닥 그림자 한 장 (타원 번짐). soft = 넓고 흐린 주변 그림자, 아니면 닿은 자리의 진한 접촉 그림자.
+ * 색은 매트 하늘빛에 맞춘 푸른 잉크 (스카이 소다 그림자와 같은 기운).
+ */
+function shadowTexture(soft: boolean): CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 32;
@@ -243,9 +267,17 @@ function shadowTexture(): CanvasTexture {
   if (ctx) {
     ctx.setTransform(1, 0, 0, 0.25, 0, 0);
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, 'rgba(43,34,51,0.55)');
-    g.addColorStop(0.55, 'rgba(43,34,51,0.28)');
-    g.addColorStop(1, 'rgba(43,34,51,0)');
+    if (soft) {
+      g.addColorStop(0, 'rgba(30,52,96,0.42)');
+      g.addColorStop(0.45, 'rgba(30,52,96,0.24)');
+      g.addColorStop(0.8, 'rgba(30,52,96,0.07)');
+      g.addColorStop(1, 'rgba(30,52,96,0)');
+    } else {
+      g.addColorStop(0, 'rgba(22,32,58,0.85)');
+      g.addColorStop(0.5, 'rgba(22,32,58,0.6)');
+      g.addColorStop(0.78, 'rgba(22,32,58,0.18)');
+      g.addColorStop(1, 'rgba(22,32,58,0)');
+    }
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
   }
@@ -255,6 +287,11 @@ function shadowTexture(): CanvasTexture {
 }
 
 // ── 재질 ─────────────────────────────────────────────────
+
+/** 주광 방향 (월드 = 보기 공간: 카메라는 돌지 않는다) — 왼쪽 위 앞 */
+const KEY_DIR = new Vector3(-0.55, 0.9, 0.8).normalize();
+/** 동시에 셰이더로 넘기는 자국 수 (softbody SOFT_TUNING.maxDents 와 같게) */
+const MAX_DENTS = 3;
 
 interface JellyUniforms {
   uGaze: { value: Vector2 };
@@ -268,19 +305,33 @@ interface JellyUniforms {
   uFill: { value: Vector4 };
   uFillA: { value: Color };
   uFillB: { value: Color };
+  /** 겉모습: x 속 비침, y 가장자리 어둡게, z 그림 색 지키기, w 젖은 반사점 */
+  uLook: { value: Vector4 };
+  /** 잔결: x 세기, y 촘촘함 */
+  uGrain: { value: Vector2 };
+  uKeyDir: { value: Vector3 };
+  /** 자국 (쉬는 자세 몸 좌표): xyz 가운데, w 반지름 */
+  uDentC: { value: Vector4[] };
+  /** 자국 깊이 (안쪽 +) */
+  uDentD: { value: Vector3 };
+  /** 몸 높이 (쉬는 자세) */
+  uHeight: { value: number };
 }
 
-function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): MeshPhysicalMaterial {
+function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look: MaterialLook, env: Texture): MeshPhysicalMaterial {
   const mat = new MeshPhysicalMaterial({
     map,
-    roughness: 0.38,
+    roughness: look.roughness,
     metalness: 0,
-    clearcoat: 1,
-    clearcoatRoughness: 0.08,
-    sheen: 0.6,
-    sheenRoughness: 0.35,
-    sheenColor: new Color('#fff4f8'),
-    specularIntensity: 0.6,
+    clearcoat: look.clearcoat,
+    clearcoatRoughness: look.clearcoatRoughness,
+    sheen: look.sheen,
+    sheenRoughness: look.sheenRoughness,
+    sheenColor: new Color('#fff6fa'),
+    specularIntensity: look.specular,
+    // 재질마다 방 반사 세기가 달라 장면 환경 대신 같은 텍스처를 재질에 직접 건다 (PMREM 은 한 장뿐)
+    envMap: env,
+    envMapIntensity: look.envIntensity,
     // 반짝: 비눗방울 같은 박막 간섭 무지갯빛
     iridescence,
     iridescenceIOR: 1.35,
@@ -288,6 +339,37 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
   });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, u);
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        'void main() {',
+        /* glsl */ `attribute vec3 aRest;
+      attribute float aFront;
+      uniform vec4 uDentC[${MAX_DENTS}];
+      uniform vec3 uDentD;
+      uniform float uHeight;
+      varying float vDent;
+      varying float vFront;
+      varying float vHn;
+      void main() {`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        /* glsl */ `#include <begin_vertex>
+      {
+        // 자국 바닥이 얼마나 가려졌나 (쉬는 자세 좌표로 재니 몸이 어떻게 변형돼도 같은 자리)
+        float ao = 0.0;
+        for (int i = 0; i < ${MAX_DENTS}; i++) {
+          float dd = uDentD[i];
+          if (dd <= 0.0) continue;
+          vec3 d = aRest - uDentC[i].xyz;
+          float r = uDentC[i].w;
+          ao = max(ao, exp(-dot(d, d) / (r * r)) * min(1.0, dd / r));
+        }
+        vDent = ao;
+        vFront = aFront;
+        vHn = aRest.y / max(uHeight, 1.0);
+      }`,
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
@@ -301,11 +383,31 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
       uniform vec4 uFill;
       uniform vec3 uFillA;
       uniform vec3 uFillB;
+      uniform vec4 uLook;
+      uniform vec2 uGrain;
+      uniform vec3 uKeyDir;
+      #define BODY_EXPOSURE 0.84
+      // 소프트박스 창 방향: 카메라 가까이 왼쪽 위 (앞면 가운데에서 조금 비낀 곳에 비친다)
+      #define SOFTBOX_DIR vec3(-0.33, 0.47, 0.82)
+      varying float vDent;
+      varying float vFront;
+      varying float vHn;
       vec3 jellyHue(float h) {
         return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
       }
       float jellyHash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      // 부드러운 값 노이즈 (잔결 범프용 — 미분이 매끈해야 반짝이 점이 생기지 않는다)
+      float jellyNoise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = jellyHash(i);
+        float b = jellyHash(i + vec2(1.0, 0.0));
+        float c = jellyHash(i + vec2(0.0, 1.0));
+        float d = jellyHash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
       }
       // 몸속 특별한 속: 앞면 가운데에서만, 얼굴은 비켜서, 눌린 만큼(uFill.w) 밝게, 소용돌이(uFill.z)만큼 돈다
       // 반환: rgb = 속 색, a = 덮는 정도 (밝은 몸에서도 보이게 더하지 않고 섞는다)
@@ -379,17 +481,91 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
       #endif`,
       )
       .replace(
+        '#include <normal_fragment_maps>',
+        /* glsl */ `#include <normal_fragment_maps>
+      #ifdef USE_MAP
+      if (uGrain.x > 0.0) {
+        // 잔결: 높이 노이즈를 화면 미분으로 법선에 얹는다 (Mikkelsen 범프, 텍스처·접선 없음)
+        vec2 gp = vMapUv * uGrain.y;
+        float gh = jellyNoise(gp) * 0.65 + jellyNoise(gp * 2.7 + 7.1) * 0.35;
+        vec3 dpdx = dFdx(-vViewPosition);
+        vec3 dpdy = dFdy(-vViewPosition);
+        vec3 r1 = cross(dpdy, normal);
+        vec3 r2 = cross(normal, dpdx);
+        float det = dot(dpdx, r1);
+        vec3 grad = sign(det) * (dFdx(gh) * r1 + dFdy(gh) * r2);
+        // 작게 보이면 (칸이 픽셀보다 작아지면) 잔결이 지글거리는 점이 된다 → 그만큼 옅게
+        float gAa = 1.0 - smoothstep(0.2, 0.55, length(fwidth(gp)));
+        // 눈·입처럼 진하게 인쇄된 곳은 매끈하게 (반짝이는 눈이 거칠어 보이지 않게)
+        gAa *= smoothstep(0.04, 0.2, dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)));
+        normal = normalize(abs(det) * normal - uGrain.x * gAa * grad);
+      }
+      #endif`,
+      )
+      .replace(
+        '#include <aomap_fragment>',
+        /* glsl */ `#include <aomap_fragment>
+      {
+        // 자국 바닥: 둘레 벽에 가려 방 반사가 덜 든다 (색 그늘은 아래 opaque 에서)
+        float dentAo = 1.0 - 0.6 * vDent;
+        reflectedLight.indirectSpecular *= dentAo;
+        // 속 비침 (1): 몸속에서 흩어진 빛이 그늘진 쪽까지 감싼다
+        float wrap = clamp((dot(normal, uKeyDir) + 0.7) / 1.7, 0.0, 1.0);
+        reflectedLight.indirectDiffuse += diffuseColor.rgb * wrap * uLook.x * 0.3 * dentAo;
+      }`,
+      )
+      .replace(
         '#include <opaque_fragment>',
         /* glsl */ `
       {
-        float nv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
-        // 가장자리 빛: 젤리 표면을 스치는 빛 (전설 이상은 등급 색으로 더 밝게, 만지면 부푼다)
-        float rim = pow(1.0 - nv, 2.4);
-        outgoingLight += mix(vec3(1.0, 0.96, 0.98), uRimColor, min(1.0, uRimBoost * 1.5)) * rim * (0.32 + uRimBoost);
+        vec3 jV = normalize(vViewPosition);
+        float nv = clamp(dot(normalize(nonPerturbedNormal), jV), 0.0, 1.0);
+        float edge = 1.0 - nv;
+        float tl = uLook.x;
+        // 정면은 그림 색을 지킨다 (얼굴·무늬가 또렷하게)
+        outgoingLight = mix(outgoingLight, diffuseColor.rgb * 0.92 + 0.01, uLook.z * nv * nv);
+        // 자국 바닥: 회색이 아니라 몸색 쪽으로 짙어진다 (실제 실리콘 자국처럼)
+        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.75 + 0.05, vDent * 0.6);
+        // 속 비침 (2): 두꺼운 가운데는 색이 진하고 맑게 (몸색을 한 번 더 곱한다)
+        float thick = nv * mix(0.55, 1.0, vFront);
+        outgoingLight = mix(outgoingLight, outgoingLight * (diffuseColor.rgb * 1.1 + 0.02), tl * thick * 0.7);
+        // 몸 바탕은 조금 낮춰 반사가 톤 매핑에 눌려 사라지지 않을 머리 공간을 남긴다 (밝은 파스텔 몸에서도 광택이 보이게)
+        outgoingLight *= BODY_EXPOSURE;
+        // 스튜디오 소프트박스: 주광 쪽 네모난 창이 비친다 (제품 사진의 반사). 거칠수록 넓고 흐리고 옅다 —
+        // 폼은 은은한 번짐, 젤리·슬라임은 또렷한 창. 반사 방향으로 재니 눌린 자국을 따라 창이 휘고 미끄러진다
+        {
+          float rough = roughnessFactor;
+          vec3 box = SOFTBOX_DIR;
+          vec3 R = reflect(-jV, normal);
+          vec3 T1 = normalize(cross(box, vec3(0.0, 1.0, 0.0)));
+          vec3 T2 = cross(T1, box);
+          float soft = mix(0.02, 0.5, rough * rough);
+          float a = abs(dot(R, T1));
+          float b = abs(dot(R, T2));
+          float win = (1.0 - smoothstep(0.15, 0.15 + soft, a)) * (1.0 - smoothstep(0.22, 0.22 + soft, b));
+          win *= smoothstep(0.0, 0.3, dot(R, box));
+          outgoingLight += vec3(1.0, 0.99, 0.97) * win * mix(1.1, 0.12, rough) * (1.0 - 0.7 * vDent);
+        }
+        // 윤곽 쪽은 둥글게 어두워진다 (만화 외곽선 대신)
+        outgoingLight *= 1.0 - uLook.y * pow(edge, 2.2);
+        // 속 비침 (3): 얇은 가장자리로 빛이 새어 나오고 (역광), 바닥 쪽에 빛이 모인다 (굴절된 빛)
+        vec3 glowCol = mix(diffuseColor.rgb, vec3(1.0), 0.35);
+        outgoingLight += glowCol * pow(edge, 2.0) * tl * 0.4;
+        float pool = exp(-pow((vHn - 0.16) / 0.13, 2.0)) * nv;
+        outgoingLight += diffuseColor.rgb * pool * tl * 0.22;
+        // 젖은 반사점: 창 가운데와 주광에 맺히는 아주 작은 흰 점 (눌린 자국을 따라 미끄러진다)
+        if (uLook.w > 0.0) {
+          vec3 R = reflect(-jV, normal);
+          float sp = pow(max(dot(R, SOFTBOX_DIR), 0.0), 420.0);
+          vec3 H = normalize(uKeyDir + jV);
+          sp += pow(max(dot(normal, H), 0.0), 700.0);
+          outgoingLight += vec3(1.0) * sp * uLook.w * 1.4 * (1.0 - 0.6 * vDent);
+        }
+        // 가장자리 빛: 전설 이상은 등급 색으로 더 밝게, 만지면 부푼다
+        float rim = pow(edge, 2.4);
+        outgoingLight += mix(vec3(1.0, 0.97, 0.99), uRimColor, min(1.0, uRimBoost * 1.5)) * rim * (0.12 + uRimBoost);
         // 반짝: 보는 각도와 시간에 따라 도는 무지개 가장자리
-        outgoingLight += jellyHue(fract(nv * 1.3 + vViewPosition.y * 0.004 + uTime * 0.12)) * pow(1.0 - nv, 1.6) * 0.3 * uShiny;
-        // 가짜 속빛: 정면일수록 본래 색이 안에서 비치듯 밝게 (그림 색을 지킨다)
-        outgoingLight = mix(outgoingLight, diffuseColor.rgb * 1.04 + 0.02, 0.42 * nv * nv);
+        outgoingLight += jellyHue(fract(nv * 1.3 + vViewPosition.y * 0.004 + uTime * 0.12)) * pow(edge, 1.6) * 0.45 * uShiny;
         #ifdef USE_MAP
         if (uFill.x > 0.5) {
           vec4 fill = jellyFilling(vMapUv, nv);
@@ -405,14 +581,17 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number): Mes
   return mat;
 }
 
-function outlineMaterial(): MeshBasicMaterial {
-  const mat = new MeshBasicMaterial({ color: INK, side: BackSide, toneMapped: false });
+/** 가는 외곽선: 몸색을 짙게 한 색의 뒤집힌 껍질. 굵기는 겉모습 값(outline)을 따른다 */
+function outlineMaterial(color: Color, width: number): MeshBasicMaterial {
+  const mat = new MeshBasicMaterial({ color, side: BackSide, toneMapped: false });
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
-      `vec3 transformed = vec3( position ) + normal * ${OUTLINE.toFixed(2)};`,
+      `vec3 transformed = vec3( position ) + normal * ${width.toFixed(2)};`,
     );
   };
+  // 굵기가 셰이더 글자에 들어가므로 굵기마다 따로 컴파일한다 (함수 글자가 같아 캐시가 섞이지 않게)
+  mat.customProgramCacheKey = () => `jelly-outline-${width.toFixed(2)}`;
   return mat;
 }
 
@@ -443,10 +622,17 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
   scene.environment = s.env;
   scene.environmentIntensity = 0.55;
   const camera = new PerspectiveCamera(FOV, 1, 1, 5000);
-  scene.add(new HemisphereLight('#fffaf2', '#f3dce6', 1.1));
-  const key = new DirectionalLight('#ffffff', 1.5);
-  key.position.set(-0.6, 1, 0.9);
+  // 스튜디오 조명: 하늘빛 방(반구광) + 왼쪽 위 부드러운 주광 + 오른쪽 차가운 보조광 + 뒤 위 역광(윗가장자리 빛)
+  scene.add(new HemisphereLight('#fdfcff', '#dfe9f7', 0.6));
+  const key = new DirectionalLight('#fff8f0', 1.45);
+  key.position.copy(KEY_DIR);
   scene.add(key);
+  const fill = new DirectionalLight('#e4efff', 0.45);
+  fill.position.set(0.95, 0.15, 0.6);
+  scene.add(fill);
+  const back = new DirectionalLight('#ffffff', 0.8);
+  back.position.set(0.3, 0.85, -1);
+  scene.add(back);
 
   const bodies = new Set<BodyInternal>();
   const meshOwner = new Map<Mesh, BodyInternal>();
@@ -532,11 +718,15 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
     geo.setAttribute('position', pos);
     geo.setAttribute('normal', nor);
     geo.setAttribute('uv', new BufferAttribute(mesh.uv, 2));
+    // 셰이더용 고정 값: 쉬는 자세 좌표(자국 그늘) + 앞면 높이 비율(두께)
+    geo.setAttribute('aRest', new BufferAttribute(mesh.rest, 3));
+    geo.setAttribute('aFront', new BufferAttribute(mesh.front, 1));
     geo.setIndex(new BufferAttribute(mesh.index, 1));
     // 변형해도 레이캐스트가 미리 걸러내지 않도록 넉넉한 경계
     geo.boundingSphere = new Sphere(new Vector3(0, mesh.height / 2, 0), 400);
     geo.boundingBox = new Box3(new Vector3(-400, -400, -400), new Vector3(400, 400, 400));
 
+    const look = bo.look ?? MATERIALS[DEFAULT_MATERIAL].look;
     const glowOpt = bo.glow && bo.glow.strength > 0 ? bo.glow : null;
     const glowColor = new Color(glowOpt?.color ?? '#ffffff');
     const uniforms: JellyUniforms = {
@@ -550,6 +740,12 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       uFill: { value: new Vector4(bo.filling?.kind ?? 0, bo.filling ? 1 : 0, 0, 0) },
       uFillA: { value: new Color(bo.filling?.colors[0] ?? '#ffffff') },
       uFillB: { value: new Color(bo.filling?.colors[1] ?? '#ffffff') },
+      uLook: { value: new Vector4(look.translucency, look.edgeDark, look.albedoHold, look.wet) },
+      uGrain: { value: new Vector2(look.grain * GRAIN_BUMP, look.grainScale) },
+      uKeyDir: { value: KEY_DIR },
+      uDentC: { value: Array.from({ length: MAX_DENTS }, () => new Vector4(0, 0, 0, 1)) },
+      uDentD: { value: new Vector3(0, 0, 0) },
+      uHeight: { value: mesh.height },
     };
     // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
     uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
@@ -557,16 +753,20 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
     const baseRim = glowOpt ? glowOpt.strength * 0.3 : 0;
     uniforms.uRimBoost.value = baseRim;
     const placeholder = new CanvasTexture(document.createElement('canvas'));
-    const bodyMat = jellyMaterial(placeholder, uniforms, uniforms.uShiny.value);
+    const bodyMat = jellyMaterial(placeholder, uniforms, uniforms.uShiny.value, look, s.env);
     const bodyMesh = new Mesh(geo, bodyMat);
     bodyMesh.frustumCulled = false;
     bodyMesh.visible = false;
     root.add(bodyMesh);
-    const inkMat = outlineMaterial();
-    const ink = new Mesh(geo, inkMat);
-    ink.frustumCulled = false;
-    ink.visible = false;
-    root.add(ink);
+    // 가는 외곽선: 몸색을 짙게 해 잉크 쪽으로 조금 — 만화 테두리가 아니라 모양을 알아보게 하는 선
+    const inkColor = new Color(bo.color ?? INK).multiplyScalar(0.42).lerp(new Color(INK), 0.45);
+    const inkMat = look.outline > 0 ? outlineMaterial(inkColor, OUTLINE * (0.2 + 0.4 * look.outline)) : null;
+    const ink = inkMat ? new Mesh(geo, inkMat) : null;
+    if (ink) {
+      ink.frustumCulled = false;
+      ink.visible = false;
+      root.add(ink);
+    }
 
     // 장식 카드: 뒤 = 몸 뒤, 앞 = 몸 앞면보다 조금 앞 (깊이 검사를 켜야 여러 마리가 겹칠 때 앞 몸이 가린다)
     const makeCard = (z: number, order: number) => {
@@ -594,21 +794,40 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
     const backCard = makeCard(-2, 2);
     const frontCard = makeCard(mesh.depth + 2, 4);
 
-    // 바닥 그림자 (몸 뒤, 매트에 남는다)
-    const shadowTex = shadowTexture();
-    const shadowMat = new MeshBasicMaterial({
-      map: shadowTex,
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      opacity: 0.9,
-    });
-    const shadow = new Mesh(new PlaneGeometry(1, 1), shadowMat);
-    shadow.renderOrder = 1;
-    shadow.frustumCulled = false;
+    // 바닥 그림자 (몸 뒤, 매트에 남는다): 넓고 흐린 주변 그림자 + 닿은 자리의 진한 접촉 그림자
     const shadowZ = -mesh.depth * 0.6 - 3;
-    shadow.position.set(0, 0, shadowZ);
-    root.add(shadow);
+    const makeShadow = (soft: boolean, order: number) => {
+      const tex = shadowTexture(soft);
+      const mat = new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, opacity: 1 });
+      const m = new Mesh(new PlaneGeometry(1, 1), mat);
+      m.renderOrder = order;
+      m.frustumCulled = false;
+      m.position.set(0, 0, shadowZ + (soft ? 0 : 0.5));
+      root.add(m);
+      return { tex, mat, mesh: m };
+    };
+    const shadow = makeShadow(true, 1);
+    const contact = makeShadow(false, 1);
+    // 발자국: 변형된 몸에서 바닥에 닿은 폭·가운데·바닥과의 틈 (몸 좌표)
+    const foot = { minX: -mesh.halfWidth * 0.8, maxX: mesh.halfWidth * 0.8, gap: 0, squash: 0 };
+    let liftUnits = 0;
+    const applyShadow = () => {
+      const width = Math.max(4, foot.maxX - foot.minX);
+      const cx = (foot.minX + foot.maxX) / 2;
+      const up = liftUnits + foot.gap;
+      // 들수록 넓고 옅게 퍼진다
+      const spread = 1 + Math.min(0.6, up / 90);
+      shadow.mesh.scale.set((width * 1.3 + 14) * spread, 22 * spread * (1 + foot.squash * 0.6), 1);
+      shadow.mesh.position.set(cx, -liftUnits - 1, shadowZ);
+      shadow.mat.opacity = Math.max(0.3, 1 - up / 110);
+      // 접촉 그림자: 닿아 있을 때만, 눌릴수록 넓고 진하게
+      const touch = Math.max(0, 1 - up / 7);
+      contact.mesh.visible = touch > 0.01;
+      contact.mesh.scale.set(width * 1.02 + 4, 7 * (1 + foot.squash * 0.8), 1);
+      contact.mesh.position.set(cx, -liftUnits - 0.5, shadowZ + 0.5);
+      contact.mat.opacity = touch * Math.min(1, 0.62 + foot.squash * 1.2);
+    };
+    applyShadow();
 
     // 몸 뒤 빛 (전설 이상·반짝): 텍스처 한 장 + 보통 섞기 — 새 렌더 타깃·후처리 없음
     let glowTex: CanvasTexture | null = null;
@@ -689,9 +908,8 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       const py = p.y - rect.top;
       root.position.set((px - cssW / 2) * k, (cssH / 2 - py) * k, zg);
       root.scale.setScalar(p.unit * k);
-      const liftUnits = p.unit > 0 ? p.lift / p.unit : 0;
-      shadow.position.y = -liftUnits;
-      shadowMat.opacity = 0.9 * Math.max(0.25, 1 - liftUnits / 120);
+      liftUnits = p.unit > 0 ? Math.max(0, p.lift / p.unit) : 0;
+      applyShadow();
     };
 
     const updateNow = (pose: Pose, soft: SoftState) => {
@@ -707,10 +925,34 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
         deformPoints(card.grid.rest, card.grid.vertexCount, mesh.height, pose, soft, card.pos.array as Float32Array);
         card.pos.needsUpdate = true;
       }
-      // 그림자: 눌려 퍼지면 넓게
-      const w = mesh.halfWidth * 2.25 * pose.scaleX;
-      shadow.scale.set(w, 20 * Math.max(0.6, pose.scaleX), 1);
-      shadow.position.x = pose.offsetX;
+      // 자국 그늘: 셰이더가 쉬는 자세 좌표로 잰다
+      const dc = uniforms.uDentC.value;
+      const dd = uniforms.uDentD.value;
+      for (let i = 0; i < MAX_DENTS; i++) {
+        const d = soft.dents[i];
+        const depth = d ? Math.max(0, d.depth.x) : 0;
+        dd.setComponent(i, depth);
+        if (d) dc[i]!.set(d.center.x, d.center.y, d.center.z, Math.max(1, d.radius));
+      }
+      // 발자국: 가장 낮은 정점 근처 정점들의 폭 (당김·기울기·눌림을 그대로 따른다)
+      let lo = Infinity;
+      for (let i = 1; i < out.length; i += 3) if (out[i]! < lo) lo = out[i]!;
+      const band = lo + Math.max(2, mesh.height * 0.05);
+      let fx0 = Infinity;
+      let fx1 = -Infinity;
+      for (let i = 0; i < out.length; i += 3) {
+        if (out[i + 1]! > band) continue;
+        const x = out[i]!;
+        if (x < fx0) fx0 = x;
+        if (x > fx1) fx1 = x;
+      }
+      if (fx1 > fx0) {
+        foot.minX = fx0;
+        foot.maxX = fx1;
+      }
+      foot.gap = Math.max(0, lo);
+      foot.squash = Math.max(0, Math.min(0.5, 1 - pose.scaleY));
+      applyShadow();
     };
 
     const beforeRender = (now: number) => {
@@ -783,7 +1025,7 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       placeholder.dispose();
       ready = true;
       bodyMesh.visible = true;
-      ink.visible = true;
+      if (ink) ink.visible = true;
     })();
 
     const internal: BodyInternal = {
@@ -852,13 +1094,15 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
           m.geometry?.dispose();
         });
         bodyMat.dispose();
-        inkMat.dispose();
+        inkMat?.dispose();
         for (const card of [backCard, frontCard]) {
           card.mat.map?.dispose();
           card.mat.dispose();
         }
-        shadowMat.dispose();
-        shadowTex.dispose();
+        for (const sh of [shadow, contact]) {
+          sh.mat.dispose();
+          sh.tex.dispose();
+        }
         glowMat?.dispose();
         glowTex?.dispose();
         placeholder.dispose();
