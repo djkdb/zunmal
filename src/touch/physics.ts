@@ -11,7 +11,12 @@
  *
  * 좌표계: point 는 몸 중심 기준 정규화 좌표. x −1(왼쪽)…1(오른쪽), y −1(위)…1(아래).
  * drag 의 displacement 도 같은 단위(몸 반지름)이다.
+ *
+ * 촉감(`data/materials.ts` 의 MaterialFeel)을 상태에 담아 스프링 강성·감쇠·늘어나는 한계·반동·처짐을 바꾼다.
+ * 슬로우 라이징은 놓은 뒤 눌림이 스프링 대신 지수 곡선으로 천천히 차오른다 (누를 때는 빠르다 = 히스테리시스).
+ * feel 을 주지 않으면 예전 기본 말랑(NEUTRAL_FEEL) 그대로다.
  */
+import type { MaterialFeel } from '../data/materials';
 
 export interface Spring {
   x: number;
@@ -33,7 +38,21 @@ export interface TouchState {
   pressY: number;
   /** 움직임 줄이기: 감쇠를 크게 해 흔들림 횟수를 줄인다 */
   reducedMotion: boolean;
+  /** 촉감 */
+  feel: MaterialFeel;
 }
+
+/** 예전 기본 말랑 (촉감이 없을 때) — 모든 배수 1 */
+export const NEUTRAL_FEEL: Readonly<MaterialFeel> = {
+  springK: 1,
+  zetaFree: 1,
+  riseTauMs: 0,
+  stretch: 1,
+  snap: 1,
+  sag: 0,
+  stickMs: 0,
+  impact: 1,
+};
 
 export interface Transform {
   scaleX: number;
@@ -79,6 +98,10 @@ export const TUNING = {
   offsetMax: 0.14,
   /** 속도가 이보다 작고 목표와 가까우면 멈춘 것으로 본다 */
   settleEps: 0.0015,
+  /** 슬로우 라이징: 튕김(찌르기 등) 속도가 사라지는 빠르기 (1/s) — 빠르게 들어가고 */
+  riseKickDamp: 22,
+  /** 슬로우 라이징: 이만큼 가까우면 다 돌아온 것으로 본다 */
+  riseSnap: 0.004,
 } as const;
 
 // ── 유틸 ──────────────────────────────────────────────────
@@ -110,9 +133,10 @@ function kick(s: Spring, dv: number): Spring {
 
 // ── 상태 생성 ──────────────────────────────────────────────
 
-export function createTouchState(options: { reducedMotion?: boolean } = {}): TouchState {
+export function createTouchState(options: { reducedMotion?: boolean; feel?: MaterialFeel } = {}): TouchState {
+  const feel = options.feel ?? NEUTRAL_FEEL;
   return {
-    squash: spring(),
+    squash: spring(feel.sag),
     lean: spring(),
     offsetX: spring(),
     offsetY: spring(),
@@ -121,7 +145,18 @@ export function createTouchState(options: { reducedMotion?: boolean } = {}): Tou
     pressX: 0,
     pressY: 0,
     reducedMotion: options.reducedMotion ?? false,
+    feel,
   };
+}
+
+/** 촉감 바꾸기 (쉬는 눌림도 새 처짐으로) */
+export function setFeel(state: TouchState, feel: MaterialFeel): TouchState {
+  return { ...state, feel, squash: state.held ? state.squash : withTarget(state.squash, feel.sag) };
+}
+
+/** 늘어나는 한계 배수에서 기울기·옆 이동 배수 (당김만큼 멀리 가지는 않는다) */
+function stretchScale(feel: MaterialFeel, share: number): number {
+  return 1 + (feel.stretch - 1) * share;
 }
 
 export function setReducedMotion(state: TouchState, reducedMotion: boolean): TouchState {
@@ -168,16 +203,18 @@ export function drag(state: TouchState, displacement: { x: number; y: number }):
   const dy = displacement.y;
   const dist = Math.hypot(dx, dy);
   // 끌수록 누름 효과는 줄고 늘림 효과가 커진다
+  const f = state.feel;
   const pressPart = pressSquash(state.pressure) * Math.max(0, 1 - dist * 1.6);
-  const vertical = dy < 0 ? -softLimit(-dy * 0.55, TUNING.stretchUpMax) : softLimit(dy * 0.4, TUNING.stretchDownMax);
+  const upMax = TUNING.stretchUpMax * f.stretch;
+  const vertical = dy < 0 ? -softLimit(-dy * 0.55 * stretchScale(f, 0.3), upMax) : softLimit(dy * 0.4, TUNING.stretchDownMax);
   // 옆으로 당겨도 몸이 길어지므로 세로로 살짝 늘어난다
-  const sideStretch = -softLimit(Math.abs(dx) * 0.12, 0.1);
+  const sideStretch = -softLimit(Math.abs(dx) * 0.12, 0.1 * f.stretch);
   return {
     ...state,
     held: true,
     squash: withTarget(state.squash, pressPart + vertical + sideStretch),
-    lean: withTarget(state.lean, softLimit(dx * 0.55, TUNING.leanMax)),
-    offsetX: withTarget(state.offsetX, softLimit(dx * 0.18, TUNING.offsetMax)),
+    lean: withTarget(state.lean, softLimit(dx * 0.55, TUNING.leanMax * stretchScale(f, 0.6))),
+    offsetX: withTarget(state.offsetX, softLimit(dx * 0.18, TUNING.offsetMax * stretchScale(f, 0.8))),
     offsetY: withTarget(state.offsetY, 0),
   };
 }
@@ -187,12 +224,13 @@ export function drag(state: TouchState, displacement: { x: number; y: number }):
  * 늘어나 있던 만큼 튕겨 나가는 속도를 조금 더해 "탱" 하는 반동을 만든다.
  */
 export function release(state: TouchState): TouchState {
-  const snap = 1.5;
+  const snap = 1.5 * state.feel.snap;
+  const sag = state.feel.sag;
   return {
     ...state,
     held: false,
     pressure: 0,
-    squash: kick(withTarget(state.squash, 0), -state.squash.x * snap),
+    squash: kick(withTarget(state.squash, sag), -(state.squash.x - sag) * snap),
     lean: kick(withTarget(state.lean, 0), -state.lean.x * snap),
     offsetX: withTarget(state.offsetX, 0),
     offsetY: withTarget(state.offsetY, 0),
@@ -232,10 +270,11 @@ export function tickle(state: TouchState, direction: number): TouchState {
 export function impact(state: TouchState, dirX: number, strength: number): TouchState {
   const s = clamp(Number.isFinite(strength) ? strength : 0, 0, 1);
   const d = clamp(Number.isFinite(dirX) ? dirX : 0, -1, 1);
+  const k = state.feel.impact;
   return {
     ...state,
-    squash: kick(state.squash, (2.4 + 4.2 * s) * (1 - 0.6 * Math.abs(d))),
-    lean: kick(state.lean, d * (1.2 + 2.2 * s)),
+    squash: kick(state.squash, (2.4 + 4.2 * s) * (1 - 0.6 * Math.abs(d)) * k),
+    lean: kick(state.lean, d * (1.2 + 2.2 * s) * k),
   };
 }
 
@@ -277,21 +316,29 @@ export function stretchUp(state: TouchState, strength = 1): TouchState {
 
 // ── 적분 ──────────────────────────────────────────────────
 
-function zetaFor(t: SpringTuning, held: boolean, reduced: boolean): number {
-  const z = held ? t.zetaHeld : t.zetaFree;
+function zetaFor(t: SpringTuning, held: boolean, reduced: boolean, feel: MaterialFeel = NEUTRAL_FEEL): number {
+  const z = held ? t.zetaHeld : Math.min(1.2, t.zetaFree * feel.zetaFree);
   return reduced ? Math.max(z, TUNING.reducedZeta) : z;
 }
 
-function integrate(s: Spring, t: SpringTuning, held: boolean, reduced: boolean, dt: number): Spring {
-  const zeta = zetaFor(t, held, reduced);
-  const c = 2 * zeta * Math.sqrt(t.k);
+function integrate(
+  s: Spring,
+  t: SpringTuning,
+  held: boolean,
+  reduced: boolean,
+  dt: number,
+  feel: MaterialFeel = NEUTRAL_FEEL,
+): Spring {
+  const zeta = zetaFor(t, held, reduced, feel);
+  const k = t.k * feel.springK;
+  const c = 2 * zeta * Math.sqrt(k);
   let x = s.x;
   let v = s.v;
   let remaining = dt;
   while (remaining > 1e-9) {
     const h = Math.min(TUNING.subStep, remaining);
     // semi-implicit Euler: 안정적이고 결정적
-    const a = t.k * (s.target - x) - c * v;
+    const a = k * (s.target - x) - c * v;
     v += a * h;
     x += v * h;
     remaining -= h;
@@ -299,19 +346,56 @@ function integrate(s: Spring, t: SpringTuning, held: boolean, reduced: boolean, 
   return { x, v, target: s.target };
 }
 
+/**
+ * 슬로우 라이징: 튕김 속도는 금방 사라지고(빠르게 들어감) 목표 쪽으로는 지수 곡선으로 천천히 돌아온다.
+ * side = +1 이면 눌린 쪽(x > target)에 있을 때만 느리게, 반대쪽(늘어난 쪽)은 보통 스프링 (늘어난 채 멈춰 있지 않게).
+ * side = 0 이면 양쪽 모두 느리게.
+ */
+export function relaxSpring(s: Spring, tauMs: number, dt: number, fallback: () => Spring, side = 0): Spring {
+  if (side !== 0 && (s.x - s.target) * side <= 0 && s.v * side <= 0) return fallback();
+  let x = s.x;
+  let v = s.v;
+  const tau = Math.max(1, tauMs) / 1000;
+  let remaining = dt;
+  while (remaining > 1e-9) {
+    const h = Math.min(TUNING.subStep, remaining);
+    x += v * h;
+    v *= Math.exp(-TUNING.riseKickDamp * h);
+    if (side === 0 || (x - s.target) * side > 0) x = s.target + (x - s.target) * Math.exp(-h / tau);
+    remaining -= h;
+  }
+  if (Math.abs(x - s.target) < TUNING.riseSnap && Math.abs(v) < 0.02) {
+    x = s.target;
+    v = 0;
+  }
+  return { x, v, target: s.target };
+}
+
+/** 놓은 뒤 눌림이 목표로 90% 돌아오는 대략의 시간 (ms) — 소리 길이·테스트용 */
+export function recoverMs(feel: MaterialFeel): number {
+  if (feel.riseTauMs > 0) return feel.riseTauMs * Math.log(10);
+  // 감쇠 진동: 포락선 exp(-ζω t) 가 0.1 이 되는 시간
+  const w = Math.sqrt(TUNING.squash.k * feel.springK);
+  const zeta = Math.min(1.2, TUNING.squash.zetaFree * feel.zetaFree);
+  return (Math.log(10) / (zeta * w)) * 1000;
+}
+
 /** dtMs 만큼 시뮬레이션을 진행한다. dt 는 [0, maxDtMs] 로 제한된다. */
 export function step(state: TouchState, dtMs: number): TouchState {
   const dtClamped = Number.isFinite(dtMs) ? clamp(dtMs, 0, TUNING.maxDtMs) : 0;
   if (dtClamped === 0) return state;
   const dt = dtClamped / 1000;
-  const { held, reducedMotion: r } = state;
+  const { held, reducedMotion: r, feel } = state;
   const offT: SpringTuning = TUNING.offset;
+  const slow = !held && feel.riseTauMs > 0;
+  const squash = () => integrate(state.squash, TUNING.squash, held, r, dt, feel);
+  const lean = () => integrate(state.lean, TUNING.lean, held, r, dt, feel);
   return {
     ...state,
-    squash: integrate(state.squash, TUNING.squash, held, r, dt),
-    lean: integrate(state.lean, TUNING.lean, held, r, dt),
-    offsetX: integrate(state.offsetX, offT, held, r, dt),
-    offsetY: integrate(state.offsetY, offT, held, r, dt),
+    squash: slow ? relaxSpring(state.squash, feel.riseTauMs, dt, squash, 1) : squash(),
+    lean: slow ? relaxSpring(state.lean, feel.riseTauMs * 0.6, dt, lean) : lean(),
+    offsetX: integrate(state.offsetX, offT, held, r, dt, feel),
+    offsetY: integrate(state.offsetY, offT, held, r, dt, feel),
   };
 }
 
@@ -329,7 +413,7 @@ export function isAtRest(state: TouchState): boolean {
   return (
     !state.held &&
     isSettled(state) &&
-    state.squash.target === 0 &&
+    state.squash.target === state.feel.sag &&
     state.lean.target === 0 &&
     state.offsetX.target === 0 &&
     state.offsetY.target === 0
@@ -355,10 +439,12 @@ export function snapToTargets(state: TouchState): TouchState {
  * 세로로 눌리면(scaleY<1) 옆으로 퍼지고, 늘어나면 가늘어진다 (넓이를 대략 보존).
  */
 export function toTransform(state: TouchState): Transform {
-  const scaleY = clamp(1 - state.squash.x, 0.45, 1.75);
+  const f = state.feel;
+  const scaleY = clamp(1 - state.squash.x, 0.45, Math.max(1.75, 1.25 + TUNING.stretchUpMax * f.stretch));
   // 완전한 넓이 보존(1/scaleY)의 80% 정도만 반영해 너무 넓적해지지 않게
-  const scaleX = clamp(1 + (1 / scaleY - 1) * 0.8, 0.6, 1.9);
-  const lean = clamp(state.lean.x, -1.2, 1.2);
+  const scaleX = clamp(1 + (1 / scaleY - 1) * 0.8, 0.5, 1.9);
+  const leanMax = 1.2 * Math.max(1, stretchScale(f, 0.25));
+  const lean = clamp(state.lean.x, -leanMax, leanMax);
   return {
     scaleX,
     scaleY,
@@ -371,14 +457,31 @@ export function toTransform(state: TouchState): Transform {
 
 /** 현재 늘어난 정도 0..1 (소리 밝기/크기에 사용) */
 export function stretchAmount(state: TouchState): number {
-  const vertical = Math.max(0, -state.squash.x) / TUNING.stretchUpMax;
-  const side = Math.abs(state.lean.x) / TUNING.leanMax;
+  const f = state.feel;
+  const vertical = Math.max(0, -state.squash.x) / (TUNING.stretchUpMax * f.stretch);
+  const side = Math.abs(state.lean.x) / (TUNING.leanMax * stretchScale(f, 0.6));
   return clamp(Math.max(vertical, side), 0, 1);
 }
 
 /** 현재 눌린 정도 0..1 */
 export function squashAmount(state: TouchState): number {
-  return clamp(state.squash.x / TUNING.pressMax, 0, 1);
+  return clamp((state.squash.x - state.feel.sag) / TUNING.pressMax, 0, 1);
+}
+
+/** 기본 말랑의 늘림 한계 대비 지금 몇 배 늘어났는가 (쭉쭉이는 2 를 넘는다 — 늘림 소리 음높이에 사용) */
+export function stretchLength(state: TouchState): number {
+  return Math.max(0, -state.squash.x) / TUNING.stretchUpMax;
+}
+
+/**
+ * 찐득이: 손가락을 뗄 때 얼마나 붙어 있다가 떨어지는가. 오래 눌렀을수록 오래 붙고 많이 딸려 올라온다.
+ * delayMs = 0 이면 붙지 않는다. lift 는 떨어지기 직전 위로 늘어나는 양 (몸 반지름 단위, drag 의 −y).
+ */
+export function peelPlan(feel: MaterialFeel, heldMs: number, tap: boolean): { delayMs: number; lift: number } {
+  if (!(feel.stickMs > 0)) return { delayMs: 0, lift: 0 };
+  const held = clamp(Number.isFinite(heldMs) ? heldMs : 0, 0, 1500) / 1500;
+  if (tap) return { delayMs: Math.round(feel.stickMs * 0.3), lift: 0.15 };
+  return { delayMs: Math.round(feel.stickMs * (0.45 + 0.55 * held)), lift: 0.3 + 0.4 * held };
 }
 
 /** 흔들림 크기 (놓았을 때 소리 세기에 사용) 0..1 */
@@ -388,6 +491,7 @@ export function wobbleEnergy(state: TouchState): number {
 }
 
 /** 놓은 뒤 세로 출렁임의 대략적인 주파수 (Hz) — 소리 비브라토를 화면과 맞출 때 사용 */
-export function wobbleHz(): number {
-  return Math.sqrt(TUNING.squash.k) / (2 * Math.PI);
+export function wobbleHz(feel: MaterialFeel = NEUTRAL_FEEL): number {
+  return Math.sqrt(TUNING.squash.k * feel.springK) / (2 * Math.PI);
 }
+

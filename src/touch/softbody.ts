@@ -10,10 +10,14 @@
  *     자국·당김으로 변한 부피는 나머지 몸이 법선 방향으로 살짝 부풀거나 줄어 되돌린다 (부피 보존).
  *
  * 좌표는 jellyMesh.ts 의 "몸 좌표" (SVG 단위, 바닥 가운데 원점, y 위, z 카메라 쪽).
+ *
+ * 촉감(feel): 스프링 강성·감쇠 배수, 당김 한계(쭉쭉이는 훨씬 멀리), 놓을 때 반동, 그리고 슬로우 라이징의
+ * 느린 자국 — 놓은 자국은 스프링 대신 지수 곡선으로 천천히 차오른다 (physics.relaxSpring 과 같은 곡선).
  */
+import type { MaterialFeel } from '../data/materials';
 import type { JellyMesh } from './jellyMesh';
 import { meshVolume } from './jellyMesh';
-import { toTransform, type Spring, type TouchState } from './physics';
+import { NEUTRAL_FEEL, relaxSpring, toTransform, type Spring, type TouchState } from './physics';
 
 export interface Vec3 {
   x: number;
@@ -56,6 +60,8 @@ export interface SoftState {
   reducedMotion: boolean;
   /** 졸고 있다: 느리고 깊게 계속 숨쉰다 */
   doze?: boolean;
+  /** 촉감 (없으면 기본 말랑) */
+  feel?: MaterialFeel;
 }
 
 /** 변형에 쓰는 전체 자세 */
@@ -140,8 +146,9 @@ function finite(n: number, fallback = 0): number {
 
 // ── 상태 ──────────────────────────────────────────────────
 
-export function createSoftState(options: { reducedMotion?: boolean } = {}): SoftState {
+export function createSoftState(options: { reducedMotion?: boolean; feel?: MaterialFeel } = {}): SoftState {
   return {
+    feel: options.feel,
     dents: [],
     grab: null,
     pullX: spring(),
@@ -223,7 +230,8 @@ export function softPull(state: SoftState, displacement: { x: number; y: number 
   const dx = finite(displacement.x);
   const dy = finite(displacement.y);
   const dist = Math.hypot(dx, dy);
-  const k = dist > 1e-9 ? softLimit(dist * 0.5, SOFT_TUNING.pullMax) / dist : 0;
+  const { gain, max } = pullLimits(state.feel);
+  const k = dist > 1e-9 ? softLimit(dist * gain, max) / dist : 0;
   return {
     ...state,
     held: true,
@@ -268,7 +276,7 @@ export function softTickle(state: SoftState, direction: number): SoftState {
 export function softRelease(state: SoftState, velocity: { x: number; y: number } = { x: 0, y: 0 }): SoftState {
   const vx = clamp(finite(velocity.x), -2000, 2000);
   const vy = clamp(finite(velocity.y), -2000, 2000);
-  const snap = 1.4;
+  const snap = 1.4 * (state.feel ?? NEUTRAL_FEEL).snap;
   return {
     ...state,
     held: false,
@@ -285,17 +293,35 @@ export function softRelease(state: SoftState, velocity: { x: number; y: number }
 
 // ── 적분 ──────────────────────────────────────────────────
 
-function integrate(s: Spring, t: SpringTuning, held: boolean, reduced: boolean, dt: number): Spring {
-  const zeta0 = held ? t.zetaHeld : t.zetaFree;
+/** 당김 세기·한계 (쭉쭉이는 멀리) */
+export function pullLimits(feel: MaterialFeel = NEUTRAL_FEEL): { gain: number; max: number; radius: number } {
+  const extra = feel.stretch - 1;
+  return {
+    gain: 0.5 * (1 + extra * 0.3),
+    max: SOFT_TUNING.pullMax * feel.stretch,
+    radius: SOFT_TUNING.pullRadius * (1 + extra * 0.3),
+  };
+}
+
+function integrate(
+  s: Spring,
+  t: SpringTuning,
+  held: boolean,
+  reduced: boolean,
+  dt: number,
+  feel: MaterialFeel = NEUTRAL_FEEL,
+): Spring {
+  const zeta0 = held ? t.zetaHeld : Math.min(1.2, t.zetaFree * feel.zetaFree);
   const zeta = reduced ? Math.max(zeta0, SOFT_TUNING.reducedZeta) : zeta0;
-  const c = 2 * zeta * Math.sqrt(t.k);
+  const k = t.k * feel.springK;
+  const c = 2 * zeta * Math.sqrt(k);
   let x = finite(s.x);
   let v = finite(s.v);
   const target = finite(s.target);
   let remaining = dt;
   while (remaining > 1e-9) {
     const h = Math.min(SOFT_TUNING.subStep, remaining);
-    const a = t.k * (target - x) - c * v;
+    const a = k * (target - x) - c * v;
     v += a * h;
     x += v * h;
     remaining -= h;
@@ -313,19 +339,25 @@ export function stepSoft(state: SoftState, dtMs: number): SoftState {
   if (ms === 0) return state;
   const dt = ms / 1000;
   const { held, reducedMotion: r } = state;
+  const feel = state.feel ?? NEUTRAL_FEEL;
   const T = SOFT_TUNING;
+  const rise = feel.riseTauMs;
   const dents = state.dents
-    .map((d) => ({ ...d, depth: integrate(d.depth, T.dent, d.active, r, dt) }))
+    .map((d) => {
+      const spring = () => integrate(d.depth, T.dent, d.active, r, dt, feel);
+      // 슬로우 라이징: 놓은 자국은 천천히 차오른다 (누르는 동안은 빠른 스프링)
+      return { ...d, depth: !d.active && rise > 0 ? relaxSpring(d.depth, rise, dt, spring, 1) : spring() };
+    })
     // 다 돌아온 자국은 지운다
     .filter((d) => d.active || !settled(d.depth, 0.05));
-  const twist = integrate(state.twist, T.twist, held, r, dt);
-  const sway = integrate(state.sway, T.sway, held, r, dt);
+  const twist = integrate(state.twist, T.twist, held, r, dt, feel);
+  const sway = integrate(state.sway, T.sway, held, r, dt, feel);
   return {
     ...state,
     dents,
-    pullX: integrate(state.pullX, T.pull, held, r, dt),
-    pullY: integrate(state.pullY, T.pull, held, r, dt),
-    pullZ: integrate(state.pullZ, T.pull, held, r, dt),
+    pullX: integrate(state.pullX, T.pull, held, r, dt, feel),
+    pullY: integrate(state.pullY, T.pull, held, r, dt, feel),
+    pullZ: integrate(state.pullZ, T.pull, held, r, dt, feel),
     twist: { ...twist, x: clamp(twist.x, -T.twistMax * 2, T.twistMax * 2) },
     sway: { ...sway, x: clamp(sway.x, -T.swayMax * 2, T.swayMax * 2) },
     idleMs: held ? 0 : state.idleMs + ms,
@@ -471,7 +503,8 @@ function localDisplace(
     const dx = px - g0.x;
     const dy = py - g0.y;
     const dz = pz - g0.z;
-    const r = SOFT_TUNING.pullRadius;
+    const r = pullLimits(soft.feel).radius;
+
     const g = Math.exp(-(dx * dx + dy * dy + dz * dz * 0.25) / (r * r));
     // 바닥은 접시에 붙어 있어 덜 딸려 온다
     const floor = smoothstep(0, 18, py);
