@@ -1024,6 +1024,17 @@ function Playroom() {
     const now = performance.now();
     const world = worldRef.current;
     const worldEvents = stepWorld(world, dt);
+    // 혼자 모드: 말랑이는 가운데 제자리 (들어 옮기기·던지기·밀기·소품에 밀림 없음, 폴짝 높이만 움직인다)
+    if (soloRef.current && world.bodies.length === 1) {
+      const only = world.bodies[0];
+      if (only && recsRef.current.get(only.id)?.kind === 'malang') {
+        const c = soloSpot(world.bounds);
+        only.x = c.x;
+        only.y = c.y;
+        only.vx = 0;
+        only.vy = 0;
+      }
+    }
     handleEvents(worldEvents);
     const pairEvents = stepInteractions(interactRef.current, {
       now,
@@ -1440,7 +1451,8 @@ function Playroom() {
     if (rec.kind === 'malang' && rec.actor) {
       const actor = rec.actor;
       // 쭉쭉이는 멀리 늘어난 뒤에야 따라온다 (촉감 표의 carryFrac)
-      if (!actor.carrying && actor.travel(e.clientX, e.clientY) > L.sprite * actor.env.material.carryFrac) {
+      // 혼자 모드에서는 들어 옮기지 않는다 — 당기면 제자리에서 늘어나기만
+      if (!soloRef.current && !actor.carrying && actor.travel(e.clientX, e.clientY) > L.sprite * actor.env.material.carryFrac) {
         startCarry();
         actor.startCarry();
       }
@@ -1553,8 +1565,8 @@ function Playroom() {
       if (actor.isKeyGesture()) {
         actor.keyPull(arrow.x, arrow.y);
       } else {
-        // 화살표만: 그쪽으로 톡 민다
-        nudgeBody(worldRef.current, rec.key, arrow.x, arrow.y * 0.8);
+        // 화살표만: 그쪽으로 톡 민다 (혼자 모드는 제자리에서 흔들리기만)
+        if (!soloRef.current) nudgeBody(worldRef.current, rec.key, arrow.x, arrow.y * 0.8);
         actor.bumped(-arrow.x, 0.3);
         squish.poke(0.3);
       }
