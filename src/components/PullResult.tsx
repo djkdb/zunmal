@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { playRarityFanfare, sfx } from '../audio/sfx';
 import { RARITY_META, rarityRank, type Rarity } from '../data/rarity';
@@ -9,7 +9,18 @@ import { CoinIcon } from './icons';
 import { Malang } from './Malang';
 import { Modal } from './Modal';
 import { buzz } from './pullHaptics';
-import { revealStep, summarizePulls, topRarity } from './pullReveal';
+import {
+  allOpen,
+  canOpen,
+  initialPhases,
+  openAllSchedule,
+  openSequence,
+  openTiming,
+  openedCount,
+  summarizePulls,
+  topRarity,
+  type CardPhase,
+} from './pullReveal';
 import { RarityBadge } from './RarityBadge';
 import './PullResult.css';
 
@@ -19,7 +30,7 @@ interface PullResultProps {
   items: readonly ResolvedPull[];
   totalRefund: number;
   onClose(): void;
-  /** 전체 화면 연출(신화 이상)로 이미 보여 준 결과의 위치. 이 카드는 모으기 없이 바로 뒤집고 결과음도 생략한다. */
+  /** 전체 화면 연출(신화 이상)로 이미 보여 준 결과의 위치. 이 카드는 처음부터 앞면이고 결과음도 생략한다. */
   seenIndex?: number;
   /** 다시 뽑기 버튼용 현재 코인 */
   coins: number;
@@ -39,6 +50,9 @@ const REVEAL_TITLE: Record<Rarity, string> = {
 /** 뒤집힐 때 튀는 빛 조각 수 (에픽 이상만) */
 const BURST_COUNT: Record<Rarity, number> = { common: 0, rare: 0, epic: 6, legendary: 10, mythic: 12, secret: 12 };
 
+/** Esc로 "모두 열기"를 누른 직후 같은 키의 닫기 요청은 무시한다 */
+const ESC_GRACE_MS = 400;
+
 function OwnershipTag({ item, compact = false }: { item: ResolvedPull; compact?: boolean }) {
   if (item.isNewShiny) return <span className="pull-tag pull-tag--shiny">{compact ? 'NEW' : '반짝 NEW'}</span>;
   if (item.isNew) return <span className="pull-tag pull-tag--new">NEW</span>;
@@ -49,10 +63,10 @@ function OwnershipTag({ item, compact = false }: { item: ResolvedPull; compact?:
   );
 }
 
+/** 열린 카드의 스크린리더 이름: "해파리 말랑, 레어, 새 말랑이" */
 function describe(item: ResolvedPull): string {
-  return `${item.shiny ? '반짝 ' : ''}${RARITY_META[item.rarity].label} ${item.character.name}, ${
-    item.isNew || item.isNewShiny ? '새로 만났어요' : `이미 있어서 ${item.refund}코인 돌려받았어요`
-  }`;
+  const own = item.isNewShiny ? '새 반짝 말랑이' : item.isNew ? '새 말랑이' : `이미 있어서 ${item.refund}코인 돌려받음`;
+  return `${item.shiny ? '반짝 ' : ''}${item.character.name}, ${RARITY_META[item.rarity].label}, ${own}`;
 }
 
 function Burst({ rarity }: { rarity: Rarity }) {
@@ -67,11 +81,11 @@ function Burst({ rarity }: { rarity: Rarity }) {
   );
 }
 
-/** 캡슐 뒷면: 모으기 전에는 모두 같은 크림색, 차례가 오면 등급 색으로 물든다 */
+/** 캡슐 뒷면: 모두 같은 크림색. 누르면(모으기) 등급 색으로 물든다 */
 function CapsuleBack() {
   return (
-    <svg className="pull-card__capsule" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
-      <path className="pull-card__cap-top" d="M-17 0 A17 17 0 0 1 17 0 Z" />
+    <svg className="pull-capsule" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
+      <path className="pull-capsule__top" d="M-17 0 A17 17 0 0 1 17 0 Z" />
       <path d="M-17 0 A17 17 0 0 0 17 0 Z" fill="#fffdf8" stroke="#2b2233" strokeWidth="3" strokeLinejoin="round" />
       <rect x="-18" y="-2" width="36" height="4" rx="2" fill="#2b2233" />
       <ellipse cx="-7" cy="-9" rx="4.5" ry="2.5" fill="#fff" opacity="0.75" transform="rotate(-30 -7 -9)" />
@@ -79,53 +93,68 @@ function CapsuleBack() {
   );
 }
 
-type CardState = 'back' | 'charge' | 'hold' | 'face';
-
 function PullCard({
   item,
   index,
-  state,
+  phase,
   pop,
+  poke,
   best,
   selected,
   animate,
-  onSelect,
+  onPress,
 }: {
   item: ResolvedPull;
   index: number;
-  state: CardState;
+  phase: CardPhase;
   pop: number;
+  poke: number;
   best: boolean;
   selected: boolean;
   animate: boolean;
-  onSelect(): void;
+  onPress(): void;
 }) {
-  const face = state === 'face';
+  const face = phase === 'face';
   const cls = [
     'pull-card',
     `pull-card--${item.rarity}`,
-    `is-${state}`,
+    `is-${phase}`,
     item.shiny && face ? 'is-shiny' : '',
-    best && face ? 'is-best' : '',
+    best ? 'is-best' : '',
     selected ? 'is-selected' : '',
   ]
     .filter(Boolean)
     .join(' ');
+  const label = face
+    ? describe(item)
+    : phase === 'back'
+      ? `캡슐 ${index + 1} 열기`
+      : `캡슐 ${index + 1} 여는 중`;
   return (
     <li className={cls} style={{ '--pop': pop } as CSSProperties}>
       <button
         type="button"
         className="pull-card__btn"
-        onClick={onSelect}
+        onClick={onPress}
         aria-pressed={face ? selected : undefined}
-        aria-label={face ? `${index + 1}번째: ${describe(item)}` : `${index + 1}번째 캡슐, 아직 열지 않았어요`}
+        aria-label={label}
       >
         <span className="pull-card__flip">
           <span className="pull-card__back">
             <CapsuleBack />
           </span>
           <span className="pull-card__face" aria-hidden="true">
-            <Malang character={item.character} size={42} animation="none" decorative shiny={item.shiny} />
+            <span className="pull-card__art">
+              <Malang
+                character={item.character}
+                size={96}
+                animation="none"
+                decorative
+                shiny={item.shiny}
+                poke={poke}
+                className="pull-card__malang"
+              />
+            </span>
             <span className="pull-card__name">{item.character.name}</span>
             <RarityBadge rarity={item.rarity} compact />
             <OwnershipTag item={item} compact />
@@ -133,7 +162,7 @@ function PullCard({
         </span>
       </button>
       {face && animate && <Burst rarity={item.rarity} />}
-      {best && face && (
+      {best && (
         <span className="pull-card__ribbon" aria-hidden="true">
           최고
         </span>
@@ -142,61 +171,76 @@ function PullCard({
   );
 }
 
-/** 선택한(기본: 가장 좋은) 결과를 크게 보여 주는 줄 */
-function DetailRow({ item }: { item: ResolvedPull | undefined }) {
-  if (!item) {
-    return (
-      <div className="pull-detail pull-detail--empty" aria-hidden="true">
-        <span className="pull-detail__placeholder">캡슐을 여는 중이에요</span>
-      </div>
-    );
-  }
+/** 열린 카드를 누르면 격자 위에 뜨는 얇은 설명 띠. 누르면 닫힌다. */
+function DetailBar({ item, top, onDismiss }: { item: ResolvedPull; top: boolean; onDismiss(): void }) {
   return (
-    <div className={`pull-detail pull-detail--${item.rarity}${item.shiny ? ' is-shiny' : ''}`}>
+    <button
+      type="button"
+      className={`pull-detail pull-detail--${item.rarity}${item.shiny ? ' is-shiny' : ''}${top ? ' is-top' : ''}`}
+      onClick={onDismiss}
+      aria-label={`${describe(item)}. ${item.character.description} 설명 닫기`}
+    >
       <Malang
         key={`${item.character.id}-${item.shiny}`}
         character={item.character}
-        size={56}
+        size={48}
         animation="bounce"
         decorative
         shiny={item.shiny}
       />
-      <div className="pull-detail__text">
-        <p className="pull-detail__name">
-          {item.shiny ? '반짝 ' : ''}
-          {item.character.name}
-        </p>
-        <div className="pull-detail__tags">
+      <span className="pull-detail__text" aria-hidden="true">
+        <span className="pull-detail__line">
+          <span className="pull-detail__name">
+            {item.shiny ? '반짝 ' : ''}
+            {item.character.name}
+          </span>
           <RarityBadge rarity={item.rarity} compact />
-          <OwnershipTag item={item} />
           {item.byPity && <span className="pull-tag pull-tag--note">천장 확정</span>}
           {item.byGuarantee && <span className="pull-tag pull-tag--note">레어 이상 보장</span>}
-        </div>
-        <p className="pull-detail__desc">{item.character.description}</p>
-      </div>
-    </div>
+        </span>
+        <span className="pull-detail__desc">{item.character.description}</span>
+      </span>
+    </button>
   );
 }
 
-function Summary({ items }: { items: readonly ResolvedPull[] }) {
+/** 한 줄 요약 + 도감(또는 코인 모으기) 링크 */
+function SummaryLine({ items, short }: { items: readonly ResolvedPull[]; short: boolean }) {
   const s = summarizePulls(items);
   return (
-    <dl className="pull-summary">
-      <div>
-        <dt>새 말랑이</dt>
-        <dd>{s.newCount}</dd>
-      </div>
-      <div className={s.shinyCount > 0 ? 'is-lit' : undefined}>
-        <dt>반짝</dt>
-        <dd>{s.shinyCount}</dd>
-      </div>
-      <div>
-        <dt>환급 코인</dt>
-        <dd>
-          <CoinIcon size={16} />+{s.refund.toLocaleString()}
-        </dd>
-      </div>
-    </dl>
+    <div className="pull-summary">
+      {items.length > 1 && (
+        <dl className="pull-summary__list">
+          <div>
+            <dt>새 말랑이</dt>
+            <dd>{s.newCount}</dd>
+          </div>
+          {s.shinyCount > 0 && (
+            <div className="is-lit">
+              <dt>반짝</dt>
+              <dd>{s.shinyCount}</dd>
+            </div>
+          )}
+          {s.refund > 0 && (
+            <div>
+              <dt className="visually-hidden">환급 코인</dt>
+              <dd>
+                <CoinIcon size={14} />+{s.refund.toLocaleString()}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
+      {short ? (
+        <Link to="/play" className="pull-summary__link is-short" onClick={() => sfx.button()}>
+          코인 모으러 가기
+        </Link>
+      ) : (
+        <Link to="/collection" className="pull-summary__link" onClick={() => sfx.button()}>
+          도감 보기
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -211,48 +255,35 @@ function Actions({
   onClose(): void;
   closeRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const short = coins < PULL_PRICE.single;
   return (
     <div className="pull-actions">
-      <div className="pull-actions__again">
-        {(['single', 'multi'] as const).map((kind) => {
-          const price = PULL_PRICE[kind];
-          const enough = coins >= price;
-          const label = kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기';
-          return (
-            <button
-              key={kind}
-              type="button"
-              className={`btn btn--small ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
-              disabled={!enough}
-              onClick={() => {
-                sfx.button();
-                onPullAgain(kind);
-              }}
-              aria-label={`${label}, ${price.toLocaleString()}코인${enough ? '' : ' (코인 부족)'}`}
-            >
-              {label}
-              <span className="pull-actions__cost" aria-hidden="true">
-                <CoinIcon size={16} />
-                {price.toLocaleString()}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="pull-actions__more">
-        <Link to="/collection" className="btn btn--small" onClick={() => sfx.button()}>
-          도감 보기
-        </Link>
-        <button ref={closeRef} type="button" className="btn btn--small btn--lemon" onClick={onClose}>
-          닫기
-        </button>
-      </div>
-      {short && (
-        <p className="pull-actions__short small">
-          코인이 모자라요. <Link to="/play">미니게임에서 모아 오세요.</Link>
-        </p>
-      )}
+      {(['single', 'multi'] as const).map((kind) => {
+        const price = PULL_PRICE[kind];
+        const enough = coins >= price;
+        const label = kind === 'multi' ? `${PULL_COUNT.multi}연 뽑기` : '1회 뽑기';
+        return (
+          <button
+            key={kind}
+            type="button"
+            className={`btn btn--small pull-actions__again ${kind === 'multi' ? 'btn--sky' : 'btn--primary'}`}
+            disabled={!enough}
+            onClick={() => {
+              sfx.button();
+              onPullAgain(kind);
+            }}
+            aria-label={`${label}, ${price.toLocaleString()}코인${enough ? '' : ' (코인 부족)'}`}
+          >
+            {label}
+            <span className="pull-actions__cost" aria-hidden="true">
+              <CoinIcon size={14} />
+              {price.toLocaleString()}
+            </span>
+          </button>
+        );
+      })}
+      <button ref={closeRef} type="button" className="btn btn--small btn--lemon pull-actions__close" onClick={onClose}>
+        닫기
+      </button>
     </div>
   );
 }
@@ -284,11 +315,28 @@ function SingleResult({ item, animate }: { item: ResolvedPull; animate: boolean 
   );
 }
 
+/** 1회: 큰 캡슐 하나. 누르면 등급만큼 뜸을 들인 뒤 열린다. */
+function SingleCapsule({ item, phase, onPress }: { item: ResolvedPull; phase: CardPhase; onPress(): void }) {
+  return (
+    <div className="pull-bigcap-wrap">
+      <button
+        type="button"
+        className={`pull-bigcap pull-card--${item.rarity} is-${phase}`}
+        onClick={onPress}
+        aria-label={phase === 'back' ? '캡슐 열기' : '캡슐 여는 중'}
+        autoFocus
+      >
+        <CapsuleBack />
+      </button>
+    </div>
+  );
+}
+
 /**
  * 뽑기 결과.
- * 1회: 큰 카드가 등급에 맞춰 튀어나온다 (전설 이상은 잠깐 숨을 멈췄다가).
- * 10연: 캡슐 10개가 뒷면으로 깔린 뒤 한 장씩 뒤집힌다. 아무 곳이나 누르거나 "모두 열기"로 건너뛴다.
- *       다 열리면 요약(새 말랑이/반짝/환급)과 다시 뽑기 버튼이 나온다.
+ * 캡슐이 모두 뒷면으로 깔리고, 플레이어가 한 장씩 눌러 연다. 등급이 높을수록 떨림 → 숨 멈춤 → 크게 튀어나옴.
+ * "모두 열기"는 남은 캡슐을 짧은 간격으로 열되 전설 이상은 뜸을 지킨다.
+ * 다 열리면 한 줄 요약과 다시 뽑기 버튼이 나온다. 열린 카드를 누르면 설명 띠가 뜬다.
  */
 export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPullAgain }: PullResultProps) {
   const reduced = useReducedMotion();
@@ -297,16 +345,34 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
   const rarities = items.map((it) => it.rarity);
   const summary = summarizePulls(items);
 
-  // 앞에서부터 몇 장이 앞면인지 + 지금 차례 카드의 단계
-  const [cursor, setCursor] = useState(() => (reduced || single ? n : 0));
-  const [stage, setStage] = useState<'wait' | 'charge' | 'hold'>('wait');
+  const [phases, setPhases] = useState<CardPhase[]>(() => initialPhases(n, seenIndex));
+  const phasesRef = useRef(phases);
   const [selected, setSelected] = useState<number | null>(null);
+  const [pokes, setPokes] = useState<number[]>(() => Array<number>(n).fill(0));
   const [flash, setFlash] = useState<{ key: number; rarity: Rarity } | null>(null);
-  const fanfareDone = useRef(single !== undefined || seenIndex === summary.bestIndex);
+  const [announce, setAnnounce] = useState('');
+  const fanfareDone = useRef(seenIndex === summary.bestIndex);
+  const openAllRequested = useRef(false);
+  const escAt = useRef(-Infinity);
+  const timers = useRef<number[]>([]);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const done = cursor >= n;
-  const revealingRef = useRef(!done);
-  revealingRef.current = !done;
+  const gridRef = useRef<HTMLOListElement>(null);
+  const done = allOpen(phases);
+
+  useEffect(() => {
+    const list = timers.current;
+    return () => list.forEach((id) => window.clearTimeout(id));
+  }, []);
+
+  const later = (ms: number, fn: () => void) => {
+    if (ms <= 0) fn();
+    else timers.current.push(window.setTimeout(fn, ms));
+  };
+
+  const setPhase = (i: number, phase: CardPhase) => {
+    phasesRef.current = phasesRef.current.map((p, k) => (k === i ? phase : p));
+    setPhases(phasesRef.current);
+  };
 
   const playBestFanfare = () => {
     if (fanfareDone.current) return;
@@ -315,15 +381,16 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
     if (best) playRarityFanfare(sfx, best.rarity, best.shiny);
   };
 
-  const flip = (i: number) => {
+  /** 한 장이 앞면이 되는 순간: 소리·번쩍·진동 */
+  const onFlipped = (i: number, silent: boolean) => {
     const item = items[i];
-    setCursor(i + 1);
-    setStage('wait');
     if (!item) return;
+    setAnnounce(describe(item));
+    if (silent) return;
     const rank = rarityRank(item.rarity);
     sfx.flip();
     if (i === summary.bestIndex) playBestFanfare();
-    else if (rank >= 1 && i !== seenIndex) sfx.tap(rank * 3);
+    else if (rank >= 1) sfx.tap(rank * 3);
     if (item.shiny && i !== summary.bestIndex) sfx.shinyChime();
     if (rank >= rarityRank('legendary') && i !== seenIndex) {
       setFlash({ key: i, rarity: item.rarity });
@@ -331,69 +398,91 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
     }
   };
 
-  // 한 장씩 뒤집기: 대기 → (모으기 → 숨 멈춤) → 뒤집기
-  useEffect(() => {
-    if (done) return;
-    const step = revealStep(rarities, cursor, cursor === seenIndex);
-    let ms: number;
-    let next: () => void;
-    if (stage === 'wait') {
-      ms = step.gap;
-      next = () => {
-        if (step.charge > 0) {
-          setStage('charge');
-          if (rarityRank(rarities[cursor] ?? 'common') >= rarityRank('legendary')) sfx.capsuleShake();
-        } else flip(cursor);
-      };
-    } else if (stage === 'charge') {
-      ms = step.charge;
-      next = () => (step.hold > 0 ? setStage('hold') : flip(cursor));
-    } else {
-      ms = step.hold;
-      next = () => flip(cursor);
+  const openCard = (i: number, { quick = false, silent = false } = {}) => {
+    const item = items[i];
+    if (!item || !canOpen(phasesRef.current[i])) return;
+    const rank = rarityRank(item.rarity);
+    let t = 0;
+    for (const [phase, ms] of openSequence(item.rarity, { seen: i === seenIndex, reduced, quick })) {
+      later(t, () => {
+        setPhase(i, phase);
+        if (phase === 'charge' && !silent) {
+          if (rank >= rarityRank('legendary')) sfx.capsuleShake();
+          else sfx.tap(4);
+        }
+        if (phase === 'face') onFlipped(i, silent);
+      });
+      t += ms;
     }
-    const id = window.setTimeout(next, ms);
-    return () => window.clearTimeout(id);
-    // 단계가 바뀔 때마다 다음 예약을 건다
-  }, [cursor, stage, done]);
+  };
 
-  // 모두 열렸을 때: 결과음(아직이면), 환급 코인 소리, 포커스를 닫기로
+  const openAll = () => {
+    if (openAllRequested.current || allOpen(phasesRef.current)) return;
+    openAllRequested.current = true;
+    const steps = openAllSchedule(rarities, phasesRef.current, { seenIndex, reduced });
+    if (reduced) {
+      // 한꺼번에 열 때는 뒤집는 소리를 한 번만 (결과음은 다 열린 뒤)
+      sfx.flip();
+      steps.forEach(({ index }) => openCard(index, { silent: true }));
+      return;
+    }
+    steps.forEach(({ index, at }) => later(at, () => openCard(index, { quick: true })));
+  };
+
+  const pressCard = (i: number) => {
+    const phase = phasesRef.current[i];
+    if (canOpen(phase)) {
+      setSelected(null);
+      openCard(i);
+      return;
+    }
+    if (phase !== 'face') return;
+    sfx.tap(2);
+    setPokes((ps) => ps.map((p, k) => (k === i ? p + 1 : p)));
+    setSelected((s) => (s === i ? null : i));
+  };
+
+  // 모두 열렸을 때: 결과음(아직이면), 환급 코인 소리, 포커스가 사라졌으면 닫기로
   useEffect(() => {
     if (!done) return;
-    closeRef.current?.focus({ preventScroll: true });
-    if (single) return;
+    const active = document.activeElement;
+    const keepFocus = active && gridRef.current?.contains(active);
+    if (!keepFocus) closeRef.current?.focus({ preventScroll: true });
     playBestFanfare();
+    if (single) return;
     const id = totalRefund > 0 ? window.setTimeout(() => sfx.coin(), 260) : undefined;
     return () => window.clearTimeout(id);
   }, [done]);
 
-  const revealAll = () => {
-    if (!revealingRef.current) return;
-    revealingRef.current = false;
-    setCursor(n);
-    setStage('wait');
+  // 다 열기 전에는 바깥 탭으로 닫히지 않는다 (실수로 캡슐을 날리지 않게). Esc는 "모두 열기".
+  const requestClose = () => {
+    if (!allOpen(phasesRef.current)) return;
+    if (performance.now() - escAt.current < ESC_GRACE_MS) return;
+    onClose();
   };
 
-  // 공개 중 Esc/바깥 탭은 닫지 않고 나머지를 연다
-  const requestClose = () => (revealingRef.current ? revealAll() : onClose());
-
-  const stateOf = (i: number): CardState => {
-    if (i < cursor) return 'face';
-    if (i === cursor && stage !== 'wait') return stage;
-    return 'back';
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || allOpen(phasesRef.current)) return;
+    e.preventDefault();
+    escAt.current = performance.now();
+    openAll();
   };
 
-  // 모달 테두리는 지금까지 열린 카드 중 최고 등급을 따라 점점 화려해진다
-  const shownTop = topRarity(rarities.slice(0, cursor));
-  const hasShinyShown = items.slice(0, cursor).some((it) => it.shiny);
-  const detailIndex = selected ?? (done ? summary.bestIndex : cursor - 1);
+  const faceItems = items.filter((_, i) => phases[i] === 'face');
+  const shownTop = topRarity(faceItems.map((it) => it.rarity));
+  const hasShinyShown = faceItems.some((it) => it.shiny);
+  const opened = openedCount(phases);
   const title = single
-    ? REVEAL_TITLE[single.rarity]
+    ? done
+      ? REVEAL_TITLE[single.rarity]
+      : '캡슐을 눌러 열어 보세요'
     : !done
-      ? `캡슐 ${n}개를 열어요`
+      ? '캡슐을 눌러 열어 보세요'
       : rarityRank(shownTop) >= rarityRank('legendary')
         ? REVEAL_TITLE[shownTop]
         : `${n}연 뽑기 결과`;
+  const detailItem = selected !== null && phases[selected] === 'face' ? items[selected] : undefined;
+  const short = coins < PULL_PRICE.single;
 
   return (
     <Modal
@@ -401,56 +490,75 @@ export function PullResult({ items, totalRefund, onClose, seenIndex, coins, onPu
       onClose={requestClose}
       className={`pull-modal pull-modal--${shownTop}${hasShinyShown ? ' has-shiny' : ''}${single ? ' pull-modal--single' : ' pull-modal--multi'}`}
     >
-      {/* 공개 중에는 어디를 눌러도 나머지를 한 번에 연다 */}
-      <div className="pull-result" onClick={revealAll}>
-        <h2 id="pull-result-title" className="pull-title">
-          {title}
-        </h2>
+      <div className={`pull-result${done ? ' is-done' : ''}`} onKeyDown={onKeyDown}>
+        <div className="pull-head">
+          <h2 id="pull-result-title" className="pull-title">
+            {title}
+          </h2>
+          {!single && !done && (
+            <span className="pull-count" aria-hidden="true">
+              {opened}/{n}
+            </span>
+          )}
+        </div>
         {single ? (
-          <SingleResult item={single} animate={!reduced} />
+          phases[0] === 'face' ? (
+            <SingleResult item={single} animate={!reduced && seenIndex !== 0} />
+          ) : (
+            <SingleCapsule item={single} phase={phases[0] ?? 'back'} onPress={() => pressCard(0)} />
+          )
         ) : (
-          <>
-            <ol className="pull-grid" aria-label={`${n}개 결과`}>
-              {items.map((item, i) => {
-                const st = stateOf(i);
-                return (
-                  <PullCard
-                    key={i}
-                    item={item}
-                    index={i}
-                    state={st}
-                    pop={revealStep(rarities, i, i === seenIndex).pop}
-                    best={done && i === summary.bestIndex && rarityRank(item.rarity) >= 1}
-                    selected={done && i === detailIndex}
-                    animate={!reduced && i !== seenIndex}
-                    onSelect={() => {
-                      if (revealingRef.current) return;
-                      sfx.tap(2);
-                      setSelected(i);
-                    }}
-                  />
-                );
-              })}
+          <div className="pull-stage">
+            <ol ref={gridRef} className={`pull-grid${n === 10 ? ' pull-grid--ten' : ''}`} aria-label={`캡슐 ${n}개`}>
+              {items.map((item, i) => (
+                <PullCard
+                  key={i}
+                  item={item}
+                  index={i}
+                  phase={phases[i] ?? 'back'}
+                  pop={openTiming(item.rarity, { seen: i === seenIndex, reduced }).pop}
+                  poke={pokes[i] ?? 0}
+                  best={done && i === summary.bestIndex && rarityRank(item.rarity) >= 1}
+                  selected={i === selected && detailItem !== undefined}
+                  animate={!reduced && i !== seenIndex}
+                  onPress={() => pressCard(i)}
+                />
+              ))}
             </ol>
-            <DetailRow item={detailIndex >= 0 ? items[detailIndex] : undefined} />
-          </>
+            {detailItem && selected !== null && (
+              <DetailBar item={detailItem} top={selected >= n - 3} onDismiss={() => setSelected(null)} />
+            )}
+          </div>
         )}
-        {!single && !done ? (
-          <div className="pull-footer pull-footer--revealing">
-            <p className="pull-progress" aria-hidden="true">
-              <span style={{ transform: `scaleX(${cursor / n})` }} />
+        <div className={`pull-footer${done ? '' : ' is-opening'}`}>
+          {done ? (
+            <>
+              <SummaryLine items={items} short={short} />
+              <Actions coins={coins} onPullAgain={onPullAgain} onClose={onClose} closeRef={closeRef} />
+            </>
+          ) : single ? (
+            <p className="pull-hint">
+              {phases[0] === 'back' ? '캡슐을 톡 누르면 열려요' : '두근두근…'}
             </p>
-            <p className="pull-skip-hint">아무 곳이나 누르면 다 열려요</p>
-            <button type="button" className="btn btn--block btn--grape pull-skip" autoFocus onClick={revealAll}>
-              모두 열기
-            </button>
-          </div>
-        ) : (
-          <div className="pull-footer">
-            {!single && <Summary items={items} />}
-            <Actions coins={coins} onPullAgain={onPullAgain} onClose={onClose} closeRef={closeRef} />
-          </div>
-        )}
+          ) : (
+            <>
+              <p className="pull-hint">열린 캡슐을 누르면 설명이 나와요</p>
+              <button
+                type="button"
+                className="btn btn--small btn--grape btn--block pull-open-all"
+                onClick={() => {
+                  sfx.button();
+                  openAll();
+                }}
+              >
+                모두 열기
+              </button>
+            </>
+          )}
+        </div>
+        <p className="visually-hidden" aria-live="polite">
+          {announce}
+        </p>
         {flash && <div key={flash.key} className={`pull-flash pull-flash--${flash.rarity}`} aria-hidden="true" />}
       </div>
     </Modal>
