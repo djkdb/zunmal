@@ -141,6 +141,13 @@ describe('summarizePulls', () => {
     expect(s.bestIndex).toBe(3);
   });
 
+  it('새 말랑이 중 가장 좋은 것 (없으면 -1)', () => {
+    expect(summarizePulls([item('epic', { refund: 80 }), item('common', { isNew: true }), item('rare', { isNew: true })]).bestNewIndex).toBe(2);
+    expect(summarizePulls([item('rare', { isNew: true }), item('rare', { isNew: true, shiny: true })]).bestNewIndex).toBe(1);
+    expect(summarizePulls([item('rare', { isNew: true }), item('rare', { isNew: true })]).bestNewIndex).toBe(0);
+    expect(summarizePulls([item('legendary', { refund: 300 }), item('common', { shiny: true, isNewShiny: true })]).bestNewIndex).toBe(-1);
+  });
+
   it('같은 등급이면 반짝을, 그다음 앞선 결과를 최고로 고른다', () => {
     expect(summarizePulls([item('rare'), item('rare')]).bestIndex).toBe(0);
     expect(summarizePulls([item('rare'), item('rare', { shiny: true })]).bestIndex).toBe(1);

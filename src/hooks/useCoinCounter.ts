@@ -4,6 +4,7 @@ import {
   counterHeldUntil,
   countUpDuration,
   countUpValue,
+  deferredCoins,
   subscribeCoinFx,
   type CoinFlightPlan,
 } from '../lib/coinFx';
@@ -38,8 +39,11 @@ const SHAKE: Keyframe[] = [
  * - 코인이 날아오는 중이면(coinFx 계획) 첫 코인 도착부터 올라가고, 코인이 닿을 때마다 알약이 톡.
  * - 줄면 0.3초 만에 내려간다. 움직임 줄이기면 즉시.
  */
-export function useCoinCounter(coins: number, pillRef: RefObject<HTMLElement | null>): { display: number; short: boolean } {
+export function useCoinCounter(stored: number, pillRef: RefObject<HTMLElement | null>): { display: number; short: boolean } {
   const reduced = useReducedMotion();
+  // 뽑기 환급처럼 잠시 미뤄 둔 코인은 빼고 보여 준다 (coinFx.deferCoins)
+  const [held, setHeld] = useState(deferredCoins);
+  const coins = Math.max(0, stored - held);
   const [display, setDisplay] = useState(coins);
   const [short, setShort] = useState(false);
   const shown = useRef(coins);
@@ -121,7 +125,9 @@ export function useCoinCounter(coins: number, pillRef: RefObject<HTMLElement | n
   useEffect(
     () =>
       subscribeCoinFx((e) => {
-        if (e.type === 'plan') {
+        if (e.type === 'defer') {
+          setHeld(e.amount);
+        } else if (e.type === 'plan') {
           if (!reduced && target.current !== shown.current) runWithPlan(e.plan);
         } else if (e.type === 'arrive') {
           pop();

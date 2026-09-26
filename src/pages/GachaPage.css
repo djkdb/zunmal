@@ -53,7 +53,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 천장 카운터: 한 줄 글 + 오른쪽 "확률 보기" 링크, 아래 금빛 막대 */
+/* 천장 카운터: 한 줄 글 + 아래 금빛 막대 (확률은 아래 "확률 안내 보기" 한 곳에서) */
 .pity {
   display: flex;
   flex-direction: column;
@@ -102,24 +102,6 @@
 /* 천장이 가까우면 막대가 반짝이는 금빛으로 */
 .pity--near .pity__bar > span {
   background: linear-gradient(90deg, var(--gold), #ffe08a, var(--gold));
-}
-
-/* 확률 보기: 글자 링크 모양 버튼 (누르는 범위는 44px) */
-.gacha-page__rates {
-  flex-shrink: 0;
-  min-height: 44px;
-  margin: -6px -8px -6px 0;
-  padding: 0 8px;
-  border: 0;
-  background: none;
-  color: var(--link);
-  font-weight: 700;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.gacha-page__rates:active {
-  opacity: 0.7;
 }
 
 .gacha-page__message {

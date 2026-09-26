@@ -146,6 +146,8 @@ export interface PullSummary {
   refund: number;
   /** 가장 높은 등급 결과의 위치 (같은 등급이면 반짝 우선, 그다음 앞선 것) */
   bestIndex: number;
+  /** 새로 만난 말랑이 중 가장 좋은 결과의 위치 ("지금 만지러 가기"), 없으면 -1 */
+  bestNewIndex: number;
 }
 
 export function summarizePulls(items: readonly PullItemLike[]): PullSummary {
@@ -153,7 +155,13 @@ export function summarizePulls(items: readonly PullItemLike[]): PullSummary {
   let newCount = 0;
   let shinyCount = 0;
   let refund = 0;
+  let bestNewIndex = -1;
   items.forEach((it, i) => {
+    if (it.isNew) {
+      const cur = items[bestNewIndex];
+      const d = cur ? rarityRank(it.rarity) - rarityRank(cur.rarity) : 1;
+      if (d > 0 || (d === 0 && cur && it.shiny && !cur.shiny)) bestNewIndex = i;
+    }
     if (it.isNew) newCount++;
     if (it.shiny) shinyCount++;
     refund += it.refund;
@@ -162,7 +170,7 @@ export function summarizePulls(items: readonly PullItemLike[]): PullSummary {
     const diff = rarityRank(it.rarity) - rarityRank(best.rarity);
     if (diff > 0 || (diff === 0 && it.shiny && !best.shiny)) bestIndex = i;
   });
-  return { newCount, shinyCount, refund, bestIndex };
+  return { newCount, shinyCount, refund, bestIndex, bestNewIndex };
 }
 
 /** 가장 높은 등급 (빈 배열이면 common) */

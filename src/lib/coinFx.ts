@@ -158,6 +158,7 @@ export type CoinFxEvent =
   | { type: 'plan'; plan: CoinFlightPlan }
   | { type: 'arrive'; index: number; count: number }
   | { type: 'hold'; until: number }
+  | { type: 'defer'; amount: number }
   | { type: 'insufficient' };
 
 type Listener = (e: CoinFxEvent) => void;
@@ -195,6 +196,30 @@ export function holdCounter(ms = 1500): void {
 
 export function counterHeldUntil(): number {
   return heldUntil;
+}
+
+let deferred = 0;
+
+/**
+ * 이미 저장된 코인 중 amount만큼을 카운터에 아직 보이지 않게 한다 (뽑기 환급: 결과를 다 열기 전에
+ * 숫자가 먼저 늘어 결과를 알려 버리지 않게). `releaseDeferredCoins`가 코인을 날리며 풀어 준다.
+ */
+export function deferCoins(amount: number): void {
+  deferred = Math.max(0, Math.floor(amount));
+  emit({ type: 'defer', amount: deferred });
+}
+
+export function deferredCoins(): number {
+  return deferred;
+}
+
+/** 미뤄 둔 코인을 보여 준다. from이 있으면 그 자리에서 코인이 날아가고, 없으면 숫자만 올라간다. */
+export function releaseDeferredCoins(from?: Element | Point): void {
+  const amount = deferred;
+  if (amount <= 0) return;
+  deferred = 0;
+  if (from) flyCoins(from, amount);
+  emit({ type: 'defer', amount: 0 });
 }
 
 /** 아직 도착 중인 비행 계획 (없으면 null). */
