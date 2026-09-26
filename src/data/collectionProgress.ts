@@ -170,3 +170,81 @@ export function summarizeCollection({ owned, claimedSets }: CollectionInput): Co
     claimableSets: sets.filter((s) => s.claimable),
   };
 }
+
+// ── 도감 화면용 ────────────────────────────────────────────────
+
+/**
+ * 없는 말랑이를 모두 만나기까지 평균 뽑기 수 (한 번에 한 마리씩 나오는 수집 문제의 정확한 식).
+ *   E = Σ_{공집합 아닌 S} (-1)^{|S|+1} / Σ_{i∈S} p_i
+ * 천장·10연 보장은 넣지 않는다(전설 이상은 실제로 조금 더 빨리 나온다). 모르는 id 는 건너뛴다. 없으면 0.
+ * 세트 멤버는 최대 6마리라 부분집합 64개로 충분하다(그보다 많으면 기존 Σ 1/p 로 어림).
+ */
+export function expectedPullsToCollect(ids: readonly string[]): number {
+  const ps = ids.map(characterPullChance).filter((p) => p > 0);
+  const n = ps.length;
+  if (n === 0) return 0;
+  if (n > 12) return ps.reduce((s, p) => s + 1 / p, 0);
+  let total = 0;
+  for (let mask = 1; mask < 1 << n; mask += 1) {
+    let sum = 0;
+    let bits = 0;
+    for (let i = 0; i < n; i += 1) {
+      if (mask & (1 << i)) {
+        sum += ps[i] ?? 0;
+        bits += 1;
+      }
+    }
+    total += (bits % 2 === 1 ? 1 : -1) / sum;
+  }
+  return total;
+}
+
+/**
+ * 화면에 쓰는 어림 뽑기 수 — 너무 정확해 보이지 않게 둥글린다.
+ * 10 미만 = 올림, 100 미만 = 5 단위, 1000 미만 = 10 단위, 그 이상 = 100 단위. 0 이하·NaN = 0.
+ */
+export function roughPullCount(expected: number): number {
+  if (!Number.isFinite(expected) || expected <= 0) return 0;
+  if (expected < 10) return Math.max(1, Math.ceil(expected));
+  const step = expected < 100 ? 5 : expected < 1000 ? 10 : 100;
+  return Math.max(step, Math.round(expected / step) * step);
+}
+
+/**
+ * 세트 탭 순서: 받을 수 있는 세트 → 시작한 미완성 세트(남은 수 적은 순 → 덜 비싼 순) → 시작 안 한 세트(덜 비싼 순)
+ * → 다 모으고 받은 세트. 같으면 목록 순서.
+ */
+export function orderSetsForDisplay(sets: readonly SetProgress[]): SetProgress[] {
+  const group = (s: SetProgress): number => (s.claimable ? 0 : !s.complete ? (s.owned > 0 ? 1 : 2) : 3);
+  return sets
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => {
+      const ga = group(a.s);
+      const gb = group(b.s);
+      if (ga !== gb) return ga - gb;
+      if (ga === 1 && a.s.missing !== b.s.missing) return a.s.missing - b.s.missing;
+      if ((ga === 1 || ga === 2) && Math.abs(a.s.expectedPulls - b.s.expectedPulls) > 1e-9) {
+        return a.s.expectedPulls - b.s.expectedPulls;
+      }
+      return a.i - b.i;
+    })
+    .map((x) => x.s);
+}
+
+/** 처음 얻은 뒤 이 시간 동안은 도감 칸에 NEW (캡슐을 아직 안 열었으면 열 때까지 계속) */
+export const COLLECTION_NEW_MS = 24 * 3_600_000;
+
+/**
+ * 도감 칸의 NEW 딱지: 놀이방 선반에 봉인된 채(캡슐을 아직 안 엶)이거나, 처음 얻은 지 하루가 안 됐다.
+ * 시계가 거꾸로 가 얻은 시각이 미래면 NEW 로 본다(곧 풀린다).
+ */
+export function isNewInCollection(
+  entry: { firstObtainedAt: number } | undefined,
+  sealed: boolean,
+  nowMs: number,
+  newMs: number = COLLECTION_NEW_MS,
+): boolean {
+  if (!entry) return false;
+  if (sealed) return true;
+  return nowMs - entry.firstObtainedAt < newMs;
+}

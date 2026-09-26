@@ -273,7 +273,11 @@ export function Malang({
               <AccessoryBack kind={character.accessory} shape={shape} paint={paint} />
             </>
           )}
-          <path d={shape.body} fill={silhouette ? '#d9cfc0' : `url(#${uid}-body)`} />
+          <path
+            d={shape.body}
+            className={silhouette ? 'malang-silhouette' : undefined}
+            fill={silhouette ? '#d9cfc0' : `url(#${uid}-body)`}
+          />
           {tilePattern && <path d={shape.body} fill={`url(#${ids.pattern})`} />}
           {!silhouette && (
             <g clipPath={`url(#${ids.clip})`}>

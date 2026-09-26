@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from './characters';
 import { COLLECTIONS } from './collections';
 import {
+  COLLECTION_NEW_MS,
   characterPullChance,
   displayPercent,
+  expectedPullsToCollect,
+  isNewInCollection,
   nearestIncompleteSet,
+  orderSetsForDisplay,
+  roughPullCount,
   setProgressOf,
   summarizeCollection,
   type OwnedLike,
@@ -121,5 +126,81 @@ describe('nearestIncompleteSet', () => {
     const all = own(CHARACTERS.map((c) => c.id));
     expect(summarizeCollection({ owned: all, claimedSets: [] }).nearestSet).toBeNull();
     expect(nearestIncompleteSet([])).toBeNull();
+  });
+});
+
+describe('expectedPullsToCollect', () => {
+  it('한 마리면 1/p', () => {
+    expect(expectedPullsToCollect(['peach-mochi'])).toBeCloseTo(1 / characterPullChance('peach-mochi'), 6);
+  });
+
+  it('같은 확률 둘이면 1.5/p (Σ 1/p 보다 작고 가장 드문 1/p 보다 크다)', () => {
+    const p = characterPullChance('peach-mochi');
+    const e = expectedPullsToCollect(['peach-mochi', 'custard-bun']);
+    expect(e).toBeCloseTo(1.5 / p, 6);
+    const spring = setProgressOf(set('spring-picnic'), own(['peach-mochi']), []);
+    const exact = expectedPullsToCollect(spring.missingIds);
+    expect(exact).toBeLessThan(spring.expectedPulls);
+    expect(exact).toBeGreaterThan(1 / characterPullChance('sakura-spirit'));
+  });
+
+  it('비었거나 모르는 id 만 있으면 0', () => {
+    expect(expectedPullsToCollect([])).toBe(0);
+    expect(expectedPullsToCollect(['nope'])).toBe(0);
+  });
+});
+
+describe('roughPullCount', () => {
+  it('크기에 맞춰 둥글린다', () => {
+    expect(roughPullCount(0)).toBe(0);
+    expect(roughPullCount(Number.NaN)).toBe(0);
+    expect(roughPullCount(0.4)).toBe(1);
+    expect(roughPullCount(8.2)).toBe(9);
+    expect(roughPullCount(24.2)).toBe(25);
+    expect(roughPullCount(11)).toBe(10);
+    expect(roughPullCount(412)).toBe(410);
+    expect(roughPullCount(6012)).toBe(6000);
+  });
+});
+
+describe('orderSetsForDisplay', () => {
+  it('받을 수 있음 → 시작한 세트(남은 수 순) → 시작 안 한 세트 → 받은 세트', () => {
+    const dessert = set('dessert-shop').memberIds;
+    const fruit = set('fruit-basket').memberIds;
+    // 디저트 가게 완성·안 받음, 과일 바구니 완성·받음, 봄 소풍은 모찌·마시멜로(디저트) + 말차 + 레몬(과일)으로 1마리 남음
+    const s = summarizeCollection({
+      owned: own([...dessert, ...fruit, 'matcha-bean']),
+      claimedSets: ['fruit-basket'],
+    });
+    const order = orderSetsForDisplay(s.sets).map((x) => x.set.id);
+    expect(order[0]).toBe('dessert-shop');
+    expect(order[1]).toBe('spring-picnic');
+    expect(order[order.length - 1]).toBe('fruit-basket');
+    expect(order).toHaveLength(COLLECTIONS.length);
+    // 시작 안 한 세트는 시작한 세트 뒤
+    const started = s.sets.filter((x) => !x.complete && x.owned > 0).map((x) => x.set.id);
+    const firstUnstarted = order.findIndex((id) => s.sets.find((x) => x.set.id === id)?.owned === 0);
+    for (const id of started) expect(order.indexOf(id)).toBeLessThan(firstUnstarted);
+  });
+
+  it('아무것도 없으면 덜 비싼 순이라 꿈의 끝(시크릿)이 맨 뒤', () => {
+    const order = orderSetsForDisplay(summarizeCollection({ owned: {}, claimedSets: [] }).sets).map((x) => x.set.id);
+    expect(order[0]).toBe('dessert-shop');
+    expect(order[order.length - 1]).toBe('dream-end');
+  });
+});
+
+describe('isNewInCollection', () => {
+  const now = 1_700_000_000_000;
+  it('봉인 캡슐이면 오래전에 얻었어도 NEW', () => {
+    expect(isNewInCollection({ firstObtainedAt: now - 30 * COLLECTION_NEW_MS }, true, now)).toBe(true);
+  });
+  it('연 말랑이는 처음 얻은 지 하루 안에만 NEW', () => {
+    expect(isNewInCollection({ firstObtainedAt: now - 1000 }, false, now)).toBe(true);
+    expect(isNewInCollection({ firstObtainedAt: now - COLLECTION_NEW_MS }, false, now)).toBe(false);
+    expect(isNewInCollection({ firstObtainedAt: now + 5000 }, false, now)).toBe(true);
+  });
+  it('없는 말랑이는 NEW 가 아니다', () => {
+    expect(isNewInCollection(undefined, true, now)).toBe(false);
   });
 });
