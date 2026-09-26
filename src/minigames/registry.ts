@@ -17,18 +17,19 @@ import type { MiniGame } from './types';
  * 새 게임 추가: minigames/<game-id>/index.tsx 작성 후 여기에 한 줄 추가.
  */
 export const MINI_GAMES: readonly MiniGame[] = [
-  buttonMalang,
-  capsuleCatch,
-  matching,
-  rhythm,
-  malangJump,
-  popUp,
-  stack,
+  // 로비 순서 = 추천 순서. 한 번 잡으면 계속하게 되는 물리·손맛 게임을 위에, 단순 연타·기억 게임을 아래에 둔다.
+  malangMerge, // 수박게임식 합치기 — 가장 중독성 있음
+  jellySlice, // 쓱 긋는 손맛
+  malangSling, // 탑 무너뜨리기
   balloonFloat,
+  malangJump,
   malangTrain,
-  jellySlice,
-  malangSling,
-  malangMerge,
+  popUp,
+  capsuleCatch,
+  stack,
+  rhythm,
+  matching,
+  buttonMalang,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {

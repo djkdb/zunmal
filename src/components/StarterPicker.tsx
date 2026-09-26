@@ -11,7 +11,8 @@ const starters = STARTER_CHARACTER_IDS.map(getCharacter).filter((c): c is Charac
 /** 첫 실행 시 함께할 시작 말랑이를 고르는 화면. */
 export function StarterPicker() {
   const chooseStarter = useGameStore((s) => s.chooseStarter);
-  const [selected, setSelected] = useState<string>(starters[0]?.id ?? '');
+  // 미리 골라 두지 않는다 — 셋을 둘러보고 직접 고르게
+  const [selected, setSelected] = useState<string>('');
 
   return (
     <section className="page starter" aria-labelledby="starter-title">
@@ -42,17 +43,19 @@ export function StarterPicker() {
         ))}
       </div>
       <p className="starter__desc" aria-live="polite">
-        {getCharacter(selected)?.description}
+        {selected ? getCharacter(selected)?.description : '눌러서 한 마리를 골라 주세요.'}
       </p>
       <button
         type="button"
         className="btn btn--primary btn--block"
+        disabled={!selected}
         onClick={() => {
+          if (!selected) return;
           sfx.success();
           chooseStarter(selected);
         }}
       >
-        이 말랑이랑 시작하기
+        {selected ? '이 말랑이랑 시작하기' : '말랑이를 골라 주세요'}
       </button>
     </section>
   );
