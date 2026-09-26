@@ -69,8 +69,13 @@
   color: var(--ink-soft);
 }
 
+.notice__table td {
+  white-space: nowrap;
+}
+
 .notice__pool {
-  margin-left: 4px;
+  display: block;
+  margin-top: 2px;
   font-size: var(--fs-xs);
   color: var(--ink-soft);
 }
@@ -84,4 +89,82 @@
   font-size: var(--fs-s);
   line-height: 1.55;
   color: var(--ink-soft);
+}
+
+.notice {
+  scroll-margin-top: 76px;
+}
+
+.notice__table tfoot th,
+.notice__table tfoot td {
+  border-bottom: 0;
+  font-family: var(--font-display);
+}
+
+.notice__rules strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+/* 말랑이별 확률: 등급마다 이름 목록 */
+.notice__each {
+  margin-top: 10px;
+  font-size: var(--fs-s);
+}
+
+.notice__each > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--font-display);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-s);
+}
+
+.notice__each > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notice__each > summary::before {
+  content: '+';
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.notice__each[open] > summary::before {
+  content: '−';
+}
+
+.notice__group {
+  padding: 8px 0 6px;
+  border-top: 1.5px dashed rgba(43, 34, 51, 0.2);
+}
+
+.notice__group ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  font-size: var(--fs-xs);
+}
+
+.notice__group li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.notice__each-rate {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
 }
