@@ -33,6 +33,45 @@ describe('촉감 표', () => {
   });
 });
 
+describe('3D 겉모습', () => {
+  it('값이 모두 유효한 범위에 있다', () => {
+    for (const m of MATERIAL_IDS) {
+      const l = MATERIALS[m].look;
+      for (const [k, v] of Object.entries(l)) {
+        expect(Number.isFinite(v), `${m}.${k}`).toBe(true);
+        expect(v, `${m}.${k}`).toBeGreaterThanOrEqual(0);
+        if (k !== 'grainScale' && k !== 'envIntensity') expect(v, `${m}.${k}`).toBeLessThanOrEqual(1);
+      }
+      expect(l.envIntensity).toBeLessThanOrEqual(2);
+      expect(l.grainScale).toBeGreaterThanOrEqual(20);
+      // 얼굴을 알아볼 수 있게 외곽선은 가늘게라도 남는다
+      expect(l.outline, m).toBeGreaterThan(0);
+    }
+  });
+
+  it('재질마다 겉모습이 실제 장난감처럼 다르다', () => {
+    const { slowRise, jelly, stretchy, sticky } = MATERIALS;
+    // 모찌·폼: 가장 매트하고 보송하며 잔결이 있다, 코팅 광택 없음
+    for (const o of [jelly, stretchy, sticky]) {
+      expect(slowRise.look.roughness).toBeGreaterThan(o.look.roughness);
+      expect(slowRise.look.sheen).toBeGreaterThan(o.look.sheen);
+      expect(slowRise.look.grain).toBeGreaterThan(o.look.grain);
+    }
+    expect(slowRise.look.clearcoat).toBe(0);
+    // 젤리: 가장 많이 비친다
+    for (const o of [slowRise, stretchy, sticky]) expect(jelly.look.translucency).toBeGreaterThan(o.look.translucency);
+    // 쭉쭉이: 매트와 젤리 사이 (새틴)
+    expect(stretchy.look.roughness).toBeLessThan(slowRise.look.roughness);
+    expect(stretchy.look.roughness).toBeGreaterThan(jelly.look.roughness);
+    expect(stretchy.look.sheen).toBeGreaterThan(0);
+    // 찐득이: 가장 젖은 듯 매끈하고 반사가 날카롭다
+    for (const o of [slowRise, jelly, stretchy]) {
+      expect(sticky.look.wet).toBeGreaterThan(o.look.wet);
+      expect(sticky.look.clearcoatRoughness).toBeLessThan(o.look.clearcoatRoughness);
+    }
+  });
+});
+
 describe('특별한 속', () => {
   it('전설 이상만 속이 있고 모두 있다', () => {
     for (const c of CHARACTERS) {
