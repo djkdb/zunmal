@@ -1,39 +1,120 @@
+.mg-result {
+  gap: 12px;
+}
+
 .mg-result__card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  text-align: center;
+  align-items: stretch;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  /* 색종이는 카드 안에서만 (화면 밖으로 번져 가로 스크롤이 생기지 않게) */
+  overflow: clip;
 }
 
 .mg-result__title {
-  font-size: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.375rem;
+  letter-spacing: var(--tracking-title);
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ── 점수: 왼쪽 파트너 + 오른쪽 큰 숫자 ── */
+.mg-result__hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.mg-result__partner {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
 }
 
 .mg-result__score {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
   line-height: 1.1;
+}
+
+.mg-result__score-label {
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 
 .mg-result__score strong {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 2.6rem;
+  font-size: 2.75rem;
   letter-spacing: var(--tracking-title);
+  line-height: 1;
+  /* 굴러 올라가는 동안 자릿수 폭이 흔들리지 않게 */
+  font-variant-numeric: tabular-nums;
 }
 
+.mg-result__prev {
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 최고 기록 딱지: 레몬 알약 + 별. 점수가 다 올라간 순간 톡 튀어나온다 */
+.mg-result__best-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 3px 11px 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--lemon);
+  color: var(--ink);
+  box-shadow: 0 3px 8px rgba(242, 193, 78, 0.35);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  animation: mg-badge-pop 0.42s var(--ease-jelly) both;
+  animation-delay: var(--badge-delay, 0ms);
+}
+
+.mg-result__best-badge svg {
+  color: #c98a00;
+}
+
+@keyframes mg-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-8deg);
+  }
+}
+
+/* ── 기록 칩 ── */
 .mg-result__stats {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin: 4px 0;
+  gap: 6px;
+  margin: 0;
 }
 
 .mg-result__stats div {
-  padding: 4px 12px;
-  border-radius: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
 }
 
@@ -44,91 +125,184 @@
 
 .mg-result__stats dd {
   margin: 0;
-  font-weight: 700;
-}
-
-.mg-result__coins {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 6px 20px;
-  border-radius: 999px;
-  background: var(--lemon);
-  box-shadow: 0 4px 12px rgba(242, 193, 78, 0.35);
-  font-weight: 800;
-  font-size: 1.5rem;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-  animation: bump 0.5s ease-out 0.2s;
 }
 
-.mg-result__coins strong {
-  font-weight: inherit;
+/* ── 보상 영수증 ── */
+.mg-receipt {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: var(--surface-2);
 }
 
-.mg-result__coin-icon {
+.mg-receipt > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.mg-receipt dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.mg-receipt dd {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mg-receipt__partner dt > span:last-child {
+  white-space: nowrap;
+}
+
+.mg-receipt__partner .malang {
+  flex: none;
+  margin: -4px 0;
+}
+
+.mg-receipt__trim dd {
+  color: var(--primary-text);
+}
+
+.mg-receipt__total {
+  margin-top: 4px;
+  padding-top: 8px;
+  box-shadow: inset 0 1px 0 var(--border);
+}
+
+.mg-receipt__total dt {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-s);
+}
+
+.mg-receipt__coin {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #fff1a8;
-  font-size: 1rem;
 }
 
-.mg-result__breakdown {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
+.mg-receipt__total dd {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.875rem;
+  letter-spacing: var(--tracking-title);
+  color: #9a6400;
+}
+
+.mg-result__note {
+  margin-top: -4px;
+  padding: 0 4px;
+  color: var(--primary-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* ── 오늘 받은 코인 ── */
+.mg-today {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mg-today__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 
-.mg-result__actions {
+.mg-today__value {
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.mg-today__value strong {
+  color: var(--ink);
+  font-weight: inherit;
+  font-size: var(--fs-s);
+}
+
+.mg-today__bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.mg-today__bar span {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  border-radius: inherit;
+  background: linear-gradient(180deg, #ffe08a, var(--gold));
+}
+
+.mg-today.is-full .mg-today__bar span {
+  background: linear-gradient(180deg, #bdeccf, var(--mint-deep));
+}
+
+/* ── 다음 행동 ── */
+.mg-result__more {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
+.mg-result__more.is-single {
+  grid-template-columns: 1fr;
+}
+
 .mg-result__gacha {
-  justify-content: center;
+  overflow: visible;
 }
 
-.mg-result__gacha-coins {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 4px;
-  padding: 1px 10px 1px 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
-  font-size: var(--fs-s);
-  font-variant-numeric: tabular-nums;
+.mg-result__gacha-tag {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  padding: 1px 9px 2px;
+  border-radius: var(--radius-pill);
+  background: var(--lemon);
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.16);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-/* 점수가 올라가는 동안 자릿수 폭이 흔들리지 않게 */
-.mg-result__score strong {
-  font-variant-numeric: tabular-nums;
+.mg-result__hint {
+  margin-top: -2px;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  text-align: center;
 }
 
-/* 기록 칸은 점수 다음에 차례로 톡톡 (움직임 줄이기면 전역 규칙이 즉시 끝낸다) */
-.mg-result__stats div {
-  animation: mg-stat-in 0.32s var(--ease-jelly) both;
-  animation-delay: calc(0.45s + var(--i, 0) * 0.07s);
-}
-
-@keyframes mg-stat-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.9);
-  }
-}
-
-/* 최고 기록 색종이: 제목 뒤 한가운데에서 터진다 */
-.mg-result__hero {
-  position: relative;
-  isolation: isolate;
-}
-
+/* ── 최고 기록 색종이: 점수 뒤 한가운데에서 터진다 ── */
 .mg-confetti {
   position: absolute;
   left: 50%;
@@ -156,7 +330,6 @@
   height: 14px;
   left: -7px;
   top: -7px;
-  border: none;
   border-radius: 0;
   background: var(--lemon);
   clip-path: polygon(50% 0, 62% 36%, 100% 38%, 70% 60%, 80% 100%, 50% 76%, 20% 100%, 30% 60%, 0 38%, 38% 36%);
@@ -181,34 +354,28 @@
   .mg-confetti {
     display: none;
   }
-  .mg-result__stats div {
+  .mg-result__best-badge {
     animation: none;
   }
 }
 
 /* 파트너: 최고 기록이면 웃는 눈 + 하트 두 개가 번갈아 떠오른다 */
-.mg-result__partner {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
 .mg-result__heart {
   position: absolute;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .mg-result__heart--0 {
-  top: 6px;
-  right: -18px;
+  top: 2px;
+  right: -12px;
 }
 
 .mg-result__heart--1 {
-  top: 26px;
-  left: -16px;
-  width: 20px;
-  height: 20px;
+  top: 22px;
+  left: -12px;
+  width: 18px;
+  height: 18px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
