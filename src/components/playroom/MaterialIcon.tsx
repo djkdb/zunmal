@@ -6,10 +6,10 @@ interface MaterialIconProps {
   className?: string;
 }
 
-const INK = '#2b2233';
+const INK = '#22304a';
 
 /**
- * 촉감 작은 그림 (잉크 외곽선 스티커). 색만이 아니라 모양으로 구분한다:
+ * 촉감 작은 그림 (둥근 선 + 파스텔 채움, icons.tsx 와 같은 결). 색만이 아니라 모양으로 구분한다:
  * 슬로우 라이징 = 손가락 자국이 남은 식빵, 탱탱 젤리 = 반짝 튀는 방울, 쭉쭉이 = 양쪽으로 늘어난 떡, 찐득이 = 흘러내리는 방울.
  */
 export function MaterialIcon({ material, size = 18, className }: MaterialIconProps) {
@@ -81,7 +81,7 @@ export function FillingIcon({ kind, colors, size = 18 }: { kind: FillingKind; co
   const [a, b] = colors;
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true" focusable="false">
-      <circle cx={16} cy={16} r={12.5} fill="#fffdf8" stroke={INK} strokeWidth={2.4} />
+      <circle cx={16} cy={16} r={12.5} fill="#fff" stroke={INK} strokeWidth={2.4} />
       {kind === 'glitter' && (
         <>
           <path d="M16 7 l2 7 l7 2 l-7 2 l-2 7 l-2 -7 l-7 -2 l7 -2 Z" fill={a} stroke={INK} strokeWidth={1.4} strokeLinejoin="round" />

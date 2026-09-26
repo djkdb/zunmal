@@ -1545,9 +1545,11 @@ function Playroom() {
 
       {/* 위 HUD 를 먼저 둔다: 키보드 Tab 순서가 나가기 → 정보 → 방법 → 사진 → 매트 위 말랑이 → 선반 */}
       <div ref={hudRef} className="playroom__hud">
-        <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
-          <CloseIcon size={24} />
-        </button>
+        <div className="pr-hud-col">
+          <button type="button" className="pr-round pr-exit" aria-label="놀이방 나가기" onClick={exit}>
+            <BackShape />
+          </button>
+        </div>
         {focusChar ? (
           <div className="pr-info" role="group" aria-label={`${josa(focusChar.name, '과/와')}의 애정`}>
             <p className="pr-info__row">
@@ -1599,26 +1601,28 @@ function Playroom() {
             <p className="pr-info__next">말랑이를 꺼내 함께 놀아요</p>
           </div>
         )}
-        <button
-          type="button"
-          className="pr-round pr-guide-btn"
-          aria-label="만지는 방법 보기"
-          onClick={() => {
-            sfx.button();
-            setGuideOpen(true);
-          }}
-        >
-          <HandShape />
-        </button>
-        <button
-          type="button"
-          className="pr-round pr-camera"
-          aria-label="매트 사진 찍기"
-          disabled={photoBusy || onMat.length === 0}
-          onClick={() => void takePhoto()}
-        >
-          <CameraShape />
-        </button>
+        <div className="pr-hud-col">
+          <button
+            type="button"
+            className="pr-round pr-guide-btn"
+            aria-label="만지는 방법 보기"
+            onClick={() => {
+              sfx.button();
+              setGuideOpen(true);
+            }}
+          >
+            <HandShape />
+          </button>
+          <button
+            type="button"
+            className="pr-round pr-camera"
+            aria-label="매트 사진 찍기"
+            disabled={photoBusy || onMat.length === 0}
+            onClick={() => void takePhoto()}
+          >
+            <CameraShape />
+          </button>
+        </div>
       </div>
 
       <div
@@ -1790,30 +1794,39 @@ function capsuleGlow(rarity: Character['rarity']): string {
 
 function HeartShape() {
   return (
-    <svg className="pr-heart" viewBox="0 0 32 32" width={18} height={18} aria-hidden="true" focusable="false">
+    <svg className="pr-heart" viewBox="0 0 32 32" width={14} height={14} aria-hidden="true" focusable="false">
       <path
         d="M16 27 C10 22 4 18 4 11.5 C4 7.5 7 5 10.5 5 C13 5 14.8 6.4 16 8.4 C17.2 6.4 19 5 21.5 5 C25 5 28 7.5 28 11.5 C28 18 22 22 16 27 Z"
-        fill="#ff7aa2"
-        stroke="#2b2233"
-        strokeWidth={2.8}
+        fill="#ff9fb8"
+        stroke="currentColor"
+        strokeWidth={2.6}
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-/** 사진기: 잉크 외곽선 + 레몬 몸 + 렌즈 */
+/** 나가기: 둥근 선 왼쪽 꺾쇠 (글자 기호 대신 SVG) */
+function BackShape() {
+  return (
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
+      <path d="M19 7 L10 16 L19 25" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 사진기: 둥근 선 + 레몬 몸 + 하늘 렌즈 */
 function CameraShape() {
   return (
-    <svg viewBox="0 0 32 32" width={26} height={26} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
       <path
         d="M5 11 q0 -3 3 -3 h3 l2 -3 h6 l2 3 h3 q3 0 3 3 v12 q0 3 -3 3 h-16 q-3 0 -3 -3 Z"
-        fill="#ffd84d"
-        stroke="#2b2233"
-        strokeWidth={2.6}
+        fill="#ffe7a3"
+        stroke="currentColor"
+        strokeWidth={2.2}
         strokeLinejoin="round"
       />
-      <circle cx={16} cy={17} r={5.2} fill="#bff3ff" stroke="#2b2233" strokeWidth={2.6} />
+      <circle cx={16} cy={17} r={5.2} fill="#dcebff" stroke="currentColor" strokeWidth={2.2} />
       <circle cx={14.4} cy={15.4} r={1.4} fill="#fff" />
     </svg>
   );
@@ -1822,12 +1835,12 @@ function CameraShape() {
 /** 손바닥: 만지는 방법 */
 function HandShape() {
   return (
-    <svg viewBox="0 0 32 32" width={26} height={26} aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" width={24} height={24} aria-hidden="true" focusable="false">
       <path
         d="M11 29 C7 26 5 22 5 18 L5 14 C5 12 8 12 8 14 L8 17 L9 6 C9 4 12 4 12 6 L12 15 L13 4 C13 2 16 2 16 4 L16 15 L17 6 C17 4 20 4 20 6 L20 16 L21 10 C21 8 24 8 24 10 L24 20 C24 25 21 29 17 29 Z"
-        fill="#ffd6e2"
-        stroke="#2b2233"
-        strokeWidth={2.4}
+        fill="#ffe3ec"
+        stroke="currentColor"
+        strokeWidth={2.1}
         strokeLinejoin="round"
       />
     </svg>
@@ -1837,8 +1850,8 @@ function HandShape() {
 function LockShape() {
   return (
     <svg className="pr-lock" viewBox="0 0 32 32" width={13} height={13} aria-hidden="true" focusable="false">
-      <path d="M10 14 v-4 q0 -6 6 -6 q6 0 6 6 v4" fill="none" stroke="#2b2233" strokeWidth={3} strokeLinecap="round" />
-      <rect x={6} y={14} width={20} height={14} rx={4} fill="#ffd84d" stroke="#2b2233" strokeWidth={3} />
+      <path d="M10 14 v-4 q0 -6 6 -6 q6 0 6 6 v4" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" />
+      <rect x={6} y={14} width={20} height={14} rx={4} fill="#ffe7a3" stroke="currentColor" strokeWidth={2.8} />
     </svg>
   );
 }
