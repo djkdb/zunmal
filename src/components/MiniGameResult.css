@@ -137,7 +137,7 @@
   flex-direction: column;
   margin: 0;
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-s);
   background: var(--surface-2);
 }
 

@@ -34,7 +34,7 @@
 .pull-count {
   flex-shrink: 0;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--sky-tint);
   color: var(--ink);
   font-weight: 700;
@@ -96,7 +96,7 @@
 .pull-modal--mythic {
   border-color: transparent;
   background:
-    linear-gradient(var(--paper), var(--paper)) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
     conic-gradient(from var(--spin, 0deg), #ff9fbd, #ffe07a, #9be88a, #8fd9ff, #cdb2ff, #ff9fbd) border-box;
   border: 5px solid transparent;
   box-shadow:
@@ -166,7 +166,7 @@
   gap: 1px;
   max-width: 100%;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--ink);
   font-weight: 700;
   font-size: 0.75rem;
@@ -669,7 +669,7 @@
   left: -4px;
   z-index: 2;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--lemon);
   box-shadow: 0 2px 6px rgba(26, 64, 128, 0.18);
   color: var(--ink);

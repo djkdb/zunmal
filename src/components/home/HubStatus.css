@@ -17,7 +17,7 @@
   gap: 1px;
   min-height: 56px;
   padding: 6px 4px 7px;
-  border-radius: 18px;
+  border-radius: var(--radius-btn);
   color: var(--ink);
   text-decoration: none;
   text-align: center;

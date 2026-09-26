@@ -295,7 +295,7 @@
 
 .collection-detail__facts div {
   padding: 8px 2px;
-  border-radius: 14px;
+  border-radius: var(--radius-s);
   background: var(--surface-2);
 }
 
