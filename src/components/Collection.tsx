@@ -93,7 +93,12 @@ export function Collection() {
           <div className="collection__progress">
             <p className="collection__progress-value">
               <strong>{ownedCount}</strong>마리 만났어요 <span className="muted">/ {CHARACTERS.length}</span>
-              <span className="collection__shiny-count">반짝 {shinyCount}</span>
+              {/* 스크린리더가 "32반짝 1"로 붙여 읽지 않게 끊어 준다 */}
+              <span className="visually-hidden">마리 중, </span>
+              <span className="collection__shiny-count">
+                반짝 {shinyCount}
+                <span className="visually-hidden">마리</span>
+              </span>
             </p>
             <div
               className="progress"
@@ -261,7 +266,8 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
   const setPartnerShiny = useGameStore((s) => s.setPartnerShiny);
   const affection = useGameStore((s) => s.affection[id] ?? 0);
   const hasShiny = (entry?.shinyCount ?? 0) > 0;
-  const [showShiny, setShowShiny] = useState(hasShiny && partnerId === id && partnerShiny);
+  // 반짝을 가졌으면 반짝 모습부터 (파트너로 원래 모습을 골라 둔 경우만 원래 모습)
+  const [showShiny, setShowShiny] = useState(hasShiny && (partnerId !== id || partnerShiny));
   if (!detail || !entry) return null;
   const isPartner = partnerId === id;
 

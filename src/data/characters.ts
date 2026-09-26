@@ -499,3 +499,13 @@ export const CHARACTERS_BY_RARITY: Readonly<Record<Rarity, readonly Character[]>
 
 /** 신규 플레이어가 고를 수 있는 시작 말랑이 (일반 등급 — 파트너 보너스 0%라 경제에 영향 없음). */
 export const STARTER_CHARACTER_IDS: readonly string[] = ['peach-mochi', 'soda-drop', 'matcha-bean'];
+
+/**
+ * 첫 말랑이 고르기 화면 전용 소개 — 도감 설명("가장 흔한 말랑이" 같은 등급 이야기) 대신
+ * 함께 지낼 파트너로서의 따뜻한 한 줄. 도감 설명은 그대로 둔다.
+ */
+export const STARTER_BLURBS: Readonly<Record<string, string>> = {
+  'peach-mochi': '누르면 “뽀옥” 하고 대답해요. 볼이 늘 발그레해서 만질 때마다 기분이 좋아져요.',
+  'soda-drop': '몸속 기포가 보글보글 올라오는 상큼한 친구예요. 흔들어 주면 더 신나요.',
+  'matcha-bean': '머리 위 잎사귀로 기분을 알려 줘요. 쌉쌀한 농담으로 자주 웃게 해 줘요.',
+};

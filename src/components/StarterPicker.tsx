@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { sfx } from '../audio/sfx';
-import { STARTER_CHARACTER_IDS, getCharacter, type Character } from '../data/characters';
+import { STARTER_BLURBS, STARTER_CHARACTER_IDS, getCharacter, type Character } from '../data/characters';
 import { STARTING_COINS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
@@ -43,7 +43,7 @@ export function StarterPicker() {
         ))}
       </div>
       <p className="starter__desc" aria-live="polite">
-        {selected ? getCharacter(selected)?.description : '눌러서 한 마리를 골라 주세요.'}
+        {selected ? (STARTER_BLURBS[selected] ?? getCharacter(selected)?.description) :'눌러서 한 마리를 골라 주세요.'}
       </p>
       <button
         type="button"
