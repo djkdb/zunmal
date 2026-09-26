@@ -950,12 +950,15 @@ function Playroom() {
       }
     }
     if (busy || worldMoving || pointersRef.current.size > 0) {
-      rafRef.current = requestAnimationFrame((t) => frameRef.current(t));
-    } else {
+      // 이 프레임 안의 반응(부딪힘·말랑이끼리)이 이미 requestFrame 으로 다음 프레임을 잡았으면 또 잡지 않는다 —
+      // 두 번 잡으면 루프가 프레임마다 두 배로 불어나 (벽에 대고 끌 때 등) 화면이 멈춘다
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame((t) => frameRef.current(t));
+    } else if (rafRef.current === null) {
       settleWorld(world);
       lastTsRef.current = null;
     }
   };
+
 
   useEffect(() => {
     setWorldCap(worldRef.current, Math.max(cap, worldRef.current.bodies.length));
