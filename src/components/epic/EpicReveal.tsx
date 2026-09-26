@@ -21,6 +21,10 @@ type Phase = 'charge' | 'burst' | 'reveal' | 'title';
 interface Script {
   /** 모으기 길이 (ms) — 이 시점에 폭발 */
   charge: number;
+  /** 모으기 앞머리의 전조 (ms, 시크릿만) */
+  omen: number;
+  /** 모으기 끝의 수축 (ms, 시크릿만) */
+  implode: number;
   /** 폭발 → 말랑이 등장까지 */
   reveal: number;
   /** 등장 → 제목 도장까지 */
@@ -34,6 +38,8 @@ interface Script {
 const SCRIPTS: Record<'mythic' | 'secret', Script> = {
   mythic: {
     charge: 1500,
+    omen: 0,
+    implode: 0,
     reveal: 350,
     title: 800,
     hold: 2600,
@@ -41,10 +47,12 @@ const SCRIPTS: Record<'mythic' | 'secret', Script> = {
     title1: '신화!',
   },
   secret: {
-    charge: 2600,
-    reveal: 450,
-    title: 1000,
-    hold: 3400,
+    charge: 3600,
+    omen: 1000,
+    implode: 500,
+    reveal: 600,
+    title: 1100,
+    hold: 3600,
     burstKind: 'star',
     title1: '시크릿!!',
   },
@@ -151,7 +159,14 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     const box = glRef.current;
     if (!mod || !box) return;
     try {
-      sceneRef.current = mod.createEpicScene(box, { theme, chargeMs: script.charge, secret: tier === 'secret', shiny: item.shiny });
+      sceneRef.current = mod.createEpicScene(box, {
+        theme,
+        chargeMs: script.charge,
+        omenMs: script.omen,
+        implodeMs: script.implode,
+        secret: tier === 'secret',
+        shiny: item.shiny,
+      });
       sceneRef.current.setPhase(phaseRef.current);
     } catch {
       setMode('2d');
@@ -161,7 +176,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };
-  }, [mode, theme, script.charge, tier, item.shiny]);
+  }, [mode, theme, script, tier, item.shiny]);
 
   useEffect(() => {
     sceneRef.current?.setPhase(phase);
@@ -179,17 +194,29 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     }
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
-    sfx.epicRiser(script.charge / 1000);
-    if (tier === 'secret') at(200, () => sfx.secretTease());
-    at(script.charge, () => {
-      setPhase('burst');
-      sfx.epicImpact();
+    const vibrate = (pattern: number[]) => {
       try {
-        navigator.vibrate?.([40, 30, 90]);
+        navigator.vibrate?.(pattern);
       } catch {
         // 진동 미지원 기기 무시
       }
+    };
+    // 시크릿: 까만 전조 동안 낮게 웅웅거리다가 모으기 시작
+    if (tier === 'secret') sfx.secretTease();
+    at(script.omen, () => sfx.epicRiser((script.charge - script.omen - script.implode) / 1000));
+    if (script.implode > 0) at(script.charge - script.implode, () => sfx.epicImplode(script.implode / 1000));
+    at(script.charge, () => {
+      setPhase('burst');
+      sfx.epicImpact();
+      vibrate([40, 30, 90]);
     });
+    // 시크릿: 0.32초 뒤 두 번째 폭발(초신성)
+    if (tier === 'secret') {
+      at(script.charge + 320, () => {
+        sfx.secretBoom();
+        vibrate([120, 40, 200]);
+      });
+    }
     at(script.charge + script.reveal, () => {
       setPhase('reveal');
       playRarityFanfare(sfx, item.rarity, item.shiny);
@@ -296,6 +323,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       }}
     >
       <div className="epic__bg" aria-hidden="true" />
+      {tier === 'secret' && !reduced && <div className="epic__bars" aria-hidden="true" />}
       {mode === '3d' && <div ref={glRef} className="epic__gl" aria-hidden="true" />}
       {mode === '2d' && tier === 'secret' && <div className="epic__nebula" aria-hidden="true" />}
       {mode === '2d' && <div className="epic__rays" aria-hidden="true" />}
@@ -352,7 +380,16 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
 
       {phase === 'title' && (
         <div className="epic__titles">
-          <p className="epic__title">{script.title1}</p>
+          <p className="epic__title" aria-label={script.title1}>
+            {/* 시크릿은 글자가 하나씩 쾅쾅 찍힌다 */}
+            {tier === 'secret'
+              ? [...script.title1].map((ch, i) => (
+                  <span key={i} aria-hidden="true" style={{ '--i': i } as CSSProperties}>
+                    {ch}
+                  </span>
+                ))
+              : script.title1}
+          </p>
           <p className="epic__name">
             {item.shiny ? '반짝 ' : ''}
             {item.character.name}

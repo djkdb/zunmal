@@ -74,6 +74,8 @@ describe('SfxEngine', () => {
     engine.capsuleOpen();
     engine.epicRiser(1.2);
     engine.epicImpact();
+    engine.epicImplode(0.45);
+    engine.secretBoom();
     engine.resultSecret();
     expect(engine.hasContext()).toBe(true);
     expect(created).toBe(1);

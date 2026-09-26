@@ -493,3 +493,124 @@
     opacity: 0;
   }
 }
+
+/* ── 시크릿 전용: 영화 화면비 띠, 반전 임팩트 프레임, 한 글자씩 찍히는 제목 ── */
+.epic__bars {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.epic__bars::before,
+.epic__bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10vh;
+  background: #000;
+  transition: transform 0.6s cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+.epic__bars::before {
+  top: 0;
+  transform: translateY(-100%);
+  animation: bars-in-top 0.7s cubic-bezier(0.3, 0, 0.2, 1) 0.1s forwards;
+}
+
+.epic__bars::after {
+  bottom: 0;
+  transform: translateY(100%);
+  animation: bars-in-bottom 0.7s cubic-bezier(0.3, 0, 0.2, 1) 0.1s forwards;
+}
+
+/* 제목이 찍히면 띠가 물러난다 */
+.epic--title .epic__bars::before {
+  animation: bars-out-top 0.6s ease-in forwards;
+}
+.epic--title .epic__bars::after {
+  animation: bars-out-bottom 0.6s ease-in forwards;
+}
+
+/* 폭발 첫 순간 한 프레임 색 반전 — 만화의 임팩트 컷 */
+.epic--secret.epic--burst .epic__gl,
+.epic--secret.epic--burst .epic__canvas {
+  animation: impact-frame 0.22s steps(1) both;
+}
+
+.epic--secret .epic__title {
+  background: none;
+  animation: none;
+}
+
+.epic--secret .epic__title span {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--title-grad));
+  background-size: 260% 100%;
+  background-position: calc(var(--i) * -30%) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation:
+    letter-stamp 0.45s cubic-bezier(0.2, 1.9, 0.4, 1) calc(var(--i) * 0.11s) both,
+    rainbow-slide 2.4s linear calc(var(--i) * 0.11s) infinite;
+}
+
+@keyframes letter-stamp {
+  0% {
+    transform: scale(3.2) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+@keyframes impact-frame {
+  0% {
+    filter: invert(1) hue-rotate(180deg) contrast(1.6);
+  }
+  35% {
+    filter: brightness(2.2) saturate(0);
+  }
+  60%,
+  100% {
+    filter: none;
+  }
+}
+
+@keyframes bars-in-top {
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes bars-in-bottom {
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes bars-out-top {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes bars-out-bottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.epic--still .epic__title span {
+  animation: none;
+}

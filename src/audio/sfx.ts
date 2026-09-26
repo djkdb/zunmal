@@ -29,6 +29,10 @@ export interface Sfx {
   epicRiser(seconds: number): void;
   /** 신화 이상 연출: 캡슐이 터지는 충격음 */
   epicImpact(): void;
+  /** 시크릿 연출: 모든 빛이 한 점으로 빨려 들어가는 소리 (초 단위 길이) */
+  epicImplode(seconds: number): void;
+  /** 시크릿 연출: 두 번째 초신성 폭발 + 하늘에서 울리는 화음 */
+  secretBoom(): void;
   success(): void;
   fail(): void;
   /** 미니게임: 가벼운 탭음. level이 높을수록 음이 올라간다 (콤보 표현). */
@@ -248,6 +252,23 @@ export class SfxEngine implements Sfx {
     this.tone({ freq: 180, slideTo: 60, duration: 0.25, type: 'triangle', gain: 0.35, attack: 0.002 });
     this.noise(0.35, { freq: 700, gain: 0.6, q: 0.6 });
     this.sweep(1.6, { from: 9000, to: 3000, gain: 0.12, q: 0.8, delay: 0.02 });
+  }
+
+  epicImplode(seconds: number) {
+    const d = Math.max(0.2, seconds);
+    // 거꾸로 감긴 바람 소리 — 높은 곳에서 바닥까지 빨려 내려가다 뚝 끊긴다
+    this.sweep(d, { from: 7000, to: 140, gain: 0.34, q: 5 });
+    this.tone({ freq: 520, slideTo: 55, duration: d, type: 'sine', gain: 0.22, attack: d * 0.3 });
+    this.tone({ freq: 260, slideTo: 40, duration: d, type: 'sawtooth', gain: 0.05, attack: d * 0.3 });
+  }
+
+  secretBoom() {
+    // 첫 폭발보다 낮고 긴 쿵 + 오래 남는 치익 + 높은 곳에서 퍼지는 장7화음 종소리
+    this.tone({ freq: 62, slideTo: 22, duration: 1.8, type: 'sine', gain: 0.95, attack: 0.002 });
+    this.tone({ freq: 124, slideTo: 40, duration: 0.5, type: 'triangle', gain: 0.3, attack: 0.002 });
+    this.noise(0.6, { freq: 400, gain: 0.55, q: 0.5 });
+    this.sweep(2.6, { from: 12000, to: 1800, gain: 0.14, q: 0.7, delay: 0.03 });
+    [1046.5, 1318.5, 1568, 1975.5, 2637].forEach((f, i) => this.bell(f, 0.12 + i * 0.07, 1.4));
   }
 
   private arpeggio(notes: readonly number[], step: number, opts: Omit<ToneOptions, 'freq'> & { startDelay?: number }) {

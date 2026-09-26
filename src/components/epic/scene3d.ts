@@ -41,6 +41,7 @@ import {
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { EpicParticleShape, EpicTheme } from './themes';
@@ -56,8 +57,12 @@ export interface EpicSceneOptions {
   theme: EpicTheme;
   /** 모으기 길이 (ms) — 금이 다 퍼지는 시점 */
   chargeMs: number;
-  /** 시크릿은 모든 장치가 더 크고 많다 */
+  /** 시크릿은 모든 장치가 더 크고 많다 + 전조·수축·이중 폭발 단계가 붙는다 */
   secret: boolean;
+  /** 시크릿 전조 (ms): 화면이 까맣게 가라앉고 캡슐이 혜성처럼 떨어진다. 신화는 0 */
+  omenMs: number;
+  /** 시크릿 수축 (ms): 폭발 직전 모든 빛이 한 점으로 빨려 든다. 신화는 0 */
+  implodeMs: number;
   shiny: boolean;
 }
 
@@ -122,7 +127,8 @@ const PARTICLE_FRAG = /* glsl */ `
       vec2 q = abs(r);
       float rays = pow(max(0.0, 1.0 - q.x), 10.0) * pow(max(0.0, 1.0 - q.y), 0.7)
                  + pow(max(0.0, 1.0 - q.y), 10.0) * pow(max(0.0, 1.0 - q.x), 0.7);
-      a = rays + exp(-dot(p, p) * 14.0);
+      // 빛살이 스프라이트 가장자리에서 잘려 네모로 보이지 않도록 거리로 줄인다
+      a = rays * max(0.0, 1.0 - length(p)) + exp(-dot(p, p) * 14.0);
       col = mix(col, vec3(1.0), exp(-dot(p, p) * 20.0));
     } else if (vShape < 2.5) {
       a = exp(-dot(p, p) * 3.2);
@@ -152,6 +158,7 @@ const BG_FRAG = /* glsl */ `
   uniform float uAspect;
   uniform float uStyle;
   uniform float uGlow;
+  uniform float uDim;
   uniform vec3 uInner;
   uniform vec3 uOuter;
   uniform vec3 uA;
@@ -206,6 +213,7 @@ const BG_FRAG = /* glsl */ `
     float star = step(0.985, hash(cell)) * dotShape * twinkle;
     col += star * 0.7 * (1.0 - mask);
     col += uInner * uGlow * exp(-r * r * 6.0);
+    col *= 1.0 - uDim;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -237,6 +245,38 @@ const RING_FRAG = /* glsl */ `
     gl_FragColor = vec4(uColor, a);
   }
 `;
+
+/** 시크릿 폭발 순간의 화면 왜곡: 중심으로 빨려 드는 방사 흐림 + 색 번짐 (빛 번짐 뒤, 출력 전) */
+const IMPACT_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uCenter: { value: new Vector2(0.5, 1 - STAGE_Y) },
+    uZoom: { value: 0 },
+    uSplit: { value: 0 },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uCenter;
+    uniform float uZoom;
+    uniform float uSplit;
+    varying vec2 vUv;
+    void main() {
+      vec2 d = vUv - uCenter;
+      vec3 col = vec3(0.0);
+      for (int i = 0; i < 10; i++) {
+        float s = 1.0 - uZoom * float(i) / 10.0;
+        col.r += texture2D(tDiffuse, uCenter + d * s * (1.0 + uSplit)).r;
+        col.g += texture2D(tDiffuse, uCenter + d * s).g;
+        col.b += texture2D(tDiffuse, uCenter + d * s * (1.0 - uSplit)).b;
+      }
+      gl_FragColor = vec4(col / 10.0, 1.0);
+    }
+  `,
+};
 
 const RAY_VERT = /* glsl */ `
   attribute vec3 aColor;
@@ -535,6 +575,11 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new Vector2(256, 256), theme.bloom, 0.5, 0.92);
   composer.addPass(bloom);
+  const impact = secret ? new ShaderPass(IMPACT_SHADER) : null;
+  if (impact) {
+    impact.enabled = false;
+    composer.addPass(impact);
+  }
   composer.addPass(new OutputPass());
 
   // 배경
@@ -548,6 +593,7 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
       uAspect: { value: 1 },
       uStyle: { value: ['galaxy', 'phoenix', 'rainbow', 'ocean', 'prism'].indexOf(theme.motif) },
       uGlow: { value: 0 },
+      uDim: { value: 0 },
       uInner: { value: new Color(theme.bgInner) },
       uOuter: { value: new Color(theme.bgOuter) },
       uA: { value: new Color(theme.nebula[0]) },
@@ -683,6 +729,87 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
   const pool = new ParticlePool();
   stage.add(pool.points);
 
+  // ── 시크릿 전용 장치 ──
+  // 혼천의처럼 캡슐·말랑이를 감싸고 도는 빛 고리 3개 (고리마다 별 구슬이 달려 있다)
+  const armillary = new Group();
+  const armRings: { ring: Group; mat: MeshBasicMaterial; speed: number }[] = [];
+  // 폭발 직후 화면을 가로지르는 가로 빛줄기
+  let streak: Mesh | null = null;
+  // 두 번째 폭발(초신성)의 무지개 충격파
+  const boomRings: Mesh<RingGeometry, ShaderMaterial>[] = [];
+  let boomDone = false;
+  if (secret) {
+    const tilts: [number, number][] = [
+      [1.15, 0.2],
+      [1.15, -1.1],
+      [0.35, 1.3],
+    ];
+    tilts.forEach(([rx, ry], i) => {
+      const ring = new Group();
+      ring.rotation.set(rx, ry, 0);
+      const mat = new MeshBasicMaterial({
+        color: new Color(theme.rayColors[i % theme.rayColors.length] ?? '#ffffff').multiplyScalar(2.4),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      });
+      ring.add(new Mesh(new TorusGeometry(1.75, 0.02, 8, 160), mat));
+      for (let k = 0; k < 3; k++) {
+        const bead = new Mesh(new SphereGeometry(0.075, 12, 8), mat);
+        const a = (k / 3) * Math.PI * 2;
+        bead.position.set(Math.cos(a) * 1.75, Math.sin(a) * 1.75, 0);
+        ring.add(bead);
+      }
+      armillary.add(ring);
+      armRings.push({ ring, mat, speed: (i % 2 ? -1 : 1) * (0.7 + i * 0.25) });
+    });
+    armillary.visible = false;
+    stage.add(armillary);
+
+    streak = new Mesh(new PlaneGeometry(1, 1), glowMaterial('#d8ecff', 3));
+    streak.position.z = 1.2;
+    streak.renderOrder = 8;
+    stage.add(streak);
+
+    const RB = ['#ff8fab', '#ffd23f', '#7ed957', '#5cc8ff', '#b98cff'];
+    for (let i = 0; i < 2; i++) {
+      const m = new ShaderMaterial({
+        vertexShader: GLOW_VERT,
+        fragmentShader: RING_FRAG,
+        uniforms: { uColor: { value: new Color(RB[(i * 2) % RB.length] ?? '#ffffff').multiplyScalar(2) }, uOpacity: { value: 0 } },
+        transparent: true,
+        depthWrite: false,
+        side: DoubleSide,
+        blending: AdditiveBlending,
+      });
+      const mesh = new Mesh(new RingGeometry(0.7, 1, 128, 1), m);
+      const uv = mesh.geometry.getAttribute('uv');
+      const posA = mesh.geometry.getAttribute('position');
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, 0.5, (Math.hypot(posA.getX(k), posA.getY(k)) - 0.7) / 0.3);
+      mesh.rotation.set(i ? 0.9 : 0, i ? 0.3 : 0, 0);
+      mesh.visible = false;
+      mesh.renderOrder = 6;
+      stage.add(mesh);
+      boomRings.push(mesh);
+    }
+  }
+
+  /** 초신성: 폭발 0.32초 뒤 한 번 더, 더 크게 */
+  const secondBoom = () => {
+    boomDone = true;
+    shake = 0.75;
+    const RB = ['#ff8fab', '#ffd23f', '#7ed957', '#5cc8ff', '#b98cff', '#ffffff'];
+    for (let i = 0; i < 260; i++) {
+      const u = rand(-1, 1);
+      const a = rand(0, Math.PI * 2);
+      const s2 = Math.sqrt(1 - u * u);
+      const sp = rand(9, 17);
+      pool.spawn({ x: 0, y: 0, z: 0, vx: Math.cos(a) * s2 * sp, vy: u * sp, vz: Math.sin(a) * s2 * sp * 0.4, life: rand(1.2, 2.4), size: rand(0.08, 0.2), color: pick(RB), shape: 'star', drag: 0.12 });
+    }
+    boomRings.forEach((r) => (r.visible = true));
+  };
+
   // ── 모티프 장치 ──
   const motifRoot = new Group();
   motifRoot.visible = false;
@@ -770,6 +897,7 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
   let phaseAt = start;
   /** 폭발 시각 — 캡슐 조각·섬광·충격파는 단계가 바뀌어도 이 시각 기준으로 움직인다 */
   let burstAt = 0;
+  let landed = opts.omenMs <= 0;
   let shake = 0;
   let spawnAcc = 0;
   let last = start;
@@ -921,7 +1049,11 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
     const t = (now - start) / 1000;
     const pt = (now - phaseAt) / 1000;
     const sb = burstAt > 0 ? (now - burstAt) / 1000 : 0;
-    const charge = clamp01((now - start) / opts.chargeMs);
+    const elapsed = now - start;
+    // 시크릿: 전조가 끝난 뒤부터 모으기, 끝 무렵 수축
+    const omenK = opts.omenMs > 0 ? clamp01(elapsed / opts.omenMs) : 1;
+    const charge = clamp01((elapsed - opts.omenMs) / Math.max(1, opts.chargeMs - opts.omenMs));
+    const implode = opts.implodeMs > 0 && phase === 'charge' ? clamp01((elapsed - (opts.chargeMs - opts.implodeMs)) / opts.implodeMs) : 0;
     const revealed = phase === 'reveal' || phase === 'title';
     bgMat.uniforms.uTime!.value = t;
 
@@ -948,13 +1080,31 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
 
     // ── 캡슐
     if (phase === 'charge') {
-      const tremble = charge ** 2 * 0.09 * scale;
+      const tremble = charge ** 2 * 0.09 * scale + implode * 0.12;
       capsule.visible = true;
-      capsule.position.set(rand(-tremble, tremble), Math.sin(t * 2) * 0.08 + rand(-tremble, tremble), 0);
+      // 전조: 어둠 속 별 하나가 반짝이다가 혜성처럼 떨어져 쾅 내려앉는다
+      const drop = clamp01((omenK - 0.45) / 0.55);
+      const fall = 7 * (1 - drop * drop);
+      capsule.position.set(rand(-tremble, tremble), fall + Math.sin(t * 2) * 0.08 + rand(-tremble, tremble), 0);
+      capsule.scale.setScalar(1.35 * (1 - implode ** 2 * 0.88));
+      if (omenK < 0.45) {
+        if (Math.random() < 0.5) {
+          pool.spawn({ x: 0, y: 4.3, z: 0, vx: 0, vy: 0, vz: 0, life: 0.25, size: 0.5 + Math.sin(t * 9) * 0.2, color: '#ffffff', shape: 'star', drag: 1 });
+        }
+      } else if (omenK < 1) {
+        pool.spawn({ x: rand(-0.4, 0.4), y: fall + rand(0.3, 1.2), z: rand(-0.3, 0.3), vx: rand(-0.3, 0.3), vy: rand(1, 3), vz: 0, life: rand(0.4, 0.9), size: rand(0.1, 0.24), color: pick(theme.palette), shape: pick(theme.shapes), drag: 0.6 });
+      } else if (!landed) {
+        landed = true;
+        shake = 0.22;
+        for (let i = 0; i < 60; i++) {
+          const a = rand(0, Math.PI * 2);
+          pool.spawn({ x: 0, y: -1.2, z: 0, vx: Math.cos(a) * rand(2, 4), vy: rand(0, 0.6), vz: Math.sin(a) * rand(2, 4), life: rand(0.5, 0.9), size: rand(0.08, 0.16), color: pick(theme.palette), shape: 'dot', drag: 0.2 });
+        }
+      }
       capsule.rotation.y = t * (0.8 + charge * 5);
       capsule.rotation.z = Math.sin(t * 3) * 0.12;
-      topMat.emissiveIntensity = charge ** 3 * 0.9;
-      botMat.emissiveIntensity = charge ** 3 * 0.5;
+      topMat.emissiveIntensity = charge ** 3 * 0.9 + implode * 3;
+      botMat.emissiveIntensity = charge ** 3 * 0.5 + implode * 3;
       for (const c of cracks) {
         const g = c.mesh.geometry;
         const count = g.index?.count ?? 0;
@@ -965,14 +1115,14 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
       spawnAcc += dt;
       while (spawnAcc > 0.016) {
         spawnAcc -= 0.016;
-        const n = Math.round((2 + charge * 5) * scale);
+        const n = omenK < 1 ? 0 : Math.round((2 + charge * 5 + implode * 8) * scale);
         for (let i = 0; i < n; i++) {
           const a = rand(0, Math.PI * 2);
           const r = rand(5, 9);
           const x = Math.cos(a) * r;
           const y = Math.sin(a) * r;
           const z = rand(-3, 2);
-          const sp = rand(0.9, 1.3) / rand(0.8, 1.2);
+          const sp = (rand(0.9, 1.3) / rand(0.8, 1.2)) * (1 + implode * 2);
           const tangential = theme.swirl * 1.8;
           pool.spawn({ x, y, z, vx: (-x - y * tangential) * sp, vy: (-y + x * tangential) * sp, vz: -z * sp, life: 0.9, size: rand(0.07, 0.18), color: pick(theme.palette), shape: pick(theme.shapes), drag: 0.9 });
         }
@@ -994,19 +1144,22 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
     const haloMat = halo.material as ShaderMaterial;
     const flashMat = flash.material as ShaderMaterial;
     if (phase === 'charge') {
-      halo.scale.setScalar(2.5 + charge ** 2 * 3 * scale);
-      haloMat.uniforms.uOpacity!.value = 0.1 + charge ** 2 * 0.45;
+      // 수축하는 동안 빛 무리는 바늘 끝처럼 작고 밝아진다
+      halo.scale.setScalar((2.5 + charge ** 2 * 3 * scale) * (1 - implode * 0.8));
+      haloMat.uniforms.uOpacity!.value = (0.1 + charge ** 2 * 0.45) * omenK + implode * 0.9;
       flashMat.uniforms.uOpacity!.value = 0;
-      bgMat.uniforms.uGlow!.value = charge ** 2 * 0.25;
-      bloom.strength = theme.bloom * (0.6 + charge * 0.5);
+      bgMat.uniforms.uGlow!.value = charge ** 2 * 0.25 * (1 - implode);
+      bgMat.uniforms.uDim!.value = Math.max(0.92 * (1 - clamp01((omenK - 0.8) / 0.2)), implode * 0.8);
+      bloom.strength = theme.bloom * (0.6 + charge * 0.5 + implode * 0.8);
     } else {
       const f = Math.exp(-sb * 6);
-      flash.scale.setScalar(4 + sb * 30);
-      flashMat.uniforms.uOpacity!.value = f * 1.1;
+      flash.scale.setScalar(4 + sb * (secret ? 14 : 30));
+      flashMat.uniforms.uOpacity!.value = f * (secret ? 0.8 : 1.1);
       halo.scale.setScalar(5 * scale + Math.sin(t * 2) * 0.3);
       haloMat.uniforms.uOpacity!.value = 0.2 + f * 0.4;
-      bgMat.uniforms.uGlow!.value = 0.12 + f * 0.8;
-      bloom.strength = theme.bloom * (0.85 + f * 0.8);
+      bgMat.uniforms.uGlow!.value = 0.12 + f * (secret ? 0.35 : 0.8);
+      bgMat.uniforms.uDim!.value = 0;
+      bloom.strength = theme.bloom * (0.85 + f * (secret ? 0.5 : 0.8));
     }
 
     // ── 충격파
@@ -1085,6 +1238,49 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
       }
       warp.geometry.getAttribute('position').needsUpdate = true;
       warp.material.opacity = revealed ? 0.35 : 0.9;
+    }
+
+    // ── 시크릿 전용
+    if (secret) {
+      if (burstAt > 0 && !boomDone && sb > 0.32) secondBoom();
+      const sb2 = Math.max(0, sb - 0.32);
+      // 고리: 모으기 중 나타나 수축 때 캡슐로 오그라들었다가, 폭발 후 크게 펼쳐진다
+      let ringScale: number;
+      let ringAlpha: number;
+      if (phase === 'charge') {
+        const k = easeOut((charge - 0.05) / 0.45);
+        ringScale = (0.4 + k * 0.6) * (1 - implode * 0.9);
+        ringAlpha = k;
+      } else {
+        ringScale = 0.1 + easeOut(sb / 0.9) * 1.05;
+        ringAlpha = 1;
+      }
+      armillary.visible = ringAlpha > 0.01;
+      armillary.scale.setScalar(ringScale);
+      armillary.rotation.y = t * 0.35;
+      for (const r of armRings) {
+        r.ring.rotation.z += dt * r.speed * (1 + implode * 8 + (phase === 'charge' ? charge * 2 : 0));
+        r.mat.opacity = ringAlpha * 0.9;
+      }
+      if (streak) {
+        const f = burstAt > 0 ? Math.exp(-sb * 1.6) : 0;
+        streak.scale.set(6 + sb * 20, 0.28 * f + 0.02, 1);
+        (streak.material as ShaderMaterial).uniforms.uOpacity!.value = f * 0.9;
+      }
+      boomRings.forEach((r, i) => {
+        const k = clamp01((sb2 - i * 0.08) / 1.3);
+        r.scale.setScalar(0.3 + easeOut(k) * 16);
+        r.material.uniforms.uOpacity!.value = r.visible ? (1 - k) ** 2 * 1.1 : 0;
+        if (k >= 1) r.visible = false;
+      });
+      if (impact) {
+        const f = burstAt > 0 ? Math.exp(-sb * 4) + (boomDone ? Math.exp(-sb2 * 5) * 0.7 : 0) : 0;
+        const zoom = implode * 0.12 + f * 0.13;
+        const split = implode * 0.004 + f * 0.018;
+        impact.enabled = zoom > 0.002;
+        impact.uniforms.uZoom!.value = zoom;
+        impact.uniforms.uSplit!.value = split;
+      }
     }
 
     pool.update(dt);
