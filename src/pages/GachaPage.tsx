@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
 import { PullResult } from '../components/PullResult';
-import { EpicReveal, isEpicRarity } from '../components/epic/EpicReveal';
+import { EpicReveal, isEpicRarity, preloadScene3d } from '../components/epic/EpicReveal';
 import { RateTable } from '../components/RateTable';
 import { GACHA_RULES, rarityRank, type Rarity } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
@@ -56,6 +56,8 @@ export function GachaPage() {
       (acc, it) => (rarityRank(it.rarity) > rarityRank(acc) ? it.rarity : acc),
       'common',
     );
+    // 신화 이상이면 머신이 흔들리는 동안 3D 연출 모듈을 받아 둔다 (평소에는 받지 않음)
+    if (isEpicRarity(best)) void preloadScene3d();
     setPending({ items: result.items, totalRefund: result.totalRefund });
     setRun({ id: Date.now(), rarity: best, shiny: result.items.some((it) => it.shiny) });
     // 확률 안내 쪽으로 스크롤해 있었더라도 머신 연출이 보이도록 맨 위로.

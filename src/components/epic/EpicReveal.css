@@ -16,12 +16,8 @@
 .epic__bg {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 45%, #3a2360 0%, #170c2c 55%, #07030f 100%);
+  background: radial-gradient(circle at 50% 45%, var(--epic-in, #3a2360) 0%, var(--epic-out, #07030f) 100%);
   animation: epic-fade-in 0.5s ease-out both;
-}
-
-.epic--secret .epic__bg {
-  background: radial-gradient(circle at 50% 45%, #2a1d6e 0%, #0d0830 50%, #02010a 100%);
 }
 
 .epic__nebula {
@@ -35,11 +31,17 @@
   border-radius: 50%;
   mask: radial-gradient(circle, #000 35%, transparent 70%);
   background:
-    radial-gradient(ellipse at 30% 35%, rgba(255, 143, 209, 0.35), transparent 45%),
-    radial-gradient(ellipse at 70% 60%, rgba(127, 224, 255, 0.3), transparent 45%),
-    radial-gradient(ellipse at 50% 80%, rgba(185, 140, 255, 0.35), transparent 50%);
+    radial-gradient(ellipse at 30% 35%, color-mix(in srgb, var(--epic-a, #ff8fd1) 35%, transparent), transparent 45%),
+    radial-gradient(ellipse at 70% 60%, color-mix(in srgb, var(--epic-c, #7fe0ff) 30%, transparent), transparent 45%),
+    radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--epic-b, #b98cff) 35%, transparent), transparent 50%);
   animation: nebula-drift 8s linear infinite;
   mix-blend-mode: screen;
+}
+
+.epic__gl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .epic__canvas {
@@ -248,8 +250,9 @@
   animation: title-stamp 0.55s cubic-bezier(0.2, 1.8, 0.4, 1) both;
 }
 
-.epic--mythic .epic__title {
-  background: linear-gradient(90deg, #ff8fab, #ffd23f, #7ed957, #5cc8ff, #b98cff, #ff8fab);
+.epic__title {
+  /* 말랑이 테마마다 다른 글자 빛 */
+  background: linear-gradient(90deg, var(--title-grad));
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -263,11 +266,24 @@
 }
 
 .epic--secret .epic__title {
-  color: #ffe07a;
-  text-shadow:
-    0 6px 0 var(--ink),
-    0 0 26px rgba(255, 224, 122, 0.9),
-    0 0 60px rgba(143, 107, 255, 0.9);
+  filter: drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 0 2px var(--ink)) drop-shadow(0 0 2px var(--ink))
+    drop-shadow(0 0 18px var(--epic-a));
+}
+
+.epic {
+  --title-grad: #ff8fab, #ffd23f, #7ed957, #5cc8ff, #b98cff, #ff8fab;
+}
+.epic--m-galaxy {
+  --title-grad: #ff8fd1, #d6b8ff, #7fb8ff, #ffffff, #ff8fd1;
+}
+.epic--m-phoenix {
+  --title-grad: #fff2a8, #ffb13d, #ff5a1f, #ffe14d, #fff2a8;
+}
+.epic--m-ocean {
+  --title-grad: #ffffff, #7fe0ff, #b8c8ff, #ffe07a, #ffffff;
+}
+.epic--m-prism {
+  --title-grad: #fffbe6, #ffd23f, #ff9fd1, #8ff0ff, #fffbe6;
 }
 
 .epic__name {
@@ -277,6 +293,15 @@
   -webkit-text-stroke: 6px var(--ink);
   paint-order: stroke fill;
   animation: name-rise 0.5s ease-out 0.25s both;
+}
+
+.epic__tagline {
+  margin-top: 2px;
+  font-size: var(--fs-s);
+  color: #fff;
+  -webkit-text-stroke: 4px var(--ink);
+  paint-order: stroke fill;
+  animation: name-rise 0.5s ease-out 0.5s both;
 }
 
 .epic__skip {

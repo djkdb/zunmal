@@ -8,6 +8,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? './' : '/',
   plugins: [react()],
+  build: {
+    // three.js 3D 연출(scene3d)은 신화 이상이 나올 때만 따로 받는 청크라 첫 화면과 무관하다.
+    chunkSizeWarningLimit: 700,
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

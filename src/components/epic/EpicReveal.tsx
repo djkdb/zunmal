@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { playRarityFanfare, sfx } from '../../audio/sfx';
-import type { Rarity } from '../../data/rarity';
 import type { ResolvedPull } from '../../gacha/engine';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { defaultRng } from '../../lib/rng';
 import { Malang } from '../Malang';
 import { lifeRatio, spawnBurst, spawnInward, spawnRain, spawnWarp, stepParticles, type Particle } from './particles';
+import { getLoadedScene3d, preloadScene3d } from './loadScene3d';
+import type { EpicScene } from './scene3d';
+import { epicThemeFor } from './themes';
 import './EpicReveal.css';
 
-/** 신화 이상만 이 연출을 쓴다 */
-export function isEpicRarity(rarity: Rarity): boolean {
-  return rarity === 'mythic' || rarity === 'secret';
-}
+export { isEpicRarity } from './epicRarity';
+export { preloadScene3d } from './loadScene3d';
+
+/** 3D 모듈을 아직 못 받았으면 이만큼만 기다렸다가 2D 연출로 시작한다 */
+const LOAD_WAIT_MS = 1500;
 
 type Phase = 'charge' | 'burst' | 'reveal' | 'title';
 
@@ -24,7 +27,6 @@ interface Script {
   title: number;
   /** 제목 이후 자동으로 넘어가기까지 */
   hold: number;
-  colors: readonly string[];
   burstKind: Particle['kind'];
   title1: string;
 }
@@ -35,7 +37,6 @@ const SCRIPTS: Record<'mythic' | 'secret', Script> = {
     reveal: 350,
     title: 800,
     hold: 2600,
-    colors: ['#ff8fab', '#ffd23f', '#7ed957', '#5cc8ff', '#b98cff', '#ffffff'],
     burstKind: 'dot',
     title1: '신화!',
   },
@@ -44,7 +45,6 @@ const SCRIPTS: Record<'mythic' | 'secret', Script> = {
     reveal: 450,
     title: 1000,
     hold: 3400,
-    colors: ['#ffe07a', '#ffffff', '#cdb2ff', '#7fe0ff', '#ff9fd1'],
     burstKind: 'star',
     title1: '시크릿!!',
   },
@@ -97,17 +97,25 @@ function drawParticles(ctx: CanvasRenderingContext2D, ps: readonly Particle[]) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+type Mode = 'loading' | '3d' | '2d';
+
 /**
  * 신화·시크릿 등장 전체 화면 연출.
- * 모으기(캡슐 떨림 + 빛 흡수) → 폭발(섬광·충격파·입자) → 등장(광선 + 말랑이) → 제목 도장.
+ * 모으기(캡슐 떨림 + 빛 흡수) → 폭발(섬광·충격파·입자) → 등장(모티프 장치 + 말랑이) → 제목 도장.
+ * 말랑이마다 테마(themes.ts)가 달라 장면이 다르다. three.js 장면을 쓰고,
+ * WebGL을 쓸 수 없으면 2D 캔버스로 대체한다. 말랑이와 글자는 항상 DOM(SVG)이 그린다.
  * 화면을 누르면 바로 넘어간다. 움직임 줄이기 설정이면 정지된 짧은 카드만 보여준다.
  */
 export function EpicReveal({ item, onDone }: EpicRevealProps) {
   const reduced = useReducedMotion();
   const tier = item.rarity === 'secret' ? 'secret' : 'mythic';
   const script = SCRIPTS[tier];
+  const theme = epicThemeFor(item.character);
   const [phase, setPhase] = useState<Phase>(reduced ? 'title' : 'charge');
+  const [mode, setMode] = useState<Mode>(() => (reduced ? '2d' : getLoadedScene3d() ? '3d' : 'loading'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<EpicScene | null>(null);
   const particles = useRef<Particle[]>([]);
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
@@ -122,8 +130,48 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     onDoneRef.current();
   }, []);
 
+  // 3D 모듈이 아직이면 잠깐 기다린다
+  useEffect(() => {
+    if (mode !== 'loading') return;
+    let alive = true;
+    const timer = window.setTimeout(() => alive && setMode('2d'), LOAD_WAIT_MS);
+    void preloadScene3d().then((m) => {
+      if (alive) setMode(m ? '3d' : '2d');
+    });
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [mode]);
+
+  // 3D 장면 만들기 — 실패하면 2D로
+  useEffect(() => {
+    if (mode !== '3d') return;
+    const mod = getLoadedScene3d();
+    const box = glRef.current;
+    if (!mod || !box) return;
+    try {
+      sceneRef.current = mod.createEpicScene(box, { theme, chargeMs: script.charge, secret: tier === 'secret', shiny: item.shiny });
+      sceneRef.current.setPhase(phaseRef.current);
+    } catch {
+      setMode('2d');
+      return;
+    }
+    return () => {
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+    };
+  }, [mode, theme, script.charge, tier, item.shiny]);
+
+  useEffect(() => {
+    sceneRef.current?.setPhase(phase);
+  }, [phase]);
+
+  const started = mode !== 'loading';
+
   // 타임라인
   useEffect(() => {
+    if (!started) return;
     if (reduced) {
       playRarityFanfare(sfx, item.rarity, item.shiny);
       const id = window.setTimeout(finish, 2200);
@@ -152,11 +200,12 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     });
     at(script.charge + script.reveal + script.title + script.hold, finish);
     return () => timers.forEach((id) => window.clearTimeout(id));
-  }, [reduced, script, tier, item.rarity, item.shiny, finish]);
+  }, [started, reduced, script, tier, item.rarity, item.shiny, finish]);
 
-  // 입자 캔버스 루프
+  // 2D 입자 캔버스 루프 (WebGL을 쓸 수 없을 때)
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || mode !== '2d') return;
+    const colors = theme.palette;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -186,15 +235,15 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       if (spawnAcc > 40) {
         spawnAcc = 0;
         if (ph === 'charge') {
-          particles.current.push(...spawnInward(rng, tier === 'secret' ? 5 : 4, w, h, cx, cy, script.colors));
+          particles.current.push(...spawnInward(rng, tier === 'secret' ? 5 : 4, w, h, cx, cy, colors));
           if (tier === 'secret') particles.current.push(...spawnWarp(rng, 6, cx, cy, ['#ffffff', '#cdb2ff', '#7fe0ff']));
         } else if (ph === 'reveal' || ph === 'title') {
-          if (rng() < 0.6) particles.current.push(...spawnRain(rng, 2, w, script.colors, tier === 'secret' ? 'star' : 'dot'));
+          if (rng() < 0.6) particles.current.push(...spawnRain(rng, 2, w, colors, tier === 'secret' ? 'star' : 'dot'));
         }
       }
       if ((ph === 'burst' || ph === 'reveal') && !burstDone) {
         burstDone = true;
-        particles.current.push(...spawnBurst(rng, tier === 'secret' ? 260 : 200, cx, cy, script.colors, script.burstKind, 1.1));
+        particles.current.push(...spawnBurst(rng, tier === 'secret' ? 260 : 200, cx, cy, colors, script.burstKind, 1.1));
         particles.current.push(...spawnBurst(rng, 90, cx, cy, ['#ffffff'], 'dot', 0.6));
       }
       // 입자 수 상한 (저사양 기기 보호)
@@ -209,7 +258,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [reduced, script, tier]);
+  }, [reduced, mode, theme, script, tier]);
 
   // 키보드: Enter/Space/Esc로 넘어가기
   useEffect(() => {
@@ -223,12 +272,20 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [finish]);
 
-  const showMalang = phase === 'reveal' || phase === 'title';
-  const style = { '--charge': `${script.charge}ms` } as CSSProperties;
+  const showMalang = started && (phase === 'reveal' || phase === 'title');
+  const flat = mode !== '3d';
+  const style = {
+    '--charge': `${script.charge}ms`,
+    '--epic-in': theme.bgInner,
+    '--epic-out': theme.bgOuter,
+    '--epic-a': theme.nebula[0],
+    '--epic-b': theme.nebula[1],
+    '--epic-c': theme.nebula[2],
+  } as CSSProperties;
 
   return (
     <div
-      className={`epic epic--${tier} epic--${phase}${reduced ? ' epic--still' : ''}${item.shiny ? ' is-shiny' : ''}`}
+      className={`epic epic--${tier} epic--m-${theme.motif} epic--${phase} epic--${mode}${reduced ? ' epic--still' : ''}${item.shiny ? ' is-shiny' : ''}`}
       style={style}
       role="dialog"
       aria-modal="true"
@@ -239,11 +296,12 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       }}
     >
       <div className="epic__bg" aria-hidden="true" />
-      {tier === 'secret' && <div className="epic__nebula" aria-hidden="true" />}
-      <div className="epic__rays" aria-hidden="true" />
-      <canvas ref={canvasRef} className="epic__canvas" aria-hidden="true" />
+      {mode === '3d' && <div ref={glRef} className="epic__gl" aria-hidden="true" />}
+      {mode === '2d' && tier === 'secret' && <div className="epic__nebula" aria-hidden="true" />}
+      {mode === '2d' && <div className="epic__rays" aria-hidden="true" />}
+      {mode === '2d' && <canvas ref={canvasRef} className="epic__canvas" aria-hidden="true" />}
 
-      {(phase === 'charge' || phase === 'burst') && !reduced && (
+      {(phase === 'charge' || phase === 'burst') && !reduced && mode === '2d' && (
         <div className="epic__capsule" aria-hidden="true">
           <svg viewBox="-60 -60 120 120" width="100%" height="100%">
             <defs>
@@ -274,9 +332,13 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       {phase === 'burst' && (
         <>
           <div className="epic__flash" aria-hidden="true" />
-          <div className="epic__shock epic__shock--1" aria-hidden="true" />
-          <div className="epic__shock epic__shock--2" aria-hidden="true" />
-          <div className="epic__shock epic__shock--3" aria-hidden="true" />
+          {flat && (
+            <>
+              <div className="epic__shock epic__shock--1" aria-hidden="true" />
+              <div className="epic__shock epic__shock--2" aria-hidden="true" />
+              <div className="epic__shock epic__shock--3" aria-hidden="true" />
+            </>
+          )}
         </>
       )}
 
@@ -295,6 +357,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
             {item.shiny ? '반짝 ' : ''}
             {item.character.name}
           </p>
+          <p className="epic__tagline">{theme.tagline}</p>
         </div>
       )}
 

@@ -69,6 +69,7 @@
 - Vitest: 가챠 확률 10만 회 검증, 경제, 저장, 미니게임 로직 테스트
 - GitHub Actions → GitHub Pages
 - 외부 이미지/사운드 파일 없음 (SVG + Canvas + WebAudio)
+- three.js — 신화·시크릿 등장 3D 연출 (필요할 때만 따로 불러옴, WebGL이 없으면 2D로 대체)
 
 ## 개발
 
