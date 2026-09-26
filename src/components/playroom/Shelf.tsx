@@ -17,13 +17,15 @@ interface ShelfProps {
   onToggle: () => void;
   onPick: (entry: ShelfEntry) => void;
   sealedCount: number;
+  /** 매트에 한 마리뿐 — 손잡이를 "친구 꺼내기"로 */
+  solo?: boolean;
 }
 
 /**
  * 아래에서 끌어 올리는 선반. 닫혀 있을 때는 손잡이 버튼만, 열리면 나무 선반 위에 말랑이·캡슐 칸.
  * 나와 있는 칸은 빈 받침으로 보이고 누르면 선반에 다시 넣는다.
  */
-export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, sealedCount }: ShelfProps) {
+export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, sealedCount, solo = false }: ShelfProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -46,7 +48,7 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
       >
         <span className="pr-shelf__grip" aria-hidden="true" />
         <span className="pr-shelf__handle-text">
-          {open ? '선반 닫기' : '선반 열기'}
+          {open ? '선반 닫기' : solo ? '친구 꺼내기' : '선반 열기'}
           <span className="pr-shelf__count">
             매트 {onMat}/{cap}
           </span>
@@ -66,7 +68,7 @@ export function Shelf({ open, entries, onMat, cap, shinyIds, onToggle, onPick, s
         hidden={!open}
       >
         <p className="pr-shelf__help">
-          누르면 매트로 꺼내요. 나와 있는 말랑이를 누르면 선반에 넣어요.
+          누르면 매트로 꺼내 함께 놀아요. 나와 있는 말랑이를 누르면 선반에 넣어요.
         </p>
         <ul className="pr-shelf__grid">
           {entries.map((e) => {

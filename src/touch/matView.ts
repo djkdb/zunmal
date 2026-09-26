@@ -14,6 +14,8 @@ export interface MatLayout {
   floorH: number;
   /** 말랑이 그림 상자 한 변 (px) = 세계 단위 1 */
   sprite: number;
+  /** 여럿이 놀 때의 말랑이 크기 (px) — 소품은 혼자일 때도 이 크기를 기준으로 그려 화면 크기가 그대로다 */
+  groupSprite: number;
 }
 
 export interface MatInsets {
@@ -23,16 +25,42 @@ export interface MatInsets {
   bottom: number;
 }
 
-/** 화면 크기 → 매트 배치. 말랑이 크기는 화면에 맞추고(100~180px), 머리가 HUD 에 가리지 않게 바닥을 내린다 */
-export function computeMatLayout(viewW: number, viewH: number, insets: MatInsets): MatLayout {
+/** 혼자 놀 때 말랑이 크기 (px) 한도 — 예전 한 마리 만지기 화면처럼 크게 */
+export const SOLO_SPRITE_MAX = 240;
+
+/**
+ * 화면 크기 → 매트 배치. 말랑이 크기는 화면에 맞추고(여럿이면 100~180px, 혼자면 더 크게 ~240px),
+ * 머리가 HUD 에 가리지 않게 바닥을 내린다.
+ */
+export function computeMatLayout(viewW: number, viewH: number, insets: MatInsets, options: { solo?: boolean } = {}): MatLayout {
   const w = Number.isFinite(viewW) && viewW > 0 ? viewW : 360;
   const h = Number.isFinite(viewH) && viewH > 0 ? viewH : 640;
-  const sprite = Math.round(Math.max(100, Math.min(180, w * 0.34, h * 0.22)));
+  const group = Math.max(100, Math.min(180, w * 0.34, h * 0.22));
+  const sprite = Math.round(options.solo ? Math.max(group, Math.min(SOLO_SPRITE_MAX, w * 0.62, h * 0.34)) : group);
   // 날개·귀 같은 장식이 매트 밖으로 나가지 않게 (몸 반폭보다 그림이 약 0.2 더 넓다)
   const side = 10 + sprite * 0.2;
   const floorTop = insets.top + sprite * 0.62;
   const floorBottom = Math.max(floorTop + sprite, insets.bottom - 6);
-  return { floorLeft: side, floorTop, floorW: Math.max(sprite, w - side * 2), floorH: floorBottom - floorTop, sprite };
+  return {
+    floorLeft: side,
+    floorTop,
+    floorW: Math.max(sprite, w - side * 2),
+    floorH: floorBottom - floorTop,
+    sprite,
+    groupSprite: Math.round(group),
+  };
+}
+
+/** 배치가 바뀔 때(화면 회전·혼자 ↔ 여럿) 세계 좌표를 옮겨 화면 위 같은 자리에 머물게 한다 */
+export function remapPoint(from: MatLayout, to: MatLayout, x: number, y: number, z: number): { x: number; y: number; z: number } {
+  const s = toScreen(from, x, y, 0);
+  const w = toWorld(to, s.x, s.y);
+  return { x: w.x, y: w.y, z: (Math.max(0, z) * from.sprite) / to.sprite };
+}
+
+/** 혼자 놀 때 말랑이 자리: 매트 가운데 */
+export function soloSpot(bounds: { w: number; d: number }): { x: number; y: number } {
+  return { x: bounds.w / 2, y: bounds.d * 0.5 };
 }
 
 export function matBounds(l: MatLayout): { w: number; d: number } {

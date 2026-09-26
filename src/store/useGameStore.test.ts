@@ -342,6 +342,28 @@ describe('놀이방 (unboxed / playroom)', () => {
     expect(store.getState().playroom.props).toEqual([{ id: 'plant', x: 0.1, y: 0.2 }]);
   });
 
+  it('들어올 때 한 마리만: 매트를 그 말랑이 하나로, 안 연 말랑이면 빈 매트', () => {
+    const store = makeStore();
+    const owned = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+    store.setState({
+      ownedMalangs: { 'peach-mochi': owned, 'soda-drop': owned, 'matcha-bean': owned },
+      unboxed: ['peach-mochi', 'soda-drop'],
+      playroom: { out: ['peach-mochi', 'soda-drop'], mat: 'cloud', props: [] },
+    });
+    const s = store.getState();
+    s.soloMalang('soda-drop');
+    expect(store.getState().playroom).toEqual({ out: ['soda-drop'], mat: 'cloud', props: [] });
+    s.soloMalang('matcha-bean');
+    expect(store.getState().playroom.out).toEqual([]);
+    s.soloMalang('ghost');
+    expect(store.getState().playroom.out).toEqual([]);
+    s.soloMalang('peach-mochi');
+    expect(s.takeOutMalang('soda-drop', 3)).toBe(true);
+    expect(store.getState().playroom.out).toEqual(['peach-mochi', 'soda-drop']);
+    s.soloMalang(null);
+    expect(store.getState().playroom.out).toEqual([]);
+  });
+
   it('꾸미기: 무늬 바꾸기, 소품 놓기·옮기기·치우기, 3개까지', () => {
     const store = makeStore();
     const s = store.getState();

@@ -68,6 +68,11 @@ export interface GameActions {
   takeOutMalang(characterId: string, cap?: number): boolean;
   /** 놀이방: 매트의 말랑이를 선반에 넣는다 */
   putBackMalang(characterId: string): void;
+  /**
+   * 놀이방에 들어올 때: 기본은 한 마리만 크게 만진다 → 매트를 이 말랑이 하나로 (캡슐을 연 보유 말랑이가 아니면 빈 매트).
+   * 친구는 선반에서 더 꺼내 함께 논다.
+   */
+  soloMalang(characterId: string | null): void;
   /** 놀이방 꾸미기: 매트 무늬 바꾸기 (무료) */
   setPlayroomMat(mat: MatPatternId): void;
   /** 놀이방 꾸미기: 소품을 놓거나 옮긴다 (x, y 는 매트 바닥 기준 0..1). 가득 차서 못 놓으면 false */
@@ -316,6 +321,14 @@ export function createGameStore(storage: PersistStorage<SaveData> = createSafeSt
           const playroom = get().playroom;
           if (!playroom.out.includes(characterId)) return;
           set({ playroom: { ...playroom, out: playroom.out.filter((id) => id !== characterId) } });
+        },
+
+        soloMalang(characterId) {
+          const state = get();
+          const ok = characterId !== null && !!state.ownedMalangs[characterId] && state.unboxed.includes(characterId);
+          const out = ok ? [characterId] : [];
+          if (out.length === state.playroom.out.length && out.every((id, i) => state.playroom.out[i] === id)) return;
+          set({ playroom: { ...state.playroom, out } });
         },
 
         setPlayroomMat(mat) {

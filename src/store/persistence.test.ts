@@ -153,6 +153,26 @@ describe('migrateSave', () => {
     expect(SAVE_VERSION).toBe(8);
   });
 
+  it('v7 → v8: 매트에는 한 마리만 (나와 있던 파트너, 없으면 처음 꺼낸 말랑이)', () => {
+    const o = { count: 1, shinyCount: 0, firstObtainedAt: 1 };
+    const owned = { 'peach-mochi': o, 'soda-drop': o, 'matcha-bean': o };
+    const unboxed = Object.keys(owned);
+    const withPartner = migrateSave(
+      { ownedMalangs: owned, unboxed, partnerId: 'soda-drop', playroom: { out: ['peach-mochi', 'soda-drop', 'matcha-bean'] } },
+      7,
+      NOW,
+    );
+    expect(withPartner.playroom.out).toEqual(['soda-drop']);
+    const noPartner = migrateSave(
+      { ownedMalangs: owned, unboxed, partnerId: 'soda-drop', playroom: { out: ['matcha-bean', 'peach-mochi'] } },
+      7,
+      NOW,
+    );
+    expect(noPartner.playroom.out).toEqual(['matcha-bean']);
+    const empty = migrateSave({ ownedMalangs: owned, unboxed, playroom: { out: [3, null] } }, 7, NOW);
+    expect(empty.playroom.out).toEqual([]);
+  });
+
   it('v7 → v8: 꺼내 둔 말랑이는 그대로, 무늬는 기본, 소품은 없음', () => {
     const owned = { 'peach-mochi': { count: 1, shinyCount: 0, firstObtainedAt: 1 } };
     const s = migrateSave(

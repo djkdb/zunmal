@@ -21,7 +21,7 @@ import { DEFAULT_MAT, sanitizeMatId, sanitizeProps, type MatPatternId, type Plac
  *  - v5: 소리 설정 분리 — settings { muted } → { sfxOn, musicOn } (효과음/배경음악)
  *  - v6: 받은 쿠폰(redeemedCoupons)
  *  - v7: 놀이방 — 캡슐을 연 말랑이(unboxed), 매트 위에 꺼내 둔 말랑이(playroom.out)
- *  - v8: 놀이방 꾸미기 — 매트 무늬(playroom.mat), 매트 위 소품(playroom.props)
+ *  - v8: 놀이방 꾸미기 — 매트 무늬(playroom.mat), 매트 위 소품(playroom.props). 기본은 한 마리만(out 은 하나로)
  */
 export const SAVE_VERSION = 8;
 /** 매트 위에 동시에 꺼내 둘 수 있는 최대 수 (저장 상한. 기기별 실제 상한은 touch/perfGovernor.ts 가 정한다) */
@@ -284,10 +284,15 @@ function migrateV6toV7(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, unboxed: owned, playroom: { out: partner ? [partner] : [] } };
 }
 
-/** v7 → v8: 꾸미기 — 기본 무늬, 소품 없음 (이미 꺼내 둔 말랑이는 그대로) */
+/**
+ * v7 → v8: 꾸미기 — 기본 무늬, 소품 없음. 놀이방 기본이 "한 마리만 크게"로 바뀌어 매트에는 한 마리만 남긴다
+ * (파트너가 나와 있었으면 파트너, 아니면 처음 꺼낸 말랑이).
+ */
 function migrateV7toV8(raw: Record<string, unknown>): Record<string, unknown> {
   const playroom = isRecord(raw.playroom) ? raw.playroom : {};
-  return { ...raw, playroom: { ...playroom, mat: DEFAULT_MAT, props: [] } };
+  const out = Array.isArray(playroom.out) ? playroom.out.filter((v): v is string => typeof v === 'string') : [];
+  const keep = typeof raw.partnerId === 'string' && out.includes(raw.partnerId) ? raw.partnerId : out[0];
+  return { ...raw, playroom: { ...playroom, out: keep ? [keep] : [], mat: DEFAULT_MAT, props: [] } };
 }
 
 /**
