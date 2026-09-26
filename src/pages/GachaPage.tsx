@@ -1,13 +1,15 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { GachaMachine, type MachineRun } from '../components/GachaMachine';
 import { PullResult } from '../components/PullResult';
 import { EpicReveal, isEpicRarity, preloadScene3d } from '../components/epic/EpicReveal';
 import { RateTable } from '../components/RateTable';
-import { GACHA_RULES, rarityRank, type Rarity } from '../data/rarity';
+import { topRarity } from '../components/pullReveal';
+import { GACHA_RULES, RARITY_META, rarityRank } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
 import type { ResolvedPull } from '../gacha/engine';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useGameStore, type PullKind } from '../store/useGameStore';
 import { CoinIcon } from '../components/icons';
 import './GachaPage.css';
@@ -21,12 +23,14 @@ export function GachaPage() {
   const coins = useGameStore((s) => s.coins);
   const pityCount = useGameStore((s) => s.pityCount);
   const pull = useGameStore((s) => s.pull);
+  const reduced = useReducedMotion();
 
   const [run, setRun] = useState<MachineRun | null>(null);
   const [pending, setPending] = useState<PendingResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [showEpic, setShowEpic] = useState(false);
   const [message, setMessage] = useState('');
+  const rateRef = useRef<HTMLDetailsElement>(null);
 
   const busy = run !== null;
   // 이번 뽑기에서 가장 높은 결과가 신화 이상이면 전체 화면 연출을 먼저 보여준다
@@ -34,15 +38,24 @@ export function GachaPage() {
     (best, it) => (isEpicRarity(it.rarity) && (!best || rarityRank(it.rarity) > rarityRank(best.rarity)) ? it : best),
     undefined,
   );
+  const isMulti = (pending?.items.length ?? 0) > 1;
   // 같은 프레임 안에서 버튼이 여러 번 눌려도(연타) 뽑기가 한 번만 일어나도록 즉시 잠근다.
-  // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다.
+  // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다. 결과 창을 닫을 때만 풀린다.
   const lockRef = useRef(false);
-  const untilPity = GACHA_RULES.pityThreshold - pityCount;
+  // 결과는 뽑는 순간 저장되지만, 천장 카운터가 연출 도중 바뀌면 결과를 미리 알려 버린다.
+  // 연출이 끝날 때까지는 뽑기 전 값을 보여 준다.
+  const pityBefore = useRef(pityCount);
+  if (!busy) pityBefore.current = pityCount;
+  const shownPity = busy ? pityBefore.current : pityCount;
+  const threshold = GACHA_RULES.pityThreshold;
+  const untilPity = threshold - shownPity;
+  const pityLabel = RARITY_META[GACHA_RULES.pityMinRarity].label;
   const discount = Math.round((1 - PULL_PRICE.multi / (PULL_PRICE.single * PULL_COUNT.multi)) * 100);
 
   const start = (kind: PullKind) => {
-    if (busy || lockRef.current) return;
+    if (lockRef.current) return;
     lockRef.current = true;
+    pityBefore.current = useGameStore.getState().pityCount;
     // 결과는 즉시 store에 확정/저장된다. 연출 도중 새로고침해도 결과는 유지.
     const result = pull(kind);
     if (!result.ok) {
@@ -52,10 +65,7 @@ export function GachaPage() {
       return;
     }
     setMessage('');
-    const best = result.items.reduce<Rarity>(
-      (acc, it) => (rarityRank(it.rarity) > rarityRank(acc) ? it.rarity : acc),
-      'common',
-    );
+    const best = topRarity(result.items.map((it) => it.rarity));
     // 신화 이상이면 머신이 흔들리는 동안 3D 연출 모듈을 받아 둔다 (평소에는 받지 않음)
     if (isEpicRarity(best)) void preloadScene3d();
     setPending({ items: result.items, totalRefund: result.totalRefund });
@@ -65,13 +75,32 @@ export function GachaPage() {
     window.scrollTo({ top: 0 });
   };
 
-  const close = () => {
-    sfx.button();
+  const reset = () => {
     setShowResult(false);
     setShowEpic(false);
     setPending(null);
     setRun(null);
     lockRef.current = false;
+  };
+
+  const close = () => {
+    sfx.button();
+    reset();
+  };
+
+  // 결과 창에서 바로 다시 뽑기: 창을 닫고(잠금 해제) 같은 이벤트 안에서 새로 뽑는다
+  const pullAgain = (kind: PullKind) => {
+    reset();
+    start(kind);
+  };
+
+  const openRates = () => {
+    sfx.button();
+    const el = rateRef.current;
+    if (!el) return;
+    el.open = true;
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    el.querySelector('summary')?.focus({ preventScroll: true });
   };
 
   return (
@@ -83,7 +112,8 @@ export function GachaPage() {
       <div className="gacha-page__machine">
         <GachaMachine
           run={run}
-          quietFanfare={!!epicItem}
+          // 10연은 결과 카드가 뒤집힐 때 결과음을 낸다. 신화 이상은 전체 화면 연출이 직접 낸다.
+          quietFanfare={!!epicItem || isMulti}
           onOpened={() => (epicItem ? setShowEpic(true) : setShowResult(true))}
         />
         <div className="gacha-page__actions">
@@ -116,9 +146,23 @@ export function GachaPage() {
             );
           })}
         </div>
-        <p className="gacha-page__pity small">
-          앞으로 <strong>{untilPity}</strong>번 안에 전설 이상이 꼭 나와요
-        </p>
+        <div className="gacha-page__info">
+          <div
+            className={`pity${untilPity <= 10 ? ' pity--near' : ''}`}
+            role="group"
+            aria-label={`${pityLabel} 이상 확정까지 ${untilPity}회 남았어요`}
+          >
+            <p className="pity__text" aria-hidden="true">
+              {pityLabel} 이상까지 <strong>{untilPity}</strong>회
+            </p>
+            <span className="pity__bar" aria-hidden="true">
+              <span style={{ '--fill': shownPity / (threshold - 1) } as CSSProperties} />
+            </span>
+          </div>
+          <button type="button" className="btn btn--small gacha-page__rates" onClick={openRates} aria-controls="rate-table">
+            확률 보기
+          </button>
+        </div>
         <p className="gacha-page__message small" role="status" aria-live="polite">
           {message}
           {message && (
@@ -130,7 +174,7 @@ export function GachaPage() {
         </p>
       </div>
 
-      <RateTable />
+      <RateTable ref={rateRef} pityCount={shownPity} />
 
       {showEpic && epicItem && (
         <EpicReveal
@@ -141,7 +185,16 @@ export function GachaPage() {
           }}
         />
       )}
-      {showResult && pending && <PullResult items={pending.items} totalRefund={pending.totalRefund} onClose={close} />}
+      {showResult && pending && (
+        <PullResult
+          items={pending.items}
+          totalRefund={pending.totalRefund}
+          seenIndex={epicItem ? pending.items.indexOf(epicItem) : undefined}
+          coins={coins}
+          onPullAgain={pullAgain}
+          onClose={close}
+        />
+      )}
     </section>
   );
 }

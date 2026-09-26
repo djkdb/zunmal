@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { playRarityFanfare, sfx } from '../audio/sfx';
-import { RARITY_META, type Rarity } from '../data/rarity';
+import { rarityRank, type Rarity } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { buzz } from './pullHaptics';
 import './GachaMachine.css';
 
 /** 캡슐 색 (위쪽 반구). 희귀도 힌트 — 텍스트는 결과 화면에서 제공. */
@@ -24,6 +25,16 @@ const DOME_CAPSULES: { x: number; y: number; r: number; color: string; rot: numb
   { x: 58, y: 84, r: 13, color: '#ffd966', rot: 10 },
   { x: 146, y: 86, r: 13, color: '#ff8fab', rot: -60 },
   { x: 102, y: 64, r: 13, color: '#f3ebdd', rot: 25 },
+];
+
+/** 캡슐 주위 반짝이 위치 (%, 캡슐 상자 기준) · 크기 · 시작 지연 */
+const SPARKLES: { x: number; y: number; s: number; d: number }[] = [
+  { x: -8, y: 12, s: 1, d: 0 },
+  { x: 104, y: 20, s: 0.8, d: 180 },
+  { x: 92, y: 92, s: 1.1, d: 360 },
+  { x: 2, y: 86, s: 0.7, d: 520 },
+  { x: 50, y: -14, s: 0.9, d: 260 },
+  { x: 118, y: 58, s: 0.6, d: 640 },
 ];
 
 export type MachinePhase = 'idle' | 'inserting' | 'shaking' | 'tease' | 'dropping' | 'ready' | 'opening';
@@ -135,7 +146,10 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
     }
     after(t.inserting + t.shaking + tease, () => setPhase('dropping'));
     after(t.inserting + t.shaking + tease + t.dropping, () => {
-      sfx.tap(4);
+      // 착지음은 등급이 높을수록 높게. 전설 이상은 착지하는 순간 금빛으로 "승격"되며 짧게 진동
+      const rank = rarityRank(run.rarity);
+      sfx.tap(4 + rank * 2);
+      if (rank >= rarityRank('legendary')) buzz(30, reduced);
       setPhase('ready');
     });
     return clearTimers;
@@ -159,8 +173,13 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
   };
 
   const showCapsule = run && (phase === 'dropping' || phase === 'ready' || phase === 'opening');
-  const capsuleTop = run ? CAPSULE_TOP[run.rarity] : CAPSULE_TOP.common;
-  const glow = run && RARITY_META[run.rarity].fanfare >= 2;
+  // 전설 캡슐은 떨어지는 동안 에픽(보라)으로 보이다가 착지하는 순간 금색으로 바뀐다 (승격 연출)
+  const capsuleTop = !run
+    ? CAPSULE_TOP.common
+    : run.rarity === 'legendary' && phase === 'dropping' && !reduced
+      ? CAPSULE_TOP.epic
+      : CAPSULE_TOP[run.rarity];
+  const rank = run ? rarityRank(run.rarity) : 0;
   const rarityClass = run && phase !== 'idle' && phase !== 'inserting' ? ` machine--r-${run.rarity}` : '';
 
   return (
@@ -235,11 +254,28 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
         <rect x="90" y="14" width="24" height="12" rx="6" fill="#ff8fab" stroke="#2b2233" strokeWidth="4" />
       </svg>
 
+      {/* 원신식 예고: 캡슐 뒤 빛이 묶음 최고 등급을 알린다. 일반·레어는 잔잔하게, 에픽은 보라 반짝이,
+          전설은 보라로 떨어지다가 착지하는 순간 금빛으로 터진다. */}
+      {showCapsule && run && rank >= 1 && (
+        <div className={`machine__aura machine__aura--${run.rarity}`} aria-hidden="true">
+          <span className="machine__glow" />
+          {rank >= rarityRank('legendary') && <span className="machine__rays" />}
+          {rank >= rarityRank('legendary') && <span className="machine__ring" />}
+          {rank >= rarityRank('epic') &&
+            SPARKLES.map((sp, i) => (
+              <span
+                key={i}
+                className="machine__spark"
+                style={{ '--x': `${sp.x}%`, '--y': `${sp.y}%`, '--s': sp.s, '--d': `${sp.d}ms` } as CSSProperties}
+              />
+            ))}
+        </div>
+      )}
       {showCapsule && run && (
         <button
           ref={capsuleRef}
           type="button"
-          className={`machine__capsule machine__capsule--${run.rarity}${glow ? ' has-glow' : ''}${run.shiny ? ' is-shiny' : ''}`}
+          className={`machine__capsule machine__capsule--${run.rarity}${run.shiny ? ' is-shiny' : ''}`}
           onClick={open}
           disabled={phase !== 'ready'}
           aria-label="캡슐 열기"
@@ -253,7 +289,11 @@ export function GachaMachine({ run, onOpened, quietFanfare = false }: GachaMachi
         {phase === 'ready'
           ? run?.rarity === 'secret'
             ? '이 캡슐… 뭔가 특별해요!'
-            : '캡슐을 눌러서 열어보세요!'
+            : rank >= rarityRank('legendary')
+              ? '금빛 캡슐! 눌러서 열어 보세요'
+              : rank === rarityRank('epic')
+                ? '보랏빛 캡슐! 눌러서 열어 보세요'
+                : '캡슐을 눌러서 열어 보세요!'
           : phase === 'tease'
             ? '어… 머신이 이상해요?!'
             : phase === 'idle'
