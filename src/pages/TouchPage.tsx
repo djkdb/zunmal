@@ -55,7 +55,7 @@ import {
 import type { PhotoLayer } from '../components/touch3d/photo';
 import { getCharacter, type Character } from '../data/characters';
 import { fillingOf, materialOf } from '../data/materials';
-import { MAT_PATTERNS, matBackgroundCss } from '../data/matPatterns';
+import { MAT_PATTERNS, matBackgroundCss, matTileDataUrl } from '../data/matPatterns';
 import {
   PROPS,
   propSpot,
@@ -63,7 +63,7 @@ import {
   type PlacedProp,
   type PropId,
 } from '../data/playroomDecor';
-import { RARITY_META, TOUCH_FX } from '../data/rarity';
+import { TOUCH_FX } from '../data/rarity';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { haptic } from '../lib/haptics';
 import { josa } from '../lib/josa';
@@ -84,9 +84,25 @@ import {
   type InteractBody,
   type InteractEvent,
 } from '../touch/interactions';
-import { computeMatLayout, matBounds, squeezePose, toScreen, toWorld, type MatLayout } from '../touch/matView';
+import {
+  computeMatLayout,
+  matBounds,
+  remapPoint,
+  soloSpot,
+  squeezePose,
+  toScreen,
+  toWorld,
+  type MatLayout,
+} from '../touch/matView';
 import { createPerf, looksLikePhone, samplePerf, type PerfState } from '../touch/perfGovernor';
-import { photoFileName } from '../touch/photoCard';
+import {
+  frameGroup,
+  groupCaption,
+  groupRarityChips,
+  groupTitle,
+  photoCardLayout,
+  photoFileName,
+} from '../touch/photoCard';
 import { fxStylesFor } from '../touch/touchFx';
 import {
   AFFECTION_PER_LEVEL,
@@ -236,11 +252,19 @@ function Playroom() {
     [capsules, owned, unboxed],
   );
   const matCount = onMat.length + capsulesOnMat.length;
+  // 기본은 한 마리만 크게 만진다. 친구를 꺼내면 여럿이 노는 배치(작게), 다시 하나가 되면 크게 가운데로
+  const solo = matCount <= 1;
+  const soloRef = useRef(solo);
+  soloRef.current = solo;
 
   const [mode, setMode] = useState<RenderMode>(() => (reduced || isJelly3dUnsupported() ? '2d' : 'loading'));
   const [stage, setStage] = useState<JellyStage | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [shelfOpen, setShelfOpen] = useState(false);
+  const shelfOpenRef = useRef(shelfOpen);
+  shelfOpenRef.current = shelfOpen;
+  /** 선반을 닫았을 때 잰 손잡이 위 끝 — 선반이 열려 있는 동안 다시 재도 매트 바닥이 줄지 않게 */
+  const closedShelfTopRef = useRef<number | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [decorOpen, setDecorOpen] = useState(false);
   const [demo, setDemo] = useState<{ spec: DemoSpec; box: { left: number; top: number; size: number } } | null>(null);
@@ -426,11 +450,28 @@ function Playroom() {
     if (!mat) return;
     const r = mat.getBoundingClientRect();
     const hudBottom = (hudRef.current?.getBoundingClientRect().bottom ?? 80) - r.top;
-    const shelfTop = (shelfRef.current?.getBoundingClientRect().top ?? r.bottom - 70) - r.top;
-    const L = computeMatLayout(r.width, r.height, { top: hudBottom, bottom: shelfTop });
+    const measuredShelfTop = (shelfRef.current?.getBoundingClientRect().top ?? r.bottom - 70) - r.top;
+    if (!shelfOpenRef.current) closedShelfTopRef.current = measuredShelfTop;
+    const shelfTop = Math.min(closedShelfTopRef.current ?? measuredShelfTop, r.height - 40);
+    const L = computeMatLayout(r.width, r.height, { top: hudBottom, bottom: shelfTop }, { solo: soloRef.current });
     // 매트가 화면 (0,0)에 붙어 있지 않을 수도 있으니 client 좌표로 옮긴다
     const Lc: MatLayout = { ...L, floorLeft: L.floorLeft + r.left, floorTop: L.floorTop + r.top };
+    const prev = layoutRef.current;
     layoutRef.current = Lc;
+    if (prev && (prev.sprite !== Lc.sprite || prev.floorLeft !== Lc.floorLeft || prev.floorTop !== Lc.floorTop)) {
+      // 배치가 바뀌어도(회전·혼자 ↔ 여럿) 말랑이는 화면 위 같은 자리에 머문다
+      for (const b of worldRef.current.bodies) {
+        const p = remapPoint(prev, Lc, b.x, b.y, b.z);
+        b.x = p.x;
+        b.y = p.y;
+        b.z = p.z;
+        if (b.held) {
+          const h = remapPoint(prev, Lc, b.holdX, b.holdY, b.holdZ);
+          b.holdX = h.x;
+          b.holdY = h.y;
+        }
+      }
+    }
     resizeWorld(worldRef.current, matBounds(Lc));
     setLayout(Lc);
     stageRef.current?.layout();
@@ -487,7 +528,8 @@ function Playroom() {
       const h = kind === 'capsule' ? CAPSULE_R * 2 : ((shape.bottom - shape.top) / VIEWBOX.w) * 0.92;
       const spawn = spawnRef.current.get(key);
       spawnRef.current.delete(key);
-      const spot = spawn ?? { ...findDropSpot(world, r, Math.random), z: reducedRef.current ? 0 : DROP_Z, pop: false };
+      const drop = wantedKeys.length === 1 ? soloSpot(world.bounds) : findDropSpot(world, r, Math.random);
+      const spot = spawn ?? { ...drop, z: reducedRef.current ? 0 : DROP_Z, pop: false };
       const material = kind === 'malang' ? materialOf(rec.character).world : undefined;
       addBody(world, { id: key, x: spot.x, y: spot.y, z: spot.z, r, h, material });
       if (spawn?.pop) {
@@ -500,24 +542,31 @@ function Playroom() {
 
   // ── 꾸미기 소품: 세계의 장애물 + DOM 그림 ─────────────────
 
+  /** 소품 크기 배율 (세계 단위): 혼자 놀 때 말랑이가 커져도 소품은 화면에서 같은 크기 */
+  const propScale = useCallback(() => {
+    const L = layoutRef.current;
+    return L ? L.groupSprite / L.sprite : 1;
+  }, []);
+
   /** 저장된 소품 자리(0..1) → 세계 좌표 (매트 안쪽으로) */
   const propWorld = useCallback((p: PlacedProp) => {
     const { w, d } = worldRef.current.bounds;
-    const r = PROPS[p.id].r;
+    const r = PROPS[p.id].r * propScale();
     const clampTo = (v: number, max: number) => Math.min(Math.max(v, Math.min(r, max / 2)), Math.max(max - r, max / 2));
     return { x: clampTo(p.x * w, w), y: clampTo(p.y * d, d) };
-  }, []);
+  }, [propScale]);
 
   useLayoutEffect(() => {
     if (!layoutRef.current) return;
     const world = worldRef.current;
+    const k = propScale();
     setObstacles(
       world,
-      placedProps.map((p) => ({ id: propKey(p.id), ...propWorld(p), r: PROPS[p.id].r, h: PROPS[p.id].h })),
+      placedProps.map((p) => ({ id: propKey(p.id), ...propWorld(p), r: PROPS[p.id].r * k, h: PROPS[p.id].h * k })),
     );
     for (const rec of recsRef.current.values()) rec.still = false;
     requestFrame();
-  }, [placedProps, layout, propWorld, requestFrame]);
+  }, [placedProps, layout, propWorld, propScale, requestFrame]);
 
   /** 소품 DOM 을 세계 자리로 (끄는 동안은 React 다시 그리기 없이) */
   const placePropEl = useCallback((id: PropId, x: number, y: number) => {
@@ -533,7 +582,7 @@ function Playroom() {
   const hitProp = useCallback((x: number, y: number): PropId | null => {
     const L = layoutRef.current;
     if (!L) return null;
-    const S = L.sprite;
+    const S = L.groupSprite;
     const list = worldRef.current.obstacles
       .map((o) => ({ o, s: toScreen(L, o.x, o.y, 0) }))
       .sort((a, b) => b.s.depth - a.s.depth);
@@ -579,30 +628,49 @@ function Playroom() {
     [],
   );
 
-  // 처음 들어올 때: 주소의 말랑이(도감 "만지러 가기")를 꺼내 두고, 매트가 비었으면 파트너를 꺼낸다
+  // 처음 들어올 때: 기본은 한 마리만 — 주소의 말랑이(도감 "만지러 가기") 또는 파트너 하나만 매트에 둔다.
+  // 친구는 선반에서 더 꺼내 함께 논다
   const openedParamRef = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (openedParamRef.current) return;
     openedParamRef.current = true;
     const st = useGameStore.getState();
     const target = paramId && st.ownedMalangs[paramId] ? paramId : null;
-    const onMatNow = st.playroom.out.filter((id) => st.unboxed.includes(id));
     if (target) {
       if (st.unboxed.includes(target)) {
-        if (!onMatNow.includes(target)) {
-          if (onMatNow.length >= capRef.current && onMatNow[0]) st.putBackMalang(onMatNow[0]);
-          st.takeOutMalang(target, capRef.current);
-        }
+        st.soloMalang(target);
       } else {
-        if (onMatNow.length >= capRef.current && onMatNow[0]) st.putBackMalang(onMatNow[0]);
-        setCapsules((c) => (c.includes(target) ? c : [...c, target]));
+        // 아직 안 연 말랑이: 캡슐 하나만 매트에
+        st.soloMalang(null);
+        setCapsules([target]);
       }
       setFocusId(target);
-    } else if (onMatNow.length === 0) {
-      const first = [st.partnerId, ...st.unboxed].find((id) => id && st.ownedMalangs[id]);
-      if (first) st.takeOutMalang(first, capRef.current);
+    } else {
+      const first = [st.partnerId, ...st.unboxed].find((id) => id && st.ownedMalangs[id] && st.unboxed.includes(id));
+      st.soloMalang(first ?? null);
     }
   }, [paramId]);
+
+  // 혼자 ↔ 여럿이 바뀌면 배치를 다시 잰다 (혼자면 크게). 다시 혼자가 되면 남은 말랑이를 가운데로 데려온다
+  const prevSoloRef = useRef(solo);
+  useLayoutEffect(() => {
+    if (prevSoloRef.current === solo) return;
+    prevSoloRef.current = solo;
+    measure();
+    if (!solo) return;
+    const world = worldRef.current;
+    const only = world.bodies.length === 1 ? world.bodies[0] : undefined;
+    if (only && !only.held) {
+      const c = soloSpot(world.bounds);
+      only.x = c.x;
+      only.y = c.y;
+      only.vx = 0;
+      only.vy = 0;
+      if (!reducedRef.current) only.z = Math.max(only.z, 0.25);
+    }
+    for (const rec of recsRef.current.values()) rec.still = false;
+    requestFrame();
+  }, [solo, measure, requestFrame]);
 
   // 집중한 말랑이: 없거나 매트에서 사라지면 첫 말랑이로
   useEffect(() => {
@@ -1564,56 +1632,90 @@ function Playroom() {
         o.getContext('2d')?.drawImage(c, 0, 0);
         return o;
       };
+      const world = worldRef.current;
       const st = modeRef.current === '3d' ? stageRef.current : null;
       const snap = st?.snapshot() ?? null;
       const fxCanvas = fxCanvasRef.current;
       const fxCopy = fxCanvas ? copy(fxCanvas) : null;
       const mod = await import('../components/touch3d/photo');
-      const layers: PhotoLayer[] = [];
-      // 앞뒤 순서대로 (뒤 말랑이부터)
-      const ordered = recs
-        .map((r) => ({ r, wb: getBody(worldRef.current, r.key) }))
-        .sort((a, b) => (a.wb?.y ?? 0) - (b.wb?.y ?? 0));
-      if (snap && st) layers.push({ image: snap, rect: toRect(st.canvas.getBoundingClientRect()) });
-      for (const { r } of ordered) {
+
+      // 그릴 것들 (뒤에서 앞): 소품 → 3D 스냅샷 → 2D 말랑이 → 입자. 2D 면 소품과 말랑이를 깊이 순서로 섞는다
+      const items: { depth: number; layer: () => Promise<PhotoLayer | null> }[] = [];
+      for (const o of world.obstacles) {
+        const id = o.id.slice('prop:'.length) as PropId;
+        const svg = propElsRef.current.get(id)?.querySelector<SVGSVGElement>('.pr-prop__art svg');
+        if (!svg) continue;
+        const depth = snap ? -1e6 + o.y : toScreen(L, o.x, o.y, 0).depth;
+        items.push({
+          depth,
+          layer: async () => {
+            const r = svg.getBoundingClientRect();
+            const img = await mod.rasterizePlainSvg(svg, r.width, r.height);
+            const px = r.width * mod.PROP_PAD;
+            const py = r.height * mod.PROP_PAD;
+            return { image: img, rect: { x: r.left - px, y: r.top - py, w: r.width + 2 * px, h: r.height + 2 * py } };
+          },
+        });
+      }
+      for (const r of recs) {
         if (snap && r.view) continue;
         const svg = r.els.sprite?.querySelector<SVGSVGElement>('svg');
-        if (!svg) continue;
-        const shape = SHAPES[r.character.shape];
-        const img = await mod.rasterizeVisibleMalang(svg, shape.body, shape.bottom);
-        const sr = svg.getBoundingClientRect();
-        const px = sr.width * mod.RASTER_PAD;
-        const py = sr.height * mod.RASTER_PAD;
-        layers.push({ image: img, rect: { x: sr.left - px, y: sr.top - py, w: sr.width + 2 * px, h: sr.height + 2 * py } });
+        const wb = getBody(world, r.key);
+        if (!svg || !wb) continue;
+        items.push({
+          depth: toScreen(L, wb.x, wb.y, wb.z).depth,
+          layer: async () => {
+            const shape = SHAPES[r.character.shape];
+            const img = await mod.rasterizeVisibleMalang(svg, shape.body, shape.bottom);
+            const sr = svg.getBoundingClientRect();
+            const px = sr.width * mod.RASTER_PAD;
+            const py = sr.height * mod.RASTER_PAD;
+            return { image: img, rect: { x: sr.left - px, y: sr.top - py, w: sr.width + 2 * px, h: sr.height + 2 * py } };
+          },
+        });
+      }
+      if (snap && st) items.push({ depth: -1e5, layer: async () => ({ image: snap, rect: toRect(st.canvas.getBoundingClientRect()) }) });
+      items.sort((a, b) => a.depth - b.depth);
+      const layers: PhotoLayer[] = [];
+      for (const it of items) {
+        const layer = await it.layer();
+        if (layer) layers.push(layer);
       }
       if (fxCopy && fxCanvas) layers.push({ image: fxCopy, rect: toRect(fxCanvas.getBoundingClientRect()) });
-      // 사진 칸은 모든 말랑이를 감싸는 상자에 맞춘다
-      let x0 = Infinity;
-      let y0 = Infinity;
-      let x1 = -Infinity;
-      let y1 = -Infinity;
-      for (const r of recs) {
-        const b = spriteBox(r);
-        if (!b) continue;
-        x0 = Math.min(x0, b.left);
-        y0 = Math.min(y0, b.top);
-        x1 = Math.max(x1, b.left + b.size);
-        y1 = Math.max(y1, b.top + b.size);
-      }
-      const matRect = matRef.current?.getBoundingClientRect();
-      const main = focusChar ?? recs[0]!.character;
+
+      // 사진 칸: 매트 위 모든 말랑이를 감싸는 상자를 칸 비율로 넓힌다 (아무도 잘리지 않게)
+      const boxes = recs
+        .map((r) => spriteBox(r))
+        .filter((b): b is NonNullable<typeof b> => b !== null)
+        .map((b) => ({ x: b.left, y: b.top, w: b.size, h: b.size }));
+      const slot = photoCardLayout('', () => 0.5).photo;
+      const capture = frameGroup(boxes, slot.w / slot.h, L.sprite);
+      const clothRect = matRef.current?.querySelector('.playroom__cloth')?.getBoundingClientRect();
+      const pattern = MAT_PATTERNS[matId];
+
+      // 왼쪽부터 (사진에 보이는 순서로) 이름을 나란히
+      const ordered = recs
+        .map((r) => ({ r, x: getBody(world, r.key)?.x ?? 0 }))
+        .sort((a, b) => a.x - b.x)
+        .map((e) => e.r);
+      const main = focusChar ?? ordered[0]!.character;
       const group = recs.length > 1;
-      const top = recs.reduce((best, r) => (RARITY_META[r.character.rarity].stars > RARITY_META[best.rarity].stars ? r.character : best), main);
       const blob = await mod.composePhoto({
-        id: group ? recs.map((r) => r.id).join('-') : main.id,
-        name: group ? `말랑이 ${recs.length}마리` : main.name,
-        rarity: group ? top.rarity : main.rarity,
+        id: group ? ordered.map((r) => r.id).join('-') : main.id,
+        name: group ? groupTitle(recs.length) : main.name,
+        rarity: main.rarity,
         shiny: group ? false : recs[0]!.shiny,
         level: levelOf(affectionRef.current[main.id] ?? 0),
-        caption: group ? '놀이방에서 함께 놀았어요' : undefined,
+        caption: group ? groupCaption(ordered.map((r) => r.character.name)) : undefined,
         group,
-        jelly: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) },
-        bounds: matRect ? toRect(matRect) : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight },
+        chips: group ? groupRarityChips(ordered.map((r) => r.character.rarity)) : undefined,
+        capture,
+        mat: {
+          tileUrl: matTileDataUrl(matId),
+          tile: pattern.tile,
+          base: pattern.base,
+          origin: { x: clothRect?.left ?? 0, y: clothRect?.top ?? 0 },
+        },
         layers,
       });
       const fileName = photoFileName(group ? 'playroom' : main.id, new Date());
@@ -1704,7 +1806,7 @@ function Playroom() {
           const def = PROPS[p.id];
           const at = propWorld(p);
           const spot = toScreen(layout, at.x, at.y, 0);
-          const w = def.w * layout.sprite;
+          const w = def.w * layout.groupSprite;
           const h = w * def.aspect;
           return (
             <div
@@ -1717,7 +1819,11 @@ function Playroom() {
               data-prop={p.id}
               style={{ transform: `translate3d(${spot.x.toFixed(1)}px, ${spot.y.toFixed(1)}px, 0)`, zIndex: Math.round(spot.depth) }}
             >
-              <span className="pr-prop__shadow" style={{ width: def.r * 2.4 * layout.sprite }} aria-hidden="true" />
+              <span
+                className="pr-prop__shadow"
+                style={{ width: def.r * 2.4 * layout.groupSprite, height: def.r * 0.5 * layout.groupSprite }}
+                aria-hidden="true"
+              />
               <span className="pr-prop__art" style={{ width: w, height: h, left: -w / 2, top: -h }} aria-hidden="true">
                 <PropArt id={p.id} />
               </span>
@@ -1942,6 +2048,7 @@ function Playroom() {
           onToggle={toggleShelf}
           onPick={onShelfPick}
           sealedCount={sealedCount}
+          solo={solo}
         />
       </div>
 

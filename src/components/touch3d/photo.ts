@@ -1,31 +1,42 @@
 /**
- * 말랑 사진 찍기: 지금 화면의 말랑이(3D 캔버스 또는 2D SVG) + 입자 캔버스를 귀여운 카드에 담아 PNG 로 만든다.
- * 배치는 순수 모듈 `touch/photoCard.ts`. 외부 이미지 없이 캔버스로만 그린다.
+ * 말랑 사진 찍기: 지금 매트의 말랑이(3D 캔버스 또는 2D SVG) + 소품 + 입자를 스카이 소다 카드에 담아 PNG 로 만든다.
+ * 배치는 순수 모듈 `touch/photoCard.ts` (담을 영역 frameGroup, 무늬 자리 patternPlacement, 칩 줄·한 줄).
+ * 외부 이미지 없이 캔버스로만 그린다 — 매트 무늬는 코드로 그린 타일 SVG, 소품은 화면의 SVG 를 굽는다.
+ * 글꼴은 CSS 토큰(--font-display / --font-body)을 읽어 화면과 같은 글꼴로 쓴다.
  *
  * 공유는 사용자 입력 안에서만 되므로(iOS) 찍은 뒤 미리보기에서 "공유하기"를 한 번 더 누르게 한다.
  */
 import { RARITY_META, type Rarity } from '../../data/rarity';
 import { createSeededRng } from '../../lib/rng';
 import {
-  captureRect,
-  fitContain,
+  layoutChipRow,
+  patternPlacement,
   photoCardLayout,
+  type RarityChip,
   type Rect,
 } from '../../touch/photoCard';
 import { VIEWBOX } from '../malang/helpers';
 import { rasterizeMalang } from './rasterMalang';
 
-const INK = '#2b2233';
-const PAPER = '#fffdf8';
-const CREAM = '#fff4e2';
-const FONT = '"Cafe24 Ssurround", "Jua", "Apple SD Gothic Neo", sans-serif';
-const RARITY_FALLBACK: Record<Rarity, string> = {
-  common: '#cfc5b6',
-  rare: '#5cc8ff',
-  epic: '#b98cff',
-  legendary: '#ffc02e',
-  mythic: '#ff7aa2',
-  secret: '#2d1b5e',
+/** 캔버스 글꼴 (CSS 토큰을 못 읽을 때). 제목 글꼴은 한 가지 굵기뿐이라 굵게 하지 않는다 */
+const DISPLAY_FALLBACK = "'Jua', 'NanumSquareRound', 'Pretendard Variable', sans-serif";
+const BODY_FALLBACK = "'NanumSquareRound', 'Pretendard Variable', sans-serif";
+
+/** 스카이 소다 색 (global.css 토큰과 같은 값) */
+const INK = '#22304a';
+const SUB = '#56657f';
+const PRIMARY = '#ff9fb8';
+const PRIMARY_DEEP = '#f27a9a';
+const PRIMARY_TEXT = '#b8456f';
+const RAINBOW = ['#ffd0dc', '#fff1b8', '#d4f5df', '#d6e9ff', '#e6dcff'] as const;
+
+const RARITY_FALLBACK: Record<Rarity, { color: string; tint: string; ink: string }> = {
+  common: { color: '#c3cddb', tint: '#eef2f7', ink: '#56657f' },
+  rare: { color: '#7db8ff', tint: '#dcebff', ink: '#2a64b0' },
+  epic: { color: '#b592ff', tint: '#eee6ff', ink: '#6d42c9' },
+  legendary: { color: '#ffc53d', tint: '#fff0c2', ink: '#8a5b00' },
+  mythic: { color: '#ff8fb5', tint: '#ffe3ec', ink: '#a83d68' },
+  secret: { color: '#ffd66b', tint: '#2d1b5e', ink: '#fff6d6' },
 };
 
 /** 화면 위 한 겹: 그림과 그 그림이 놓인 client 좌표 */
@@ -34,31 +45,55 @@ export interface PhotoLayer {
   rect: Rect;
 }
 
+/** 매트 무늬: 타일 한 장(data: URL)과 화면에서 타일이 시작하는 자리 */
+export interface PhotoMat {
+  tileUrl: string;
+  /** 타일 한 변 (CSS px) */
+  tile: number;
+  base: string;
+  /** 화면에서 매트 천의 왼쪽 위 (client px) — 무늬가 화면과 같은 자리에 오게 */
+  origin: { x: number; y: number };
+}
+
 export interface PhotoInput {
   id: string;
+  /** 제목 (한 마리면 이름, 여럿이면 "말랑이 N마리와 함께") */
   name: string;
   rarity: Rarity;
   shiny: boolean;
   level: number;
-  /** 여럿이 함께 찍었을 때 애정 단계 대신 쓰는 한 줄 (3단계 단체 사진 틀이 이 자리를 키운다) */
+  /** 여럿이 함께 찍었을 때 애정 단계 대신 쓰는 한 줄 (이름 나열) */
   caption?: string;
-  /** 여럿이 함께 (등급 딱지 없이, 밝은 바탕) */
+  /** 여럿이 함께: 등급 칩을 등급별 마릿수로 (chips) */
   group?: boolean;
-  /** 말랑이 상자 (client 좌표) — 사진 칸을 여기에 맞춘다 */
-  jelly: Rect;
-  /** 잘라낼 수 있는 범위 (client 좌표, 무대) */
-  bounds: Rect;
+  chips?: RarityChip[];
+  /** 사진 칸에 담을 영역 (client 좌표, touch/photoCard.frameGroup) */
+  capture: Rect;
+  mat: PhotoMat;
+  /** 뒤에서 앞 순서 */
   layers: PhotoLayer[];
 }
 
-function rarityColor(r: Rarity): string {
+function cssVar(name: string, fallback: string): string {
   try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(RARITY_META[r].colorVar).trim();
-    if (/^#[0-9a-f]{6}$/i.test(v)) return v;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (v) return v;
   } catch {
     // 스타일을 못 읽으면 기본값
   }
-  return RARITY_FALLBACK[r];
+  return fallback;
+}
+
+function rarityColors(r: Rarity): { color: string; tint: string; ink: string } {
+  const fb = RARITY_FALLBACK[r];
+  if (r === 'secret') return fb;
+  const hex = (v: string, d: string) => (/^#[0-9a-f]{6}$/i.test(v) ? v : d);
+  const base = RARITY_META[r].colorVar;
+  return {
+    color: hex(cssVar(base, fb.color), fb.color),
+    tint: hex(cssVar(`${base}-tint`, fb.tint), fb.tint),
+    ink: hex(cssVar(`${base}-ink`, fb.ink), fb.ink),
+  };
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, r: Rect, radius: number) {
@@ -76,7 +111,7 @@ function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
     const a = -Math.PI / 2 + (i * Math.PI) / 5;
-    const rr = i % 2 === 0 ? r : r * 0.48;
+    const rr = i % 2 === 0 ? r : r * 0.5;
     ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
   }
   ctx.closePath();
@@ -94,41 +129,24 @@ function heart(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
   ctx.closePath();
 }
 
-/** 풍선 글씨: 잉크 그림자 → 잉크 외곽선 → 흰 글자 (.page-title 과 같은 느낌) */
-function balloonText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, fill = '#ffffff') {
-  ctx.font = `${size}px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = size * 0.2;
-  ctx.strokeStyle = INK;
-  ctx.fillStyle = INK;
-  ctx.strokeText(text, x, y + size * 0.09);
-  ctx.fillText(text, x, y + size * 0.09);
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = fill;
-  ctx.fillText(text, x, y);
+/** 글자가 maxW 안에 들어가는 크기 (한 줄) */
+function fitFont(ctx: CanvasRenderingContext2D, text: string, font: (size: number) => string, size: number, maxW: number): number {
+  let s = size;
+  for (let i = 0; i < 12; i++) {
+    ctx.font = font(s);
+    if (ctx.measureText(text).width <= maxW) break;
+    s = Math.floor(s * 0.92);
+  }
+  return s;
 }
 
-/** 지금 화면을 사진 칸 크기의 캔버스로 모은다 */
-function gatherScene(input: PhotoInput): HTMLCanvasElement {
-  const cap = captureRect(input.jelly, input.bounds);
-  const scale = 3;
-  const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(cap.w * scale));
-  c.height = Math.max(1, Math.round(cap.h * scale));
-  const ctx = c.getContext('2d');
-  if (!ctx) return c;
-  for (const layer of input.layers) {
-    ctx.drawImage(
-      layer.image,
-      (layer.rect.x - cap.x) * scale,
-      (layer.rect.y - cap.y) * scale,
-      layer.rect.w * scale,
-      layer.rect.h * scale,
-    );
-  }
-  return c;
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image load failed'));
+    img.src = src;
+  });
 }
 
 /** 2D 사진에서 그림 상자 밖으로 번지는 몫 (전설 이상 오라가 네모로 잘리지 않게) — 상자 폭 대비 한쪽 */
@@ -144,6 +162,43 @@ export async function rasterizeVisibleMalang(svg: SVGSVGElement, bodyPath: strin
   return rasterizeMalang(svg, { part: 'full', rect, size: 900, bodyPath, bottom });
 }
 
+/** 소품 그림을 넓힐 몫 (한쪽, 상자 대비) — 별 조명의 빛처럼 그림 밖으로 번지는 부분까지 */
+export const PROP_PAD = 0.25;
+
+/**
+ * 색을 모두 속성으로 적은 SVG(소품 그림)를 이미지로. 상자(w×h px)보다 한쪽마다 PROP_PAD 만큼 넓게 굽는다 —
+ * 놓을 때도 같은 비율로 넓혀 놓는다.
+ */
+export async function rasterizePlainSvg(svg: SVGSVGElement, w: number, h: number): Promise<HTMLCanvasElement> {
+  const scale = 3;
+  const vb = svg.viewBox.baseVal;
+  const px = vb.width * PROP_PAD;
+  const py = vb.height * PROP_PAD;
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('viewBox', `${vb.x - px} ${vb.y - py} ${vb.width + 2 * px} ${vb.height + 2 * py}`);
+  const cw = Math.max(1, Math.round(w * (1 + 2 * PROP_PAD) * scale));
+  const ch = Math.max(1, Math.round(h * (1 + 2 * PROP_PAD) * scale));
+  clone.setAttribute('width', String(cw));
+  clone.setAttribute('height', String(ch));
+  const xml = new XMLSerializer().serializeToString(clone);
+  const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`);
+  const c = document.createElement('canvas');
+  c.width = cw;
+  c.height = ch;
+  c.getContext('2d')?.drawImage(img, 0, 0, cw, ch);
+  return c;
+}
+
+/** 칩 하나: 옅은 등급색 알약 + 별 + 글자 (색 + 아이콘 + 글자) */
+interface ChipSpec {
+  text: string;
+  /** null 이면 무지개 (반짝) */
+  bg: string | null;
+  fg: string;
+  icon: string | null;
+}
+
 export async function composePhoto(input: PhotoInput): Promise<Blob> {
   const rng = createSeededRng([...input.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7));
   const L = photoCardLayout(input.name, rng);
@@ -152,168 +207,157 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   canvas.height = L.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('no 2d context');
+  const display = cssVar('--font-display', DISPLAY_FALLBACK);
+  const body = cssVar('--font-body', BODY_FALLBACK);
+  const lineText = input.caption ?? `애정 Lv.${input.level}`;
   try {
-    await document.fonts?.load(`${L.name.size}px ${FONT}`);
+    await Promise.all([
+      document.fonts?.load(`${L.name.size}px ${display}`, `${input.name}말랑 뽑기방`),
+      document.fonts?.load(`800 ${L.line.size}px ${body}`, `${lineText}반짝${RARITY_META[input.rarity].label}마리`),
+    ]);
   } catch {
     // 글꼴을 못 받아도 기본 글꼴로 찍는다
   }
-  const color = rarityColor(input.rarity);
-  // 일반 등급 색(베이지)은 번지면 탁해 보여서 딸기우유색으로
-  const glowColor = input.rarity === 'common' || input.group ? '#ffb3c8' : color;
-  const meta = RARITY_META[input.rarity];
-  const dark = input.rarity === 'secret' && !input.group;
 
-  // 배경 + 스프링클
-  ctx.fillStyle = CREAM;
+  // 바탕: 하늘 그라데이션 + 비눗방울
+  const sky = ctx.createLinearGradient(0, 0, 0, L.height);
+  sky.addColorStop(0, '#cfe6ff');
+  sky.addColorStop(0.6, '#eaf4ff');
+  sky.addColorStop(1, '#ffffff');
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, L.width, L.height);
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 12;
-  for (const s of L.sprinkles) {
-    ctx.strokeStyle = s.color;
-    ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 3;
+  for (const b of L.bubbles) {
     ctx.beginPath();
-    ctx.moveTo(s.x - Math.cos(s.angle) * 14, s.y - Math.sin(s.angle) * 14);
-    ctx.lineTo(s.x + Math.cos(s.angle) * 14, s.y + Math.sin(s.angle) * 14);
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
 
-  // 카드: 같은 잉크 아랫단 + 종이 + 잉크 테두리
-  roundRect(ctx, { ...L.card, y: L.card.y + 14 }, 56);
-  ctx.fillStyle = INK;
-  ctx.fill();
-  roundRect(ctx, L.card, 56);
-  ctx.fillStyle = PAPER;
-  ctx.fill();
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-
-  // 사진 칸: 등급 색이 은은하게 번지는 바탕
+  // 카드: 흰 면 + 파란 기운 그림자 (테두리 없음)
   ctx.save();
-  roundRect(ctx, L.photo, 36);
-  ctx.clip();
-  const bg = ctx.createLinearGradient(0, L.photo.y, 0, L.photo.y + L.photo.h);
-  if (dark) {
-    bg.addColorStop(0, '#3b2a78');
-    bg.addColorStop(1, '#140a2a');
-  } else {
-    bg.addColorStop(0, '#fffaf0');
-    bg.addColorStop(1, CREAM);
-  }
-  ctx.fillStyle = bg;
-  ctx.fillRect(L.photo.x, L.photo.y, L.photo.w, L.photo.h);
-  const glow = ctx.createRadialGradient(
-    L.photo.x + L.photo.w / 2,
-    L.photo.y + L.photo.h * 0.55,
-    0,
-    L.photo.x + L.photo.w / 2,
-    L.photo.y + L.photo.h * 0.55,
-    L.photo.w * 0.55,
-  );
-  glow.addColorStop(0, `${glowColor}99`);
-  glow.addColorStop(1, `${glowColor}00`);
-  ctx.fillStyle = glow;
-  ctx.fillRect(L.photo.x, L.photo.y, L.photo.w, L.photo.h);
-  if (dark) {
-    // 시크릿: 밤하늘 작은 별
-    ctx.fillStyle = '#fff6c9';
-    for (const s of L.sprinkles.slice(0, 24)) {
-      const x = L.photo.x + (s.x / L.width) * L.photo.w;
-      const y = L.photo.y + (s.y / L.height) * L.photo.h;
-      star(ctx, x, y, 5 + (s.angle % 1) * 5);
-      ctx.fill();
-    }
-  }
-  // 접시
-  ctx.fillStyle = 'rgba(43,34,51,0.12)';
-  ctx.beginPath();
-  ctx.ellipse(L.photo.x + L.photo.w / 2, L.photo.y + L.photo.h * 0.86, L.photo.w * 0.34, 30, 0, 0, Math.PI * 2);
+  ctx.shadowColor = 'rgba(26, 64, 128, 0.16)';
+  ctx.shadowBlur = 44;
+  ctx.shadowOffsetY = 14;
+  roundRect(ctx, L.card, 56);
+  ctx.fillStyle = '#ffffff';
   ctx.fill();
-  const scene = gatherScene(input);
-  const at = fitContain(scene.width, scene.height, L.photo, 0.03);
-  ctx.drawImage(scene, at.x, at.y, at.w, at.h);
   ctx.restore();
-  roundRect(ctx, L.photo, 36);
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = INK;
+
+  // 사진 칸: 고른 매트 무늬(화면과 같은 자리·배율) → 소품·말랑이·입자
+  ctx.save();
+  roundRect(ctx, L.photo, 40);
+  ctx.clip();
+  ctx.fillStyle = input.mat.base;
+  ctx.fillRect(L.photo.x, L.photo.y, L.photo.w, L.photo.h);
+  const place = patternPlacement(L.photo, input.capture, input.mat.origin);
+  try {
+    const tile = await loadImage(input.mat.tileUrl);
+    const pattern = ctx.createPattern(tile, 'repeat');
+    if (pattern) {
+      const k = (place.scale * input.mat.tile) / Math.max(1, tile.naturalWidth || input.mat.tile);
+      pattern.setTransform(new DOMMatrix([k, 0, 0, k, place.x, place.y]));
+      ctx.fillStyle = pattern;
+      ctx.fillRect(L.photo.x, L.photo.y, L.photo.w, L.photo.h);
+    }
+  } catch {
+    // 무늬를 못 그리면 바탕색만
+  }
+  // 아래쪽이 살짝 도톰해 보이는 그늘
+  const shade = ctx.createLinearGradient(0, L.photo.y, 0, L.photo.y + L.photo.h);
+  shade.addColorStop(0, 'rgba(26,64,128,0)');
+  shade.addColorStop(0.72, 'rgba(26,64,128,0)');
+  shade.addColorStop(1, 'rgba(26,64,128,0.08)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(L.photo.x, L.photo.y, L.photo.w, L.photo.h);
+  for (const layer of input.layers) {
+    ctx.drawImage(
+      layer.image,
+      L.photo.x + (layer.rect.x - input.capture.x) * place.scale,
+      L.photo.y + (layer.rect.y - input.capture.y) * place.scale,
+      layer.rect.w * place.scale,
+      layer.rect.h * place.scale,
+    );
+  }
+  ctx.restore();
+  roundRect(ctx, L.photo, 40);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(26,64,128,0.08)';
   ctx.stroke();
 
-  // 등급 딱지: 색 + 별 + 글자 (단체 사진은 없음)
-  if (!input.group) drawBadge();
-  function drawBadge() {
-  if (!ctx) return;
-  const label = meta.label;
-  ctx.font = `44px ${FONT}`;
-  const starCount = Math.min(6, meta.stars);
-  const textW = ctx.measureText(label).width;
-  const badgeW = Math.max(L.badge.w, 40 + textW + 18 + starCount * 30 + 24);
-  const badge = { ...L.badge, w: badgeW };
-  roundRect(ctx, { ...badge, y: badge.y + 7 }, badge.h / 2);
+  // 등급 칩: 한 마리면 등급 + 반짝, 여럿이면 등급별 마릿수
+  const chipFor = (r: Rarity, count: number): ChipSpec => {
+    const c = rarityColors(r);
+    return { text: RARITY_META[r].label + (count > 1 ? ` ${count}마리` : ''), bg: c.tint, fg: c.ink, icon: c.color };
+  };
+  const chips: ChipSpec[] = input.group
+    ? (input.chips ?? []).map((c) => chipFor(c.rarity, c.count))
+    : [chipFor(input.rarity, 1), ...(input.shiny ? [{ text: '반짝', bg: null, fg: INK, icon: null }] : [])];
+  const chipFont = `800 30px ${body}`;
+  ctx.font = chipFont;
+  const widths = chips.map((c) => ctx.measureText(c.text).width + (c.icon ? 78 : 50));
+  const xs = layoutChipRow(widths, L.chips.x, L.chips.maxRight, 12);
+  xs.forEach((x, i) => {
+    const c = chips[i];
+    const w = widths[i];
+    if (!c || w === undefined) return;
+    const r: Rect = { x, y: L.chips.y - L.chips.h / 2, w, h: L.chips.h };
+    ctx.save();
+    ctx.shadowColor = 'rgba(26,64,128,0.18)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    roundRect(ctx, r, r.h / 2);
+    if (c.bg === null) {
+      const g = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0);
+      RAINBOW.forEach((col, k) => g.addColorStop(k / (RAINBOW.length - 1), col));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = c.bg;
+    ctx.fill();
+    ctx.restore();
+    let tx = r.x + 25;
+    if (c.icon) {
+      star(ctx, r.x + 38, L.chips.y, 14);
+      ctx.fillStyle = c.icon;
+      ctx.fill();
+      tx = r.x + 60;
+    }
+    ctx.font = chipFont;
+    ctx.fillStyle = c.fg;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c.text, tx, L.chips.y + 2);
+  });
+
+  // 이름: 제목 글꼴, 잉크색, 외곽선 없음
+  const nameSize = fitFont(ctx, input.name, (s) => `${s}px ${display}`, L.name.size, L.card.w - 100);
+  ctx.font = `${nameSize}px ${display}`;
   ctx.fillStyle = INK;
-  ctx.fill();
-  roundRect(ctx, badge, badge.h / 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-  ctx.fillStyle = dark ? '#fff6c9' : INK;
-  ctx.textAlign = 'left';
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, badge.x + 32, badge.y + badge.h / 2 + 2);
-  for (let i = 0; i < starCount; i++) {
-    star(ctx, badge.x + 32 + textW + 30 + i * 30, badge.y + badge.h / 2, 12);
-    ctx.fillStyle = dark ? '#ffd23f' : '#ffffff';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = INK;
-    ctx.stroke();
-  }
-  if (input.shiny) {
-    const sx = badge.x + badge.w + 16;
-    const shinyRect = { x: sx, y: badge.y + 8, w: 132, h: badge.h - 16 };
-    const g = ctx.createLinearGradient(sx, 0, sx + shinyRect.w, 0);
-    ['#ff8fab', '#ffd23f', '#7ed957', '#5cc8ff', '#b98cff'].forEach((c, i) => g.addColorStop(i / 4, c));
-    roundRect(ctx, shinyRect, shinyRect.h / 2);
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = INK;
-    ctx.stroke();
-    ctx.font = `34px ${FONT}`;
-    ctx.fillStyle = INK;
-    ctx.textAlign = 'center';
-    ctx.fillText('반짝', sx + shinyRect.w / 2, shinyRect.y + shinyRect.h / 2 + 2);
-  }
-  }
-
-  // 이름 (풍선 글씨)
-  balloonText(ctx, input.name, L.name.x, L.name.y, L.name.size);
+  ctx.fillText(input.name, L.name.x, L.name.y);
 
   // 애정 단계(또는 단체 사진 한 줄): 하트 + 글자
-  ctx.font = `${L.level.size}px ${FONT}`;
-  const levelText = input.caption ?? `애정 Lv.${input.level}`;
-  const lw = ctx.measureText(levelText).width;
-  const hx = L.level.x - lw / 2 - 30;
-  heart(ctx, hx, L.level.y, 24);
-  ctx.fillStyle = '#ff7aa2';
+  const lineSize = fitFont(ctx, lineText, (s) => `800 ${s}px ${body}`, L.line.size, L.card.w - 180);
+  ctx.font = `800 ${lineSize}px ${body}`;
+  const lw = ctx.measureText(lineText).width;
+  const hx = L.line.x - lw / 2 - 20;
+  heart(ctx, hx, L.line.y, lineSize * 0.46);
+  ctx.fillStyle = PRIMARY;
   ctx.fill();
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = PRIMARY_DEEP;
   ctx.stroke();
-  ctx.fillStyle = INK;
+  ctx.fillStyle = SUB;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(levelText, hx + 36, L.level.y + 2);
+  ctx.fillText(lineText, hx + 30, L.line.y + 2);
 
   // 가게 이름
-  ctx.font = `${L.logo.size}px ${FONT}`;
+  ctx.font = `${L.logo.size}px ${display}`;
   ctx.textAlign = 'right';
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = INK;
-  ctx.strokeText('말랑 뽑기방', L.logo.x, L.logo.y);
-  ctx.fillStyle = '#ff8fab';
+  ctx.fillStyle = PRIMARY_TEXT;
   ctx.fillText('말랑 뽑기방', L.logo.x, L.logo.y);
 
   return new Promise<Blob>((resolve, reject) => {
