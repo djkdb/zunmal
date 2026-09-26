@@ -1,0 +1,311 @@
+.mm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── 위 줄: 합치기 사다리 + 다음 말랑이 ── */
+.mm__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.mm__ladder {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm__rung {
+  display: flex;
+  align-items: flex-end;
+  opacity: 0.45;
+}
+
+.mm__rung.is-reached {
+  opacity: 1;
+}
+
+.mm__rung .malang {
+  display: block;
+}
+
+.mm__next {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.mm__next-label {
+  font-family: var(--font-display);
+  font-size: var(--fs-s);
+  color: var(--ink-soft);
+}
+
+.mm__next-bubble {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 30%, #e8f6ff 70%);
+}
+
+/* ── 유리병 ── */
+.mm__jar {
+  position: relative;
+  /* 300:420 비율 유지 — 화면이 낮으면 폭을 줄여 버튼이 항상 보이도록 */
+  width: min(100%, 380px, max(190px, calc((100dvh - 260px) * 300 / 420)));
+  aspect-ratio: 300 / 420;
+  margin: 0 auto;
+  border: var(--line) solid var(--ink);
+  border-top-width: 0;
+  border-radius: 10px 10px 44px 44px;
+  overflow: hidden;
+  background:
+    /* 유리 광택 줄 */
+    linear-gradient(90deg, transparent 5%, rgba(255, 255, 255, 0.75) 6%, rgba(255, 255, 255, 0.75) 8.5%, transparent 9.5%),
+    linear-gradient(180deg, #f4fbff 0%, #e3f3ff 60%, #d6ecfb 100%);
+  box-shadow: inset -10px 0 0 rgba(92, 200, 255, 0.12);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: grab;
+}
+
+/* 병 입구 테두리 */
+.mm__jar::before {
+  content: '';
+  position: absolute;
+  inset: 0 -3px auto;
+  height: 12px;
+  border: var(--line) solid var(--ink);
+  border-radius: 8px;
+  background: var(--shelf);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mm__jar.is-danger {
+  background:
+    linear-gradient(90deg, transparent 5%, rgba(255, 255, 255, 0.75) 6%, rgba(255, 255, 255, 0.75) 8.5%, transparent 9.5%),
+    linear-gradient(180deg, #ffe3ea 0%, #ffeef3 30%, #e3f3ff 70%, #d6ecfb 100%);
+}
+
+.mm__world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.mm__danger {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 3px dashed rgba(232, 82, 127, 0.45);
+}
+
+.is-danger .mm__danger {
+  border-top-color: var(--danger);
+  animation: mm-blink 0.4s steps(2, jump-none) infinite;
+}
+
+.mm__guide {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed rgba(43, 34, 51, 0.28);
+  transition: opacity 0.15s;
+}
+
+.mm__guide.is-waiting {
+  opacity: 0;
+}
+
+.mm__held {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  transition: opacity 0.15s;
+}
+
+.mm__held.is-waiting {
+  opacity: 0;
+}
+
+.mm__held .malang,
+.mm__body .malang {
+  display: block;
+}
+
+.mm__body {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 몸통 중심 기준으로 구른다 (BODY_CENTER_Y) */
+  transform-origin: 50% 57%;
+  will-change: transform;
+}
+
+/* 병 속에서는 바닥 그림자를 지운다 (쌓이면 어색하다) */
+.mm__body .malang-body-group > ellipse:first-child {
+  display: none;
+}
+
+.mm__squash {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 90%;
+}
+
+.mm__squash.is-born {
+  animation: mm-born 0.42s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+/* 합치기 팡: 퍼지는 고리 + 점수 */
+.mm__burst {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+}
+
+.mm__ring {
+  position: absolute;
+  inset: 0;
+  border: 4px solid currentColor;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--ink);
+  opacity: 0;
+  animation: mm-ring 0.45s ease-out;
+}
+
+.mm__burst.is-big .mm__ring {
+  border-width: 7px;
+  animation-duration: 0.7s;
+}
+
+.mm__points {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  -webkit-text-stroke: 5px var(--ink);
+  paint-order: stroke fill;
+  transform: translate(-50%, -50%);
+  animation: mm-rise 0.8s ease-out forwards;
+}
+
+.mm__burst.is-big .mm__points {
+  font-size: 26px;
+  color: var(--lemon);
+}
+
+/* ── 아래 조작 버튼 ── */
+.mm__controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.mm__arrow {
+  flex: none;
+  width: 56px;
+  min-height: 52px;
+  padding: 6px 0 9px;
+  touch-action: manipulation;
+}
+
+.mm__drop {
+  flex: 1 1 auto;
+  max-width: 220px;
+  min-height: 52px;
+  padding-left: 12px;
+  padding-right: 12px;
+  touch-action: manipulation;
+}
+
+@keyframes mm-born {
+  0% {
+    transform: scale(0.55);
+  }
+  55% {
+    transform: scale(1.18, 0.86);
+  }
+  80% {
+    transform: scale(0.95, 1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes mm-ring {
+  0% {
+    opacity: 1;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes mm-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -60%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(1);
+  }
+}
+
+@keyframes mm-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.mm--reduced .mm__squash.is-born,
+.mm--reduced .mm__ring,
+.mm--reduced .is-danger .mm__danger {
+  animation: none;
+}
+
+.mm--reduced .mm__points {
+  animation: none;
+  transform: translate(-50%, -80%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm__squash.is-born,
+  .mm__ring,
+  .is-danger .mm__danger {
+    animation: none;
+  }
+}
