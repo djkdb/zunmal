@@ -39,7 +39,6 @@ export function GachaPage() {
     (best, it) => (isEpicRarity(it.rarity) && (!best || rarityRank(it.rarity) > rarityRank(best.rarity)) ? it : best),
     undefined,
   );
-  const isMulti = (pending?.items.length ?? 0) > 1;
   // 같은 프레임 안에서 버튼이 여러 번 눌려도(연타) 뽑기가 한 번만 일어나도록 즉시 잠근다.
   // state는 다음 렌더까지 반영되지 않으므로 ref로 막는다. 결과 창을 닫을 때만 풀린다.
   const lockRef = useRef(false);
@@ -114,8 +113,8 @@ export function GachaPage() {
       <div className="gacha-page__machine">
         <GachaMachine
           run={run}
-          // 10연은 결과 카드가 뒤집힐 때 결과음을 낸다. 신화 이상은 전체 화면 연출이 직접 낸다.
-          quietFanfare={!!epicItem || isMulti}
+          // 결과음은 플레이어가 결과 창에서 가장 좋은 캡슐을 직접 열 때 낸다. 신화 이상은 전체 화면 연출이 직접 낸다.
+          quietFanfare
           onOpened={() => (epicItem ? setShowEpic(true) : setShowResult(true))}
         />
         <div className="gacha-page__actions">
