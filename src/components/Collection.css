@@ -467,3 +467,21 @@
     background-position: -130% 0;
   }
 }
+
+/* 거의 빈 도감: 선반 앞에 붙인 안내 쪽지 + 행동 하나 */
+.collection__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border: 2.5px dashed rgba(43, 34, 51, 0.35);
+  border-radius: var(--radius-slot);
+  background: rgba(255, 252, 245, 0.85);
+}
+
+.collection__empty-text {
+  font-size: var(--fs-s);
+  line-height: 1.45;
+  word-break: keep-all;
+}
