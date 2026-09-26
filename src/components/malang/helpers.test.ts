@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { auraLevel, avoidFace, hexToHsl, hslToHex, hueRotate, rayPaths, shinyColor, sparklePath } from './helpers';
+import {
+  auraLevel,
+  avoidFace,
+  deepen,
+  hexToHsl,
+  hslToHex,
+  hueRotate,
+  lifeTiming,
+  rayPaths,
+  shinyColor,
+  sparklePath,
+} from './helpers';
 
 describe('color helpers', () => {
   it('round-trips hex through HSL', () => {
@@ -54,5 +65,37 @@ describe('geometry helpers', () => {
       70,
     );
     expect(kept).toEqual([{ x: 20, y: 100 }]);
+  });
+});
+
+describe('deepen', () => {
+  it('darkens a pastel without turning it grey', () => {
+    const base = '#ffb8c9';
+    const [, s0, l0] = hexToHsl(base);
+    const [, s1, l1] = hexToHsl(deepen(base, 0.3));
+    expect(l1).toBeLessThan(l0);
+    expect(s1).toBeGreaterThanOrEqual(s0 - 0.01);
+  });
+});
+
+describe('lifeTiming', () => {
+  it('is deterministic per seed and stays in range', () => {
+    expect(lifeTiming('abc')).toEqual(lifeTiming('abc'));
+    for (let i = 0; i < 200; i++) {
+      const t = lifeTiming(`«r${i}»`);
+      expect(t.breatheDur).toBeGreaterThanOrEqual(2.4);
+      expect(t.breatheDur).toBeLessThanOrEqual(3.2);
+      expect(t.blinkDur).toBeGreaterThanOrEqual(3);
+      expect(t.blinkDur).toBeLessThanOrEqual(5);
+      expect(t.breatheDelay).toBeLessThanOrEqual(0);
+      expect(t.breatheDelay).toBeGreaterThanOrEqual(-t.breatheDur);
+      expect(t.blinkDelay).toBeLessThanOrEqual(0);
+      expect(t.blinkDelay).toBeGreaterThanOrEqual(-t.blinkDur);
+    }
+  });
+
+  it('spreads sequential ids so a grid does not breathe in sync', () => {
+    const phases = new Set(Array.from({ length: 32 }, (_, i) => Math.round(lifeTiming(`«r${i}»`).breatheDelay * 10)));
+    expect(phases.size).toBeGreaterThan(12);
   });
 });

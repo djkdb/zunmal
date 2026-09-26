@@ -21,14 +21,53 @@
   paint-order: stroke;
 }
 
-.malang-body-group {
+.malang-mouth {
+  stroke-width: 2.6;
+}
+
+/* 작은 크기(≤64px): 선이 1px 밑으로 가늘어지지 않게 */
+.malang--compact .malang-stroke {
+  stroke-width: 3.6;
+}
+
+.malang--compact .malang-mouth {
+  stroke-width: 3.2;
+}
+
+.malang-body-group,
+.malang-poke,
+.malang-eyes {
   transform-box: fill-box;
   transform-origin: 50% 100%;
 }
 
-/* 말랑말랑 숨쉬기 */
+.malang-eyes {
+  transform-origin: 50% 50%;
+}
+
+/*
+ * 화면 밖에서는 안쪽 애니메이션을 멈춘다 (malang/motion.ts가 data-offscreen을 붙인다).
+ * svg 자신은 멈추지 않는다: 부모 연출이 svg를 화면 안으로 옮기는 중일 수 있다.
+ */
+.malang[data-offscreen] * {
+  animation-play-state: paused !important;
+}
+
+/*
+ * 말랑말랑 숨쉬기: 바닥을 딛고 위로 살짝 늘었다 내려앉는다 (넓이 거의 유지).
+ * 주기·위상은 인스턴스마다 다르게 (Malang.tsx가 --malang-breathe-* 를 넣는다).
+ */
 .malang--idle .malang-body-group {
-  animation: malang-breathe 2.6s ease-in-out infinite;
+  animation: malang-breathe var(--malang-breathe-dur, 2.8s) ease-in-out var(--malang-breathe-delay, 0s) infinite;
+}
+
+/* 눈 깜빡임: 주기의 마지막 3.8% 동안 감았다 뜬다 (주기 3~5초 → 약 0.12~0.19초) */
+.malang--blink .malang-eyes {
+  animation: malang-blink var(--malang-blink-dur, 4s) linear var(--malang-blink-delay, 0s) infinite;
+}
+
+.malang--blink2 .malang-eyes {
+  animation: malang-blink-double var(--malang-blink-dur, 4s) linear var(--malang-blink-delay, 0s) infinite;
 }
 
 .malang--bounce .malang-body-group {
@@ -39,9 +78,9 @@
   animation: malang-wiggle 0.6s ease-in-out infinite;
 }
 
-/* 한 번 눌리는 반응 (key 교체로 재생) */
-.malang--squish .malang-body-group {
-  animation: malang-squish 0.28s ease-out 1;
+/* 한 번 눌렸다 스프링처럼 출렁이는 반응 (key 교체로 재생). poke prop과 같은 모양이다 */
+.malang--squish .malang-poke {
+  animation: malang-squish 0.62s linear 1;
 }
 
 .malang-float {
@@ -213,10 +252,47 @@
 @keyframes malang-breathe {
   0%,
   100% {
-    transform: scale(1, 1);
+    transform: scale(1.012, 0.988);
   }
   50% {
-    transform: scale(1.04, 0.95);
+    transform: scale(0.976, 1.026);
+  }
+}
+
+@keyframes malang-blink {
+  0%,
+  96.2% {
+    transform: scaleY(1);
+  }
+  97.4%,
+  98% {
+    transform: scaleY(0.1);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* 가끔은 두 번 연달아 */
+@keyframes malang-blink-double {
+  0%,
+  90.2% {
+    transform: scaleY(1);
+  }
+  91.4%,
+  92% {
+    transform: scaleY(0.1);
+  }
+  94%,
+  96.2% {
+    transform: scaleY(1);
+  }
+  97.4%,
+  98% {
+    transform: scaleY(0.1);
+  }
+  100% {
+    transform: scaleY(1);
   }
 }
 
@@ -249,15 +325,27 @@
   }
 }
 
+/* malang/motion.ts의 POKE_KEYFRAMES와 같은 곡선 */
 @keyframes malang-squish {
   0% {
     transform: scale(1, 1);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.4, 1);
   }
-  35% {
-    transform: scale(1.18, 0.78);
+  16% {
+    transform: scale(1.18, 0.82);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1);
   }
-  70% {
-    transform: scale(0.94, 1.08);
+  38% {
+    transform: scale(0.9, 1.11);
+    animation-timing-function: ease-in-out;
+  }
+  58% {
+    transform: scale(1.05, 0.955);
+    animation-timing-function: ease-in-out;
+  }
+  78% {
+    transform: scale(0.985, 1.015);
+    animation-timing-function: ease-in-out;
   }
   100% {
     transform: scale(1, 1);
