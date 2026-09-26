@@ -6,6 +6,7 @@ import malangJump from './malang-jump';
 import popUp from './pop-up';
 import stack from './stack';
 import balloonFloat from './balloon-float';
+import malangTrain from './malang-train';
 import type { MiniGame } from './types';
 
 /**
@@ -21,6 +22,7 @@ export const MINI_GAMES: readonly MiniGame[] = [
   popUp,
   stack,
   balloonFloat,
+  malangTrain,
 ];
 
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
