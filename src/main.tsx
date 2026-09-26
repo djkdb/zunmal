@@ -10,9 +10,12 @@ import './styles/global.css';
 import './app/restoreSave';
 import { App } from './app/App';
 import { captureInstallPrompt, registerServiceWorker } from './app/installPrompt';
+import { captureCouponLink } from './app/couponLink';
 
 // 홈 화면 추가: 설치 이벤트는 앱이 뜨자마자 오므로 렌더 전에 붙잡는다
 captureInstallPrompt();
+// 선물 링크(?c=코드): 라우터가 주소를 읽기 전에 코드를 꺼내고 주소에서 지운다
+captureCouponLink();
 registerServiceWorker();
 
 const container = document.getElementById('root');

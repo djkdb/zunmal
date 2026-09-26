@@ -73,6 +73,12 @@
   flex: none;
 }
 
+.coupon__hint {
+  margin: 6px 0 0;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
+
 .coupon__msg {
   margin: 8px 0 0;
   font-size: var(--fs-xs);

@@ -1,4 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { clearPendingCoupon, usePendingCoupon } from '../app/couponLink';
 import { sfx } from '../audio/sfx';
 import { COUPON_ERROR_TEXT } from '../economy/coupons';
 import { haptic } from '../lib/haptics';
@@ -14,6 +15,11 @@ export function CouponBox() {
   const [code, setCode] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // 선물 링크(?c=)로 들어왔으면 칸을 미리 채운다. 홈 말풍선에서 받으면 다시 비운다
+  const pending = usePendingCoupon();
+  useEffect(() => {
+    setCode(pending ?? '');
+  }, [pending]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -24,6 +30,7 @@ export function CouponBox() {
       if (buttonRef.current) flyCoins(buttonRef.current, res.coupon.coins);
       setMessage({ ok: true, text: `${res.coupon.title} ${res.coupon.coins.toLocaleString()}코인을 받았어요!` });
       setCode('');
+      clearPendingCoupon();
     } else {
       sfx.fail();
       setMessage({ ok: false, text: COUPON_ERROR_TEXT[res.reason] });
@@ -59,6 +66,7 @@ export function CouponBox() {
           받기
         </button>
       </div>
+      <p className="coupon__hint">인스타 공지·DM에서 받은 코드를 넣어요</p>
       {message && (
         <p className={`coupon__msg${message.ok ? ' is-ok' : ''}`} role="status">
           {message.text}

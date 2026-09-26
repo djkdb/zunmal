@@ -134,6 +134,19 @@ export function PetIcon(props: IconProps) {
   );
 }
 
+/** 톡 누르는 손가락: 위를 가리키는 검지 + 끝의 누름 표시 — "눌러 봐요" 안내용 */
+export function TapIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M13 17 V7.5 a2.6 2.6 0 0 1 5.2 0 V15 l4.6 0.9 a2.8 2.8 0 0 1 2.3 3.1 l-0.8 5.4 a4.6 4.6 0 0 1 -4.6 4 h-4.6 a4.6 4.6 0 0 1 -3.7 -1.9 l-4.2 -5.6 a2.3 2.3 0 0 1 3.5 -3 Z"
+        fill="#fff"
+      />
+      <path d="M9.5 6 l-2.6 -1.4 M21.7 6 l2.6 -1.4 M8.6 10.5 h-2.8" strokeWidth={1.8} />
+    </Svg>
+  );
+}
+
 /** iOS 공유 버튼 모양 (네모 + 위 화살표) — 홈 화면 추가 안내용 */
 export function ShareIcon(props: IconProps) {
   return (

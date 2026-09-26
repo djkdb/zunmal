@@ -247,3 +247,114 @@
     animation: none;
   }
 }
+
+/* 코인이 모자랄 때의 주인공 버튼: 두 줄이라 글자를 조금 줄인다 */
+.home__action--earn {
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ── 파트너를 누를 수 있다는 표시 ─────────────────────────────
+ * 놀이방에 한 번도 안 가 본 플레이어에게만: 말랑이 오른쪽 위 작은 말풍선 + 오른쪽 아래 손가락.
+ * 모두 절대 위치라 무대 높이를 늘리지 않는다(360×640 첫 화면 규칙). */
+.home__partner {
+  display: block;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home__partner:focus-visible {
+  outline-offset: 6px;
+}
+
+.home__touch-bubble {
+  position: absolute;
+  top: 6%;
+  left: 82%;
+  padding: 5px 12px 6px;
+  border-radius: var(--radius-pill) var(--radius-pill) var(--radius-pill) 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.home__touch-finger {
+  position: absolute;
+  right: -6%;
+  bottom: 2%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--ink);
+  transform: rotate(-28deg);
+  transform-origin: 50% 20%;
+  filter: drop-shadow(0 3px 5px rgba(26, 64, 128, 0.2));
+  animation: home-finger-tap 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes home-finger-tap {
+  0%,
+  55%,
+  100% {
+    transform: rotate(-28deg) translate(0, 0);
+  }
+  70% {
+    transform: rotate(-28deg) translate(0, -6px) scale(0.92);
+  }
+}
+
+/* 손가락이 누를 때 말랑이도 살짝 눌린다 */
+.home__partner.has-hint .malang {
+  animation: home-partner-press 1.8s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+@keyframes home-partner-press {
+  0%,
+  60%,
+  100% {
+    scale: 1 1;
+  }
+  72% {
+    scale: 1.05 0.93;
+  }
+  84% {
+    scale: 0.98 1.03;
+  }
+}
+
+/* ── 선물 링크 쿠폰 말풍선 ───────────────────────────────── */
+.home__gift {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 16px;
+  background: var(--lemon-tint);
+  box-shadow:
+    0 0 0 2px var(--lemon),
+    var(--shadow-btn);
+}
+
+.home__gift-text {
+  font-weight: 800;
+}
+
+.home__gift-btn {
+  min-height: 44px;
+  padding-inline: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home__touch-finger,
+  .home__partner.has-hint .malang {
+    animation: none;
+  }
+}

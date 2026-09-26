@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
@@ -6,7 +6,11 @@ import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
 import { CouponBox } from '../components/CouponBox';
 import { InstallCard } from '../components/InstallCard';
-import { CloseIcon } from '../components/icons';
+import { CloseIcon, TapIcon } from '../components/icons';
+import { clearPendingCoupon, usePendingCoupon } from '../app/couponLink';
+import { checkCoupon } from '../economy/coupons';
+import { flyCoins } from '../lib/coinFx';
+import { haptic } from '../lib/haptics';
 import { CHARACTERS, getCharacter } from '../data/characters';
 import { RARITY_META } from '../data/rarity';
 import { DAILY_CAP, PARTNER_RARITY_BONUS, PULL_COUNT, PULL_PRICE } from '../economy/config';
@@ -78,6 +82,35 @@ function GoalBubble({ goal, coins, onDismiss }: { goal: NextGoal; coins: number;
   );
 }
 
+/**
+ * 선물 링크(?c=코드)로 들어왔을 때: 파트너 말풍선 자리에 "선물 쿠폰이 도착했어요" + 받기.
+ * 받기는 쿠폰 칸과 같은 store.redeemCoupon — 저장당 한 번.
+ */
+function GiftBubble({ code, onDone }: { code: string; onDone(text: string): void }) {
+  const redeemCoupon = useGameStore((s) => s.redeemCoupon);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const redeem = () => {
+    const res = redeemCoupon(code);
+    clearPendingCoupon();
+    if (!res.ok) {
+      sfx.fail();
+      return;
+    }
+    sfx.success();
+    haptic('success');
+    if (buttonRef.current) flyCoins(buttonRef.current, res.coupon.coins);
+    onDone(`${res.coupon.title} ${res.coupon.coins.toLocaleString()}코인을 받았어요!`);
+  };
+  return (
+    <div className="home__bubble home__gift" role="status">
+      <span className="home__gift-text">선물 쿠폰이 도착했어요</span>
+      <button ref={buttonRef} type="button" className="btn btn--lemon btn--small home__gift-btn" onClick={redeem}>
+        받기
+      </button>
+    </div>
+  );
+}
+
 export function HomePage() {
   const partnerId = useGameStore((s) => s.partnerId);
   const owned = useGameStore((s) => s.ownedMalangs);
@@ -89,6 +122,27 @@ export function HomePage() {
   const dailyLeft = Math.max(0, DAILY_CAP - dailyEarned);
   const bonus = partner ? Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100) : 0;
   const greeting = useGreeting(coins, dailyLeft, bonus);
+  const canPull = coins >= PULL_PRICE.single;
+
+  // 놀이방에 아직 안 가 본(아무도 안 쓰다듬은) 플레이어: 파트너를 누르면 만질 수 있다고 알려 준다
+  const affection = useGameStore((s) => s.affection);
+  const neverPetted = Object.values(affection).every((v) => v <= 0);
+
+  // 선물 링크 쿠폰: 받을 수 있을 때만 말풍선. 이미 받은 쿠폰이면 조용히 버린다
+  const pendingCoupon = usePendingCoupon();
+  const redeemed = useGameStore((s) => s.redeemedCoupons);
+  const giftCheck = pendingCoupon ? checkCoupon(pendingCoupon, redeemed, new Date()) : null;
+  const giftReady = giftCheck?.ok === true;
+  const giftUsed = giftCheck !== null && !giftCheck.ok && giftCheck.reason === 'used';
+  useEffect(() => {
+    if (giftUsed) clearPendingCoupon();
+  }, [giftUsed]);
+  const [giftDone, setGiftDone] = useState<string | null>(null);
+  useEffect(() => {
+    if (!giftDone) return;
+    const t = window.setTimeout(() => setGiftDone(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [giftDone]);
 
   const totalPulls = useGameStore((s) => s.totalPulls);
   const records = useGameStore((s) => s.miniGameRecords);
@@ -128,12 +182,23 @@ export function HomePage() {
 
       {partner && (
         <div className="home__stage">
-          {showGoal && goal ? (
+          {pendingCoupon && giftReady ? (
+            <GiftBubble code={pendingCoupon} onDone={setGiftDone} />
+          ) : giftDone ? (
+            <p className="home__bubble" role="status">
+              {giftDone}
+            </p>
+          ) : showGoal && goal ? (
             <GoalBubble goal={goal} coins={coins} onDismiss={dismissGoal} />
           ) : (
             <p className="home__bubble">{greeting}</p>
           )}
-          <Link to="/touch" className="home__partner" aria-label={`${partner.name} 만지러 가기`}>
+          <Link
+            to="/touch"
+            className={`home__partner${neverPetted ? ' has-hint' : ''}`}
+            aria-label={`말랑이 만지러 가기, ${partner.name}`}
+            onClick={() => sfx.button()}
+          >
             <Malang
               character={partner}
               size={190}
@@ -142,6 +207,16 @@ export function HomePage() {
               aura="auto"
               shiny={partnerShiny && (owned[partner.id]?.shinyCount ?? 0) > 0}
             />
+            {neverPetted && (
+              <>
+                <span className="home__touch-bubble" aria-hidden="true">
+                  꾹 눌러 봐요
+                </span>
+                <span className="home__touch-finger" aria-hidden="true">
+                  <TapIcon size={34} />
+                </span>
+              </>
+            )}
           </Link>
           <div className="home__pedestal" aria-hidden="true" />
           <p className="home__name">
@@ -150,15 +225,34 @@ export function HomePage() {
         </div>
       )}
 
+      {/* 뽑을 코인이 없으면 "코인 벌기"가 주인공(딸기우유) — 누를 수 있는 다음 행동이 먼저 보이게 */}
       <div className="home__actions">
-        <Link to="/gacha" className="btn btn--primary btn--big home__action" onClick={() => sfx.button()}>
-          캡슐 뽑기
-          {coachStep === 'pull' && <span className="home__sticker">첫 뽑기</span>}
-        </Link>
-        <Link to="/play" className="btn btn--secondary btn--big home__action" onClick={() => sfx.button()}>
-          미니게임
-          {coachStep === 'play' && <span className="home__sticker">코인 모으기</span>}
-        </Link>
+        {canPull ? (
+          <>
+            <Link to="/gacha" className="btn btn--primary btn--big home__action" onClick={() => sfx.button()}>
+              캡슐 뽑기
+              {coachStep === 'pull' && <span className="home__sticker">첫 뽑기</span>}
+            </Link>
+            <Link to="/play" className="btn btn--secondary btn--big home__action" onClick={() => sfx.button()}>
+              미니게임
+              {coachStep === 'play' && <span className="home__sticker">코인 모으기</span>}
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link to="/play" className="btn btn--primary btn--big home__action home__action--earn" onClick={() => sfx.button()}>
+              <span>
+                미니게임으로
+                <br />
+                코인 벌기
+              </span>
+            </Link>
+            <Link to="/gacha" className="btn btn--secondary btn--big home__action" onClick={() => sfx.button()}>
+              캡슐 뽑기
+              {coachStep === 'pull' && <span className="home__sticker">첫 뽑기</span>}
+            </Link>
+          </>
+        )}
       </div>
 
       <InstallCard slot="in-app" />
