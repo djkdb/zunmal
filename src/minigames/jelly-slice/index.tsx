@@ -770,6 +770,7 @@ const jellySlice: MiniGame = {
   controls: '스와이프 또는 탭 (터치, 마우스)',
   durationMs: CONFIG.durationMs,
   blurb: '쓱쓱 자르기',
+  tags: ['pick', 'feel'],
   icon: JellySliceIcon,
   Component: JellySliceGame,
 };

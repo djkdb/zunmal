@@ -455,6 +455,7 @@ const capsuleCatch: MiniGame = {
   controls: '화면 드래그, 방향키 또는 A/D, 화면 버튼',
   durationMs: CONFIG.durationMs,
   blurb: '좌우로 받기',
+  tags: ['feel', 'focus'],
   icon: CapsuleCatchIcon,
   Component: CapsuleCatchGame,
 };

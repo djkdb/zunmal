@@ -468,6 +468,7 @@ const malangTrain: MiniGame = {
   controls: '밀기, 화살표 버튼, 방향키 또는 WASD',
   durationMs: CONFIG.durationMs,
   blurb: '기차 늘리기',
+  tags: ['focus', 'record'],
   icon: MalangTrainIcon,
   Component: MalangTrainGame,
 };

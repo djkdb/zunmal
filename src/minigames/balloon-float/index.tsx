@@ -698,6 +698,7 @@ const balloonFloat: MiniGame = {
   controls: '화면 누르기, Space 또는 위쪽 방향키, 떠오르기 버튼',
   durationMs: CONFIG.durationMs,
   blurb: '톡톡 날아가기',
+  tags: ['pick', 'record'],
   icon: BalloonFloatIcon,
   Component: BalloonFloatGame,
 };

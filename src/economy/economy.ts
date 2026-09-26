@@ -25,6 +25,8 @@ export interface RewardInput {
 export interface RewardBreakdown {
   score: number;
   baseCoins: number;
+  /** 파트너 희귀도 보너스 비율 (0~0.5). 결과 화면이 "+10%"로 보여 준다 */
+  partnerBonusRate: number;
   partnerBonus: number;
   /** 판당 상한 적용 후 */
   earnedCoins: number;
@@ -65,6 +67,7 @@ export function computeReward(input: RewardInput): RewardBreakdown {
   return {
     score,
     baseCoins,
+    partnerBonusRate: bonusRate,
     partnerBonus,
     earnedCoins,
     grantedCoins,

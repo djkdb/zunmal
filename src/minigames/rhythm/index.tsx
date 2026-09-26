@@ -279,6 +279,7 @@ const rhythm: MiniGame = {
   controls: '터치, 클릭, Space, Enter, F 또는 J',
   durationMs: CONFIG.chartMs,
   blurb: '박자 맞춰 톡',
+  tags: ['focus'],
   icon: RhythmIcon,
   Component: RhythmGame,
 };

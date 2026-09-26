@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINI_GAMES, RECOMMENDED_GAME_ID, getMiniGame } from './registry';
 import { formatPlayLength } from './types';
+import { GAME_MULTIPLIERS, GAME_TYPICAL_SCORES } from '../economy/config';
 
 describe('minigame registry', () => {
   it('id는 고유한 kebab-case', () => {
@@ -24,6 +25,13 @@ describe('minigame registry', () => {
       expect(g.blurb.length).toBeGreaterThan(0);
       // "2분 떨어뜨려 합치기" 정도까지 — 360px 두 칸 카드에서 한 줄
       expect(`${formatPlayLength(g.durationMs)} ${g.blurb}`.length).toBeLessThanOrEqual(11);
+    }
+  });
+
+  it('모든 게임은 코인 배율과 보통 점수(로비 예상 코인)를 가진다', () => {
+    for (const g of MINI_GAMES) {
+      expect(GAME_MULTIPLIERS[g.id], g.id).toBeGreaterThan(0);
+      expect(GAME_TYPICAL_SCORES[g.id], g.id).toBeGreaterThan(0);
     }
   });
 

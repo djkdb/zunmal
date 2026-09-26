@@ -94,6 +94,32 @@ export const GAME_MULTIPLIERS: Readonly<Record<string, number>> = {
 };
 
 /**
+ * 미니게임 로비의 "약 N코인"을 계산할 보통 점수 (한 번도 안 해 본 게임에만 쓴다. 해 본 게임은 내 기록으로 계산).
+ * 위 GAME_MULTIPLIERS 주석의 "보통" 점수 범위 가운데 값 — 모두 100~150코인 근처가 되어야 한다(economy/playReward.test.ts).
+ * 배율을 바꾸면 여기도 함께 본다.
+ */
+export const GAME_TYPICAL_SCORES: Readonly<Record<string, number>> = {
+  'button-malang': 230,
+  'capsule-catch': 350,
+  matching: 275,
+  rhythm: 500,
+  'malang-jump': 300,
+  'pop-up': 375,
+  stack: 250,
+  'balloon-float': 250,
+  'malang-train': 250,
+  'jelly-slice': 425,
+  'malang-sling': 650,
+  'malang-merge': 500,
+};
+
+/** 보통 점수가 없는 게임: 기본 배율로 약 125코인이 되는 점수 */
+export const DEFAULT_TYPICAL_SCORE = 250;
+
+/** 로비의 예상 코인은 이 단위로 반올림해 "약 120코인"처럼 보인다 (정확한 값인 척하지 않게) */
+export const EXPECTED_COINS_ROUNDING = 10;
+
+/**
  * 파트너 말랑이 희귀도 보너스 (baseCoins에 곱해지는 추가 비율).
  * 수집 동기를 주되 게임 실력보다 크게 작용하지 않도록 신화 30%, 시크릿 50%.
  */

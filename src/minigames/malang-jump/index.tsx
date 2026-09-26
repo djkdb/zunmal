@@ -569,6 +569,7 @@ const malangJump: MiniGame = {
   controls: '화면 왼쪽/오른쪽 누르기, 방향키 또는 A/D, 화면 버튼',
   durationMs: CONFIG.durationMs,
   blurb: '통통 오르기',
+  tags: ['record'],
   icon: MalangJumpIcon,
   Component: MalangJumpGame,
 };

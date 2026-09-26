@@ -341,6 +341,7 @@ const popUp: MiniGame = {
   controls: '터치, 클릭, QWE ASD ZXC 또는 숫자 1~9',
   durationMs: CONFIG.durationMs,
   blurb: '쏙 나오면 톡',
+  tags: ['feel'],
   icon: PopUpIcon,
   Component: PopUpGame,
 };

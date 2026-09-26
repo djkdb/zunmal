@@ -24,6 +24,15 @@ export interface MiniGameProps {
   sfx: Sfx;
 }
 
+/**
+ * 로비 분류 딱지 (게임 meta에 직접 적는다). "짧게"는 적지 않는다 — 한 판 길이(durationMs)에서 계산한다(`minigames/lobby.ts`).
+ *  - pick: 추천 (처음 해 봐도 재미있고 오래 붙잡게 되는 게임)
+ *  - feel: 손맛 (누르고 긋고 날리는 촉감이 주인공)
+ *  - record: 기록 도전 (오래 버티거나 높이 쌓아 최고 기록을 깨는 맛)
+ *  - focus: 집중 (박자·기억·계획을 차분히 맞추는 게임)
+ */
+export type MiniGameTag = 'pick' | 'feel' | 'record' | 'focus';
+
 export interface MiniGame {
   /** kebab-case 고유 id. 폴더명, 저장 키, 경제 배율 키로 사용 */
   id: string;
@@ -38,6 +47,8 @@ export interface MiniGame {
   durationMs: number;
   /** 로비 카드 한 줄: 무엇을 하는 게임인지 짧은 동작 (예: "톡톡 누르기"). 앞에 길이가 붙는다 */
   blurb: string;
+  /** 로비 분류 딱지 (하나 이상). 로비 위 칩 줄로 걸러 본다 */
+  tags: readonly MiniGameTag[];
 }
 
 /** 로비 카드용 길이 글자: 60초 이하·1분 단위가 아니면 초, 나머지는 분 ("20초", "90초", "2분") */

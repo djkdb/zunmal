@@ -590,6 +590,7 @@ const malangMerge: MiniGame = {
   controls: '끌어서 위치를 정하고 손을 떼기, 화살표 키와 Space 또는 Enter',
   durationMs: CONFIG.durationMs,
   blurb: '떨어뜨려 합치기',
+  tags: ['pick', 'focus', 'record'],
   icon: MalangMergeIcon,
   Component: MalangMergeGame,
 };

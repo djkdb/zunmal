@@ -247,6 +247,7 @@ const matching: MiniGame = {
   controls: '터치, 클릭, Tab과 방향키로 고르고 Enter 또는 Space',
   durationMs: CONFIG.durationMs,
   blurb: '카드 짝 찾기',
+  tags: ['focus'],
   icon: MatchingIcon,
   Component: MatchingGame,
 };

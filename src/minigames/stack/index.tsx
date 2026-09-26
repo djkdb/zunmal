@@ -463,6 +463,7 @@ const stack: MiniGame = {
   controls: '화면 터치, 클릭, Space 또는 Enter',
   durationMs: CONFIG.durationMs,
   blurb: '딱 맞춰 쌓기',
+  tags: ['focus', 'record'],
   icon: StackIcon,
   Component: StackGame,
 };

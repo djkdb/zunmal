@@ -197,6 +197,7 @@ const buttonMalang: MiniGame = {
   controls: '터치, 클릭, Space 또는 Enter',
   durationMs: CONFIG.durationMs,
   blurb: '톡톡 누르기',
+  tags: ['feel', 'record'],
   icon: ButtonMalangIcon,
   Component: ButtonMalangGame,
 };

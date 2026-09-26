@@ -947,6 +947,7 @@ const malangSling: MiniGame = {
   controls: '뒤로 끌었다 놓기, 또는 방향키로 조준하고 Space',
   durationMs: CONFIG.durationMs,
   blurb: '새총으로 날리기',
+  tags: ['pick', 'feel'],
   icon: SlingIcon,
   Component: MalangSlingGame,
 };
