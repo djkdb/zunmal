@@ -1,0 +1,86 @@
+.js {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.js__sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.js__lives {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.js__lives svg {
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.js__lives svg.is-lost {
+  transform: scale(0.8);
+  opacity: 0.55;
+}
+
+.js--reduced .js__lives svg {
+  transition: none;
+}
+
+.js__combo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-s);
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.js__combo strong {
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--berry-deep);
+}
+
+/* 도마 위 젤리 가게 진열대: 평평한 외곽선 패널 */
+.js__stage {
+  position: relative;
+  /* 2:3 비율 유지 — 화면이 낮으면 폭을 줄여 안내 문구까지 보이도록 */
+  width: min(100%, 400px, max(180px, calc((100dvh - 230px) * 2 / 3)));
+  margin: 0 auto;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(255, 122, 162, 0.18) 0 3px, transparent 4px) 0 0 / 46px 46px,
+    radial-gradient(circle at 70% 64%, rgba(92, 200, 255, 0.2) 0 3px, transparent 4px) 0 0 / 58px 58px,
+    linear-gradient(180deg, #fff0f5 0%, #fffcf5 62%, var(--cream-deep) 100%);
+}
+
+.js__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 480;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: crosshair;
+}
+
+.js__end span {
+  padding: 0 12px;
+  font-size: 2.4rem;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.js__help {
+  margin: 0;
+  text-align: center;
+  line-height: 1.35;
+}
