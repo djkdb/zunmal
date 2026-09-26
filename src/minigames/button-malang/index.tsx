@@ -62,7 +62,7 @@ function ButtonMalangGame({ partner, partnerShiny, onFinish, onExit, sfx }: Mini
     sfx.success();
     buddyRef.current?.setBase('happy');
     const id = window.setTimeout(
-      () => onFinish({ score: s.score, stats: { 누른횟수: s.hits, 최대콤보: s.maxCombo, 실수: s.misses } }),
+      () => onFinish({ score: s.score, stats: { '누른 횟수': s.hits, '최대 콤보': s.maxCombo, 실수: s.misses } }),
       reduced ? 200 : 800,
     );
     return () => window.clearTimeout(id);
@@ -195,6 +195,8 @@ const buttonMalang: MiniGame = {
   name: '말랑 누르기',
   description: '20초 동안 말랑이를 최대한 많이 눌러요. 연속으로 누르면 콤보 보너스!',
   controls: '터치, 클릭, Space 또는 Enter',
+  durationMs: CONFIG.durationMs,
+  blurb: '톡톡 누르기',
   icon: ButtonMalangIcon,
   Component: ButtonMalangGame,
 };

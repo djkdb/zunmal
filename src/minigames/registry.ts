@@ -32,6 +32,9 @@ export const MINI_GAMES: readonly MiniGame[] = [
   buttonMalang,
 ];
 
+/** 처음 온 플레이어에게 하나만 추천하는 게임 (첫 사용자 시험에서 가장 재미있다고 꼽힌 합치기) */
+export const RECOMMENDED_GAME_ID = 'malang-merge';
+
 export function getMiniGame(id: string | undefined): MiniGame | undefined {
   return MINI_GAMES.find((g) => g.id === id);
 }

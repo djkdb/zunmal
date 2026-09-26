@@ -83,6 +83,36 @@
   line-height: 1.2;
 }
 
+.lobby__tile-line {
+  color: var(--sub);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* 처음 온 플레이어에게 하나만: 딸기우유 링 + 레몬 스티커 */
+.lobby__tile.is-recommended {
+  box-shadow:
+    0 0 0 3px var(--primary),
+    var(--shadow-btn);
+}
+
+.lobby__tile-pick {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px 3px;
+  border-radius: var(--radius-pill);
+  background: var(--lemon);
+  box-shadow: 0 3px 8px rgba(26, 64, 128, 0.16);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 .lobby__tile-best {
   margin-top: auto;
   padding: 1px 10px;

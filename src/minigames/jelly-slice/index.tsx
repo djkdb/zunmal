@@ -632,7 +632,7 @@ function JellySliceGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGa
         const s = stateRef.current;
         onFinish({
           score: s.score,
-          stats: { 자른젤리: s.sliced, 황금젤리: s.goldSliced, 최대콤보: s.maxCombo, 가시폭탄: s.bombsHit },
+          stats: { '자른 젤리': s.sliced, '황금 젤리': s.goldSliced, '최대 콤보': s.maxCombo, '가시 폭탄': s.bombsHit },
         });
       },
       reduced ? 300 : 1100,
@@ -768,6 +768,8 @@ const jellySlice: MiniGame = {
   name: '말랑 슬라이스',
   description: '45초 동안 튀어 오르는 젤리를 쓱 그어 잘라요. 가시 폭탄은 피하세요!',
   controls: '스와이프 또는 탭 (터치, 마우스)',
+  durationMs: CONFIG.durationMs,
+  blurb: '쓱쓱 자르기',
   icon: JellySliceIcon,
   Component: JellySliceGame,
 };

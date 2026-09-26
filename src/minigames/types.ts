@@ -5,7 +5,7 @@ import type { Character } from '../data/characters';
 export interface MiniGameResultPayload {
   /** 게임 점수. 코인 환산은 economy 모듈이 담당한다. */
   score: number;
-  /** 결과 화면에 보여줄 부가 통계 (예: { 최대콤보: 32 }) */
+  /** 결과 화면에 보여줄 부가 통계 (예: { '최대 콤보': 32 }) */
   stats?: Record<string, number>;
 }
 
@@ -34,4 +34,15 @@ export interface MiniGame {
   Component: ComponentType<MiniGameProps>;
   /** 조작 방법 한 줄 안내 (선택) */
   controls?: string;
+  /** 한 판 길이(대략, ms). 로비 카드에 "20초"처럼 보인다 — 게임 config 값을 그대로 넘긴다 */
+  durationMs: number;
+  /** 로비 카드 한 줄: 무엇을 하는 게임인지 짧은 동작 (예: "톡톡 누르기"). 앞에 길이가 붙는다 */
+  blurb: string;
+}
+
+/** 로비 카드용 길이 글자: 60초 이하·1분 단위가 아니면 초, 나머지는 분 ("20초", "90초", "2분") */
+export function formatPlayLength(ms: number): string {
+  const sec = Math.max(1, Math.round(ms / 1000));
+  if (sec > 60 && sec % 60 === 0) return `${sec / 60}분`;
+  return `${sec}초`;
 }

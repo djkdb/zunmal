@@ -121,7 +121,7 @@ function RhythmGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGamePr
       reportedRef.current = true;
       onFinish({
         score: s.score,
-        stats: { 퍼펙트: s.perfect, 좋아요: s.good, 놓침: s.miss, 최대콤보: s.maxCombo },
+        stats: { 퍼펙트: s.perfect, 좋아요: s.good, 놓침: s.miss, '최대 콤보': s.maxCombo },
       });
     }, reduced ? 200 : 800);
     return () => window.clearTimeout(id);
@@ -277,6 +277,8 @@ const rhythm: MiniGame = {
   name: '리듬 누르기',
   description: '점점 빨라지는 박자에 맞춰 말랑이를 눌러요.',
   controls: '터치, 클릭, Space, Enter, F 또는 J',
+  durationMs: CONFIG.chartMs,
+  blurb: '박자 맞춰 톡',
   icon: RhythmIcon,
   Component: RhythmGame,
 };

@@ -380,7 +380,7 @@ function StackGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGamePro
         if (reportedRef.current) return;
         reportedRef.current = true;
         const s = stateRef.current;
-        onFinish({ score: s.score, stats: { 층수: s.floors, 딱맞음: s.perfects, 최대연속: s.maxPerfectStreak } });
+        onFinish({ score: s.score, stats: { 층수: s.floors, '딱 맞음': s.perfects, '최대 연속': s.maxPerfectStreak } });
       },
       reduced ? 250 : 1100,
     );
@@ -461,6 +461,8 @@ const stack: MiniGame = {
   name: '말랑 쌓기',
   description: '움직이는 젤리 블록을 딱 맞게 내려놓아 높이 쌓아요.',
   controls: '화면 터치, 클릭, Space 또는 Enter',
+  durationMs: CONFIG.durationMs,
+  blurb: '딱 맞춰 쌓기',
   icon: StackIcon,
   Component: StackGame,
 };

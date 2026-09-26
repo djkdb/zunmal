@@ -414,7 +414,7 @@ function MalangJumpGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGa
       onFinish({
         score: s.score,
         stats: {
-          최고높이: Math.floor(s.maxHeight / CONFIG.heightPerPoint),
+          '최고 높이': Math.floor(s.maxHeight / CONFIG.heightPerPoint),
           사탕: s.candiesCollected,
           스프링: s.springs,
         },
@@ -567,6 +567,8 @@ const malangJump: MiniGame = {
   name: '말랑 점프',
   description: '발판을 밟고 통통 튀어 60초 동안 최대한 높이 올라가요.',
   controls: '화면 왼쪽/오른쪽 누르기, 방향키 또는 A/D, 화면 버튼',
+  durationMs: CONFIG.durationMs,
+  blurb: '통통 오르기',
   icon: MalangJumpIcon,
   Component: MalangJumpGame,
 };

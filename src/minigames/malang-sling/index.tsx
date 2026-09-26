@@ -789,7 +789,7 @@ function MalangSlingGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniG
         if (reportedRef.current) return;
         reportedRef.current = true;
         const s = stateRef.current;
-        onFinish({ score: s.score, stats: { 심술사탕: s.pops, 부순블록: s.blocksBroken, 클리어: s.stagesCleared } });
+        onFinish({ score: s.score, stats: { '심술 사탕': s.pops, '부순 블록': s.blocksBroken, 클리어: s.stagesCleared } });
       },
       reduced ? 250 : 1100,
     );
@@ -945,6 +945,8 @@ const malangSling: MiniGame = {
   name: '말랑 새총',
   description: '새총으로 말랑이를 날려 심술 사탕 탑을 무너뜨려요.',
   controls: '뒤로 끌었다 놓기, 또는 방향키로 조준하고 Space',
+  durationMs: CONFIG.durationMs,
+  blurb: '새총으로 날리기',
   icon: SlingIcon,
   Component: MalangSlingGame,
 };

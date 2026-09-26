@@ -86,8 +86,8 @@ function MatchingGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniGame
         if (reported.current) return;
         reported.current = true;
         const s = stateRef.current;
-        const stats: Record<string, number> = { 찾은짝: s.pairsFound, 시도: s.attempts, 최대연속: s.maxCombo };
-        if (s.cleared) stats['남은초'] = secsLeftAtClear.current;
+        const stats: Record<string, number> = { '찾은 짝': s.pairsFound, 시도: s.attempts, '최대 연속': s.maxCombo };
+        if (s.cleared) stats['남은 초'] = secsLeftAtClear.current;
         onFinish({ score: s.score, stats });
       },
       reduced ? 300 : 1100,
@@ -245,6 +245,8 @@ const matching: MiniGame = {
   name: '짝 맞추기',
   description: '카드를 두 장씩 뒤집어 같은 말랑이 짝을 모두 찾아요.',
   controls: '터치, 클릭, Tab과 방향키로 고르고 Enter 또는 Space',
+  durationMs: CONFIG.durationMs,
+  blurb: '카드 짝 찾기',
   icon: MatchingIcon,
   Component: MatchingGame,
 };

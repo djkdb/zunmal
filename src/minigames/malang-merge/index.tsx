@@ -353,7 +353,7 @@ function MalangMergeGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniG
         if (reportedRef.current) return;
         reportedRef.current = true;
         const s = stateRef.current;
-        onFinish({ score: s.score, stats: { 합치기: s.merges, 최고단계: s.maxTier + 1, 떨어뜨림: s.drops } });
+        onFinish({ score: s.score, stats: { 합치기: s.merges, '최고 단계': s.maxTier + 1, 떨어뜨림: s.drops } });
       },
       reduced ? 300 : 1300,
     );
@@ -588,6 +588,8 @@ const malangMerge: MiniGame = {
   name: '말랑 합치기',
   description: '같은 말랑이끼리 닿으면 더 큰 말랑이가 돼요. 병이 넘치지 않게 합쳐 보세요.',
   controls: '끌어서 위치를 정하고 손을 떼기, 화살표 키와 Space 또는 Enter',
+  durationMs: CONFIG.durationMs,
+  blurb: '떨어뜨려 합치기',
   icon: MalangMergeIcon,
   Component: MalangMergeGame,
 };

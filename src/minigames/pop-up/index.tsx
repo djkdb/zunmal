@@ -152,7 +152,7 @@ function PopUpGame({ partner, partnerShiny = false, onFinish, onExit, sfx }: Min
       if (reported.current) return;
       reported.current = true;
       const s = stateRef.current;
-      onFinish({ score: s.score, stats: { 톡톡: s.boops, 황금: s.golds, 가시: s.spikes, 최대콤보: s.maxCombo } });
+      onFinish({ score: s.score, stats: { 톡톡: s.boops, 황금: s.golds, 가시: s.spikes, '최대 콤보': s.maxCombo } });
     }, reduced ? 200 : 800);
     return () => window.clearTimeout(id);
   }, [finished, onFinish, reduced, sfx]);
@@ -339,6 +339,8 @@ const popUp: MiniGame = {
   name: '쏙쏙 말랑',
   description: '컵에서 쏙 올라온 말랑이를 톡 누르고 가시 말랑은 피해요.',
   controls: '터치, 클릭, QWE ASD ZXC 또는 숫자 1~9',
+  durationMs: CONFIG.durationMs,
+  blurb: '쏙 나오면 톡',
   icon: PopUpIcon,
   Component: PopUpGame,
 };

@@ -573,7 +573,7 @@ function BalloonFloatGame({ partner, partnerShiny, onFinish, onExit, sfx }: Mini
         reportedRef.current = true;
         const s = stateRef.current;
         if (!s) return;
-        onFinish({ score: s.score, stats: { 기둥: s.passed, 별: s.starsCollected, 남은풍선: s.balloons } });
+        onFinish({ score: s.score, stats: { 기둥: s.passed, 별: s.starsCollected, '남은 풍선': s.balloons } });
       },
       reduced ? 250 : 1100,
     );
@@ -696,6 +696,8 @@ const balloonFloat: MiniGame = {
   name: '풍선 말랑',
   description: '풍선을 훅 불어 기둥 사이를 날아요. 풍선 2개가 모두 터지면 끝나요.',
   controls: '화면 누르기, Space 또는 위쪽 방향키, 떠오르기 버튼',
+  durationMs: CONFIG.durationMs,
+  blurb: '톡톡 날아가기',
   icon: BalloonFloatIcon,
   Component: BalloonFloatGame,
 };

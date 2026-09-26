@@ -257,9 +257,9 @@ function MalangTrainGame({ partner, partnerShiny, onFinish, onExit, sfx }: MiniG
         score: s.score,
         stats: {
           사탕: s.eaten,
-          황금사탕: s.goldens,
-          기차길이: s.snake.length,
-          버틴초: Math.floor(s.elapsedMs / 1000),
+          '황금 사탕': s.goldens,
+          '기차 길이': s.snake.length,
+          '버틴 초': Math.floor(s.elapsedMs / 1000),
         },
       });
     }, reduced ? 300 : 1000);
@@ -466,6 +466,8 @@ const malangTrain: MiniGame = {
   name: '말랑 기차',
   description: '사탕을 먹을 때마다 아기 말랑이가 기차에 붙어요. 벽이나 기차에 부딪히지 마세요.',
   controls: '밀기, 화살표 버튼, 방향키 또는 WASD',
+  durationMs: CONFIG.durationMs,
+  blurb: '기차 늘리기',
   icon: MalangTrainIcon,
   Component: MalangTrainGame,
 };

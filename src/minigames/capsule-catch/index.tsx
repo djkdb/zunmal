@@ -345,7 +345,7 @@ function CapsuleCatchGame({ partner, partnerShiny, onFinish, onExit, sfx }: Mini
       () =>
         onFinish({
           score: s.score,
-          stats: { 받은캡슐: s.caught, 황금캡슐: s.goldCaught, 폭탄: s.bombsHit, 최대연속: s.maxStreak },
+          stats: { '받은 캡슐': s.caught, '황금 캡슐': s.goldCaught, 폭탄: s.bombsHit, '최대 연속': s.maxStreak },
         }),
       reduced ? 200 : 900,
     );
@@ -453,6 +453,8 @@ const capsuleCatch: MiniGame = {
   name: '캡슐 받기',
   description: '30초 동안 떨어지는 캡슐을 받아요. 황금 캡슐은 보너스, 가시 폭탄은 조심!',
   controls: '화면 드래그, 방향키 또는 A/D, 화면 버튼',
+  durationMs: CONFIG.durationMs,
+  blurb: '좌우로 받기',
   icon: CapsuleCatchIcon,
   Component: CapsuleCatchGame,
 };
