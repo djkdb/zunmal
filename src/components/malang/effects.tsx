@@ -1,6 +1,6 @@
 import type { MalangEffect } from '../../data/characters';
 import { darken, lighten, mix } from '../../lib/color';
-import { sparklePath } from './helpers';
+import { deepen, sparklePath } from './helpers';
 import type { ShapeSpec } from './shapes';
 
 /**
@@ -83,10 +83,12 @@ export function BodyFillDef({ effect, paint }: { effect: MalangEffect; paint: Ef
     case 'none':
     default:
       return (
-        <radialGradient id={id} cx="38%" cy="32%" r="75%">
+        // 왼쪽 위(광원 쪽)가 밝고, 가장자리로 갈수록 채도가 오른 진한 색 → 속이 찬 젤리
+        <radialGradient id={id} cx="44%" cy="40%" r="68%" fx="34%" fy="26%">
           <stop offset="0%" stopColor={lighten(color, 0.55)} />
-          <stop offset="45%" stopColor={color} />
-          <stop offset="100%" stopColor={darken(color, 0.22)} />
+          <stop offset="24%" stopColor={lighten(color, 0.22)} />
+          <stop offset="60%" stopColor={color} />
+          <stop offset="100%" stopColor={deepen(color, 0.16)} />
         </radialGradient>
       );
   }

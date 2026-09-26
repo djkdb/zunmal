@@ -127,3 +127,59 @@ export function avoidFace<T extends Point>(points: readonly T[], faceY: number, 
   const cy = faceY + 3;
   return points.filter((p) => ((p.x - 60) / rx) ** 2 + ((p.y - cy) / ry) ** 2 > 1);
 }
+
+/** 채도를 조금 올리며 어둡게: 젤리 아랫면·가장자리의 "두께" 색 (잉크를 섞으면 탁해진다) */
+export function deepen(hex: string, amount: number): string {
+  const [h, s, l] = hexToHsl(hex);
+  const sat = s < 0.05 ? s : Math.min(1, s * (1 + amount * 0.8) + amount * 0.1);
+  return hslToHex(h, sat, l * (1 - amount));
+}
+
+// ── 인스턴스별 움직임 편차 ─────────────────────────────────
+
+/** 문자열 → 32비트 해시 (FNV-1a) */
+export function hashString(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+export interface LifeTiming {
+  /** 숨쉬기 주기(초) 2.4~3.2 */
+  breatheDur: number;
+  /** 숨쉬기 시작 위상(음수 지연, 초): 격자에서 다 같이 숨쉬지 않게 */
+  breatheDelay: number;
+  /** 눈 깜빡임 주기(초) 3~5. 감았다 뜨는 시간은 주기의 3.8% → 115~190ms */
+  blinkDur: number;
+  blinkDelay: number;
+  /** 약 1/7 확률로 두 번 연달아 깜빡인다 */
+  doubleBlink: boolean;
+}
+
+/**
+ * 인스턴스 id로 정해지는 숨쉬기/깜빡임 타이밍. 순수 함수라 렌더마다 같고(StrictMode 안전)
+ * 인스턴스마다 다르다. style 문자열이 짧도록 소수 둘째 자리로 반올림한다.
+ */
+export function lifeTiming(seed: string): LifeTiming {
+  let s = hashString(seed) || 1;
+  const next = () => {
+    // xorshift32
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const breatheDur = r2(2.4 + next() * 0.8);
+  const blinkDur = r2(3 + next() * 2);
+  return {
+    breatheDur,
+    breatheDelay: r2(-next() * breatheDur),
+    blinkDur,
+    blinkDelay: r2(-next() * blinkDur),
+    doubleBlink: next() < 0.14,
+  };
+}

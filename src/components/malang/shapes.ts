@@ -37,19 +37,22 @@ export interface ShapeSpec {
   right: number;
   /** 몸통 바닥 y */
   bottom: number;
+  /** 젤리 광택(주 광원 반사) 중심: 모양마다 왼쪽 위 어깨에 오도록 둔다 */
+  light: { x: number; y: number };
 }
 
 export const SHAPES: Record<MalangShape, ShapeSpec> = {
   round: {
     key: 'round',
     body: 'M60 30 C88 30 106 48 106 72 C106 96 86 108 60 108 C34 108 14 96 14 72 C14 48 32 30 60 30 Z',
-    faceY: 70,
+    faceY: 72,
     top: 30,
-    eyeGap: 15,
+    eyeGap: 16,
     sideY: 72,
     left: 14,
     right: 106,
     bottom: 108,
+    light: { x: 40, y: 47 },
   },
   drop: {
     key: 'drop',
@@ -61,6 +64,7 @@ export const SHAPES: Record<MalangShape, ShapeSpec> = {
     left: 18,
     right: 102,
     bottom: 110,
+    light: { x: 46, y: 48 },
   },
   bun: {
     key: 'bun',
@@ -72,17 +76,19 @@ export const SHAPES: Record<MalangShape, ShapeSpec> = {
     left: 14,
     right: 106,
     bottom: 108,
+    light: { x: 38, y: 56 },
   },
   bean: {
     key: 'bean',
     body: 'M22 72 C18 46 42 30 64 32 C90 34 108 54 102 80 C98 102 74 110 52 106 C32 102 24 92 22 72 Z',
-    faceY: 70,
+    faceY: 72,
     top: 32,
-    eyeGap: 15,
+    eyeGap: 16,
     sideY: 68,
     left: 21,
     right: 104,
     bottom: 107,
+    light: { x: 42, y: 50 },
   },
   cloud: {
     key: 'cloud',
@@ -94,29 +100,32 @@ export const SHAPES: Record<MalangShape, ShapeSpec> = {
     left: 12,
     right: 110,
     bottom: 106,
+    light: { x: 42, y: 62 },
   },
   heart: {
     key: 'heart',
     body: 'M60 108 C40 96 12 80 12 56 C12 40 24 30 40 30 C50 30 56 36 60 42 C64 36 70 30 80 30 C96 30 108 40 108 56 C108 80 80 96 60 108 Z',
-    faceY: 64,
+    faceY: 66,
     top: 30,
     eyeGap: 15,
     sideY: 56,
     left: 12,
     right: 108,
     bottom: 108,
+    light: { x: 32, y: 46 },
   },
   crystal: {
     key: 'crystal',
     // 윗면(테이블)이 평평하고 아래로 둥글게 좁아지는 말랑한 보석
     body: 'M44 22 L76 22 Q82 22 86 26 L102 43 Q108 50 103 57 Q92 82 68 104 Q60 112 52 104 Q28 82 17 57 Q12 50 18 43 L34 26 Q38 22 44 22 Z',
-    faceY: 60,
+    faceY: 62,
     top: 22,
     eyeGap: 13,
     sideY: 50,
     left: 14,
     right: 106,
     bottom: 110,
+    light: { x: 38, y: 38 },
   },
   star: {
     key: 'star',
@@ -128,5 +137,6 @@ export const SHAPES: Record<MalangShape, ShapeSpec> = {
     left: 10,
     right: 110,
     bottom: 112,
+    light: { x: 50, y: 46 },
   },
 };
