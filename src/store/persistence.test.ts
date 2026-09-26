@@ -107,19 +107,62 @@ describe('sanitizeSave: 놀이방 (v7)', () => {
 
   it.each([null, 'x', { out: 'x' }, { out: [1, 2] }, []])('손상된 playroom(%j)은 빈 매트', (playroom) => {
     const s = sanitizeSave({ ownedMalangs: owned, unboxed: ['peach-mochi'], playroom }, NOW);
-    expect(s.playroom).toEqual({ out: [] });
+    expect(s.playroom).toEqual({ out: [], mat: 'sky-dots', props: [] });
+  });
+
+  it('꾸미기(v8): 무늬·소품을 지키고 이상한 값은 고친다', () => {
+    const s = sanitizeSave(
+      {
+        ownedMalangs: owned,
+        unboxed: ['peach-mochi'],
+        playroom: {
+          out: ['peach-mochi'],
+          mat: 'cloud',
+          props: [
+            { id: 'cushion', x: 0.25, y: 0.5 },
+            { id: 'cushion', x: 0.9, y: 0.9 },
+            { id: 'sofa', x: 0.5, y: 0.5 },
+            { id: 'plant', x: 7, y: -3 },
+            { id: 'gift-box', x: 0.4, y: 0.6 },
+            { id: 'star-lamp', x: 0.6, y: 0.6 },
+          ],
+        },
+      },
+      NOW,
+    );
+    expect(s.playroom.mat).toBe('cloud');
+    expect(s.playroom.props).toEqual([
+      { id: 'cushion', x: 0.25, y: 0.5 },
+      { id: 'plant', x: 1, y: 0 },
+      { id: 'gift-box', x: 0.4, y: 0.6 },
+    ]);
+    const bad = sanitizeSave({ ownedMalangs: owned, unboxed: ['peach-mochi'], playroom: { out: [], mat: 'plaid', props: 'x' } }, NOW);
+    expect(bad.playroom.mat).toBe('sky-dots');
+    expect(bad.playroom.props).toEqual([]);
   });
 
   it('새 저장은 연 것도 매트도 비어 있다', () => {
     const s = createInitialSave(NOW);
     expect(s.unboxed).toEqual([]);
-    expect(s.playroom).toEqual({ out: [] });
+    expect(s.playroom).toEqual({ out: [], mat: 'sky-dots', props: [] });
   });
 });
 
 describe('migrateSave', () => {
-  it('현재 버전은 7', () => {
-    expect(SAVE_VERSION).toBe(7);
+  it('현재 버전은 8', () => {
+    expect(SAVE_VERSION).toBe(8);
+  });
+
+  it('v7 → v8: 꺼내 둔 말랑이는 그대로, 무늬는 기본, 소품은 없음', () => {
+    const owned = { 'peach-mochi': { count: 1, shinyCount: 0, firstObtainedAt: 1 } };
+    const s = migrateSave(
+      { ownedMalangs: owned, unboxed: ['peach-mochi'], playroom: { out: ['peach-mochi'], mat: 'star-night', props: [{ id: 'plant', x: 0.1, y: 0.1 }] } },
+      7,
+      NOW,
+    );
+    expect(s.playroom).toEqual({ out: ['peach-mochi'], mat: 'sky-dots', props: [] });
+    const broken = migrateSave({ ownedMalangs: owned, unboxed: ['peach-mochi'], playroom: 'x' }, 7, NOW);
+    expect(broken.playroom).toEqual({ out: [], mat: 'sky-dots', props: [] });
   });
 
   it('v6 → v7: 가진 말랑이는 모두 연 것으로, 매트에는 파트너 하나', () => {
@@ -130,14 +173,14 @@ describe('migrateSave', () => {
     };
     const s = migrateSave({ coins: 10, ownedMalangs: owned, partnerId: 'soda-drop' }, 6, NOW);
     expect(s.unboxed.sort()).toEqual(['ember-imp', 'peach-mochi', 'soda-drop']);
-    expect(s.playroom).toEqual({ out: ['soda-drop'] });
+    expect(s.playroom).toEqual({ out: ['soda-drop'], mat: 'sky-dots', props: [] });
     expect(s.coins).toBe(10);
   });
 
   it('v6 → v7: 말랑이가 없으면 빈 매트, 알 수 없는 id는 연 목록에서도 빠진다', () => {
     const empty = migrateSave({ coins: 10 }, 6, NOW);
     expect(empty.unboxed).toEqual([]);
-    expect(empty.playroom).toEqual({ out: [] });
+    expect(empty.playroom).toEqual({ out: [], mat: 'sky-dots', props: [] });
     const odd = migrateSave(
       { ownedMalangs: { 'peach-mochi': { count: 1 }, 'not-a-malang': { count: 1 } }, partnerId: 'not-a-malang' },
       6,

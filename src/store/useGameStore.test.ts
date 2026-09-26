@@ -3,7 +3,7 @@ import { COLLECTIONS, findUnknownMembers } from '../data/collections';
 import { DAILY_CAP, MISSION_ALL_CLEAR_BONUS, PULL_PRICE, SET_REWARD_COINS, STARTING_COINS } from '../economy/config';
 import { generateDailyMissions } from '../missions/missions';
 import { createSeededRng } from '../lib/rng';
-import { SAVE_KEY, SAVE_VERSION } from './persistence';
+import { SAVE_KEY, SAVE_VERSION, createInitialSave } from './persistence';
 import { MAX_AFFECTION, createGameStore, createSafeStorage } from './useGameStore';
 
 class MemoryStorage implements Storage {
@@ -326,7 +326,7 @@ describe('놀이방 (unboxed / playroom)', () => {
     store.setState({
       ownedMalangs: { 'peach-mochi': owned, 'soda-drop': owned, 'matcha-bean': owned },
       unboxed: ['peach-mochi', 'soda-drop', 'matcha-bean'],
-      playroom: { out: [] },
+      playroom: { out: [], mat: 'cloud', props: [{ id: 'plant', x: 0.1, y: 0.2 }] },
     });
     const s = store.getState();
     expect(s.takeOutMalang('peach-mochi', 2)).toBe(true);
@@ -337,5 +337,26 @@ describe('놀이방 (unboxed / playroom)', () => {
     expect(store.getState().playroom.out).toEqual(['soda-drop']);
     expect(s.takeOutMalang('matcha-bean', 2)).toBe(true);
     expect(store.getState().playroom.out).toEqual(['soda-drop', 'matcha-bean']);
+    // 꺼내고 넣어도 꾸미기는 그대로
+    expect(store.getState().playroom.mat).toBe('cloud');
+    expect(store.getState().playroom.props).toEqual([{ id: 'plant', x: 0.1, y: 0.2 }]);
+  });
+
+  it('꾸미기: 무늬 바꾸기, 소품 놓기·옮기기·치우기, 3개까지', () => {
+    const store = makeStore();
+    const s = store.getState();
+    s.setPlayroomMat('star-night');
+    expect(store.getState().playroom.mat).toBe('star-night');
+    s.setPlayroomMat('plaid' as never);
+    expect(store.getState().playroom.mat).toBe('star-night');
+    expect(s.placeProp('cushion', 0.2, 0.3)).toBe(true);
+    expect(s.placeProp('plant', 0.8, 0.3)).toBe(true);
+    expect(s.placeProp('gift-box', 0.5, 0.9)).toBe(true);
+    expect(s.placeProp('star-lamp', 0.5, 0.1)).toBe(false);
+    expect(s.placeProp('cushion', 1.5, 0.4)).toBe(true);
+    expect(store.getState().playroom.props[0]).toEqual({ id: 'cushion', x: 1, y: 0.4 });
+    s.removeProp('plant');
+    expect(store.getState().playroom.props.map((p) => p.id)).toEqual(['cushion', 'gift-box']);
+    expect(store.getState().coins).toBe(createInitialSave().coins);
   });
 });

@@ -109,6 +109,20 @@ export interface World {
   contactSince: Map<string, number>;
   /** 지난 스텝 끝의 맞닿음 목록 (말랑이끼리 상호작용 판정에 쓴다) */
   touching: WorldContact[];
+  /** 움직이지 않는 장애물 (꾸미기 소품). 상한(cap)에 세지 않는다 */
+  obstacles: WorldObstacle[];
+}
+
+/**
+ * 움직이지 않는 장애물 — 매트 위 소품. 말랑이와 같은 "말랑한 공" 모양(반지름 r, 높이 h)이지만 질량이 무한하다:
+ * 부딪히면 말랑이만 밀려나고, 위에 얹히면 받쳐 준다. 맞닿음 목록(touching)·말랑이끼리 판정에는 들어가지 않는다.
+ */
+export interface WorldObstacle {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+  h: number;
 }
 
 export type WorldEvent =
@@ -164,6 +178,8 @@ export const WORLD_TUNING = {
   stickReach: 0.14,
   /** 이만큼 붙어 있으면 끈적임이 다 풀린다 (ms) */
   stickHoldMs: 1400,
+  /** 소품(장애물)이 말랑이를 밀어내는 깊이 한도 (반지름 합 대비) — 크게 겹쳐도 천천히 비켜난다 */
+  obstaclePushMax: 0.12,
 } as const;
 
 // ── 만들기 ─────────────────────────────────────────────────
@@ -178,6 +194,7 @@ export function createWorld(bounds: WorldBounds, options: { cap?: number; reduce
     timeMs: 0,
     contactSince: new Map(),
     touching: [],
+    obstacles: [],
   };
 }
 
@@ -203,6 +220,51 @@ export function setWorldReducedMotion(world: World, reduced: boolean): void {
 export function resizeWorld(world: World, bounds: WorldBounds): void {
   world.bounds = sanitizeBounds(bounds);
   for (const b of world.bodies) confine(b, world.bounds);
+  for (const o of world.obstacles) confineObstacle(o, world.bounds);
+}
+
+// ── 장애물 (소품) ──────────────────────────────────────────
+
+function confineObstacle(o: WorldObstacle, bounds: WorldBounds): void {
+  o.x = Math.min(Math.max(o.x, Math.min(o.r, bounds.w / 2)), Math.max(bounds.w - o.r, bounds.w / 2));
+  o.y = Math.min(Math.max(o.y, Math.min(o.r, bounds.d / 2)), Math.max(bounds.d - o.r, bounds.d / 2));
+}
+
+/** 장애물 목록을 통째로 바꾼다 (매트 안으로 옮기고, 같은 id 는 첫 것만) */
+export function setObstacles(world: World, list: readonly WorldObstacle[]): void {
+  const next: WorldObstacle[] = [];
+  for (const o of list) {
+    if (next.some((n) => n.id === o.id)) continue;
+    const r = Number.isFinite(o.r) && o.r > 0 ? o.r : 0.2;
+    const ob: WorldObstacle = {
+      id: o.id,
+      x: finite(o.x, world.bounds.w / 2),
+      y: finite(o.y, world.bounds.d / 2),
+      r,
+      h: Number.isFinite(o.h) && o.h > 0 ? o.h : 2 * r,
+    };
+    confineObstacle(ob, world.bounds);
+    next.push(ob);
+  }
+  world.obstacles = next;
+  const ids = new Set(next.map((o) => obstacleKey(o.id)));
+  for (const key of [...world.contacts]) if (key.startsWith(OBSTACLE_PREFIX) && !ids.has(key.split('|')[0] ?? '')) world.contacts.delete(key);
+}
+
+/** 장애물 하나를 옮긴다 (손가락으로 끌기). 옮긴 자리를 돌려준다 */
+export function moveObstacle(world: World, id: string, x: number, y: number): { x: number; y: number } | null {
+  const o = world.obstacles.find((ob) => ob.id === id);
+  if (!o) return null;
+  o.x = finite(x, o.x);
+  o.y = finite(y, o.y);
+  confineObstacle(o, world.bounds);
+  return { x: o.x, y: o.y };
+}
+
+const OBSTACLE_PREFIX = 'obstacle:';
+
+function obstacleKey(id: string): string {
+  return `${OBSTACLE_PREFIX}${id}`;
 }
 
 export function getBody(world: World, id: string): WorldBody | undefined {
@@ -274,9 +336,10 @@ export function findDropSpot(world: World, r: number, rng: RNG, tries = 24): { x
     const y = lo(d) + rng() * Math.max(0, d - 2 * lo(d));
     let nearest = Infinity;
     for (const b of world.bodies) nearest = Math.min(nearest, Math.hypot(b.x - x, b.y - y) - b.r - r);
+    for (const o of world.obstacles) nearest = Math.min(nearest, Math.hypot(o.x - x, o.y - y) - o.r - r);
     // 가운데 쪽을 조금 더 좋아한다 (가장자리에 붙지 않게)
     const center = -0.15 * Math.hypot(x - w / 2, (y - d * 0.55) * 0.8);
-    const score = (world.bodies.length === 0 ? 0 : Math.min(nearest, 3)) + center;
+    const score = (world.bodies.length + world.obstacles.length === 0 ? 0 : Math.min(nearest, 3)) + center;
     if (score > bestScore) {
       bestScore = score;
       best = { x, y };
@@ -411,6 +474,13 @@ function subStep(
   const bounceScale = world.reducedMotion ? T.reducedBounce : 1;
 
   // 1) 외력: 중력 / 들고 있는 스프링
+  const anyHeld = bodies.some((b) => b.held);
+  const climbables: { body: WorldBody | null; x: number; y: number; z: number; r: number; h: number; held: boolean }[] = anyHeld
+    ? [
+        ...bodies.map((o) => ({ body: o, x: o.x, y: o.y, z: o.z, r: o.r, h: o.h, held: o.held })),
+        ...world.obstacles.map((o) => ({ body: null, x: o.x, y: o.y, z: 0, r: o.r, h: o.h, held: false })),
+      ]
+    : [];
   for (const b of bodies) {
     b.squeezeX = 0;
     b.squeezeY = 0;
@@ -421,18 +491,19 @@ function subStep(
       let targetZ = b.holdZ;
       // 천천히 가져가면 올라타고, 빠르게 밀면 밀어낸다
       const climbing = Math.hypot(b.vx, b.vy) < T.climbSpeed;
-      for (const o of bodies) {
+      for (const o of climbables) {
         if (!climbing) break;
-        if (o === b || o.held) continue;
+        if (o.body === b || o.held) continue;
+        const oz = o.z;
         const d = Math.hypot(b.x - o.x, b.y - o.y);
         const rr = b.r + o.r;
         const aiming = Math.hypot(b.holdX - o.x, b.holdY - o.y) < rr * T.climbTarget;
-        const above = b.z > o.z + o.h * 0.5;
+        const above = b.z > oz + o.h * 0.5;
         if (d < rr * T.climbReach && (aiming || above)) {
           // 가까워질수록 미리 올라가 옆으로 밀지 않고 넘어간다 (위아래는 높이 비율로 줄여 잰다)
           const zs = rr / ((b.h + o.h) / 2);
           const up = Math.sqrt(Math.max(0, rr * rr - d * d * 0.6)) / zs;
-          targetZ = Math.max(targetZ, o.z + o.h / 2 + up - b.h / 2 + 0.03);
+          targetZ = Math.max(targetZ, oz + o.h / 2 + up - b.h / 2 + 0.03);
         }
       }
       b.vx += (T.holdK * (b.holdX - b.x) - c * b.vx) * h;
@@ -524,6 +595,57 @@ function subStep(
       if (!world.contacts.has(key) && !reported.has(key) && -vn > T.bumpEventSpeed) {
         reported.add(key);
         events.push({ kind: 'bump', a: a.id, b: b.id, speed: -vn, nx, ny, nz });
+      }
+    }
+  }
+
+  // 2-1) 장애물(소품): 말랑이만 밀려난다. 크게 겹쳐도(소품을 말랑이 위로 끌어 놓을 때) 확 튀지 않게 밀어내는 깊이를 제한
+  if (world.obstacles.length > 0) {
+    for (let i = 0; i < n; i++) {
+      const b = bodies[i]!;
+      const mb = effMass(b);
+      for (const o of world.obstacles) {
+        const dx = b.x - o.x;
+        const dy = b.y - o.y;
+        const rr = b.r + o.r;
+        const dz = (b.z + b.h / 2 - o.h / 2) * (rr / ((b.h + o.h) / 2));
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= rr * rr) continue;
+        const dist = Math.sqrt(d2);
+        const nx = dist > 1e-6 ? dx / dist : 1;
+        const ny = dist > 1e-6 ? dy / dist : 0;
+        const nz = dist > 1e-6 ? dz / dist : 0;
+        const overlap = rr - dist;
+        const push = Math.min(overlap, rr * T.obstaclePushMax);
+        const k = T.contactK * b.material.stiffness;
+        const c = 2 * T.contactZeta * Math.sqrt(k);
+        const vn = b.vx * nx + b.vy * ny + b.vz * nz;
+        const jn = Math.max(0, (k * push - c * vn) * mb * 2) * h;
+        b.vx += (jn * nx) / mb;
+        b.vy += (jn * ny) / mb;
+        b.vz += (jn * nz) / mb;
+        // 마찰: 소품 표면을 따라 미끄러지는 속도를 줄인다
+        const tvx = b.vx - (b.vx * nx + b.vy * ny + b.vz * nz) * nx;
+        const tvy = b.vy - (b.vx * nx + b.vy * ny + b.vz * nz) * ny;
+        const tvz = b.vz - (b.vx * nx + b.vy * ny + b.vz * nz) * nz;
+        const vt = Math.hypot(tvx, tvy, tvz);
+        if (vt > 1e-6 && jn > 0) {
+          const dv = Math.min(vt, (b.material.grip * jn) / mb);
+          b.vx -= (dv * tvx) / vt;
+          b.vy -= (dv * tvy) / vt;
+          b.vz -= (dv * tvz) / vt;
+        }
+        const sq = Math.max(0, overlap) / rr;
+        b.squeezeX += nx * sq;
+        b.squeezeY += ny * sq;
+        b.squeezeZ += nz * sq;
+        if (overlap > 0 && nz > 0.45) supported[i] = true;
+        const key = `${obstacleKey(o.id)}|${b.id}`;
+        touching.add(key);
+        if (!world.contacts.has(key) && !reported.has(key) && -vn > T.wallEventSpeed) {
+          reported.add(key);
+          events.push({ kind: 'wall', id: b.id, speed: -vn, nx, ny });
+        }
       }
     }
   }
