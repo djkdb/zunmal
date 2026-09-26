@@ -132,3 +132,35 @@ export function PetIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** iOS 공유 버튼 모양 (네모 + 위 화살표) — 홈 화면 추가 안내용 */
+export function ShareIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M11 13 h-3 v14 h16 v-14 h-3" fill="#fff9ee" />
+      <path d="M16 20 v-15 M11 9.5 l5 -5 l5 5" />
+    </Svg>
+  );
+}
+
+/** 홈 화면 추가: 휴대폰 + 더하기 */
+export function HomeAddIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="8" y="3.5" width="16" height="25" rx="3.5" fill="#fff9ee" />
+      <path d="M16 11 v8 M12 15 h8" stroke="#e8527f" strokeWidth={3} />
+      <path d="M14 24.5 h4" />
+    </Svg>
+  );
+}
+
+/** 점 세 개 메뉴 버튼 모양 */
+export function MoreIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="8" cy="16" r="2.4" fill="#2b2233" stroke="none" />
+      <circle cx="16" cy="16" r="2.4" fill="#2b2233" stroke="none" />
+      <circle cx="24" cy="16" r="2.4" fill="#2b2233" stroke="none" />
+    </Svg>
+  );
+}

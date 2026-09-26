@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 말랑 뽑기방 앱 아이콘: 크림 바탕 + 딸기우유 말랑이. 가운데 80% 안에 그려 마스크 아이콘으로도 쓴다 -->
+  <rect width="512" height="512" fill="#fff4e0"/>
+  <g fill="#ffd84d" opacity="0.9">
+    <rect x="70" y="92" width="34" height="12" rx="6" transform="rotate(-30 87 98)"/>
+    <rect x="404" y="120" width="34" height="12" rx="6" fill="#6ec6ff" transform="rotate(25 421 126)"/>
+    <rect x="96" y="398" width="34" height="12" rx="6" fill="#8ed081" transform="rotate(40 113 404)"/>
+    <rect x="392" y="392" width="34" height="12" rx="6" fill="#ff9db4" transform="rotate(-20 409 398)"/>
+  </g>
+  <ellipse cx="256" cy="420" rx="150" ry="22" fill="#2b2233" opacity="0.12"/>
+  <path d="M256 128 C356 128 410 196 410 286 C410 372 346 416 256 416 C166 416 102 372 102 286 C102 196 156 128 256 128 Z"
+        fill="#ffb3c7" stroke="#2b2233" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M170 196 C186 170 214 156 244 152" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
+  <circle cx="204" cy="284" r="18" fill="#2b2233"/>
+  <circle cx="308" cy="284" r="18" fill="#2b2233"/>
+  <circle cx="210" cy="277" r="6" fill="#fff"/>
+  <circle cx="314" cy="277" r="6" fill="#fff"/>
+  <ellipse cx="170" cy="320" rx="24" ry="14" fill="#ff7fa3" opacity="0.7"/>
+  <ellipse cx="342" cy="320" rx="24" ry="14" fill="#ff7fa3" opacity="0.7"/>
+  <path d="M236 318 Q246 332 256 318 Q266 332 276 318" fill="none" stroke="#2b2233" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

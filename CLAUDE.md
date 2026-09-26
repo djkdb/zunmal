@@ -114,6 +114,17 @@ UI 작업 전에 `.claude/skills/frontend-design/SKILL.md`를 읽는다. 컨셉�
     모듈을 1.5초 안에 못 받거나 WebGL을 못 만들면 2D 캔버스(`epic/particles.ts`)로 대체한다. 언마운트 시 dispose + 컨텍스트 해제.
   - 말랑이와 글자는 항상 DOM(SVG)이 캔버스 위에 그린다. 3D 무대 원점 = 화면 위 45%(`STAGE_Y`)로 DOM과 맞춘다.
   - 탭/Enter/Esc로 건너뛰기(처음 0.5초는 무시), 움직임 줄이기면 정지 카드만. 이때 머신은 결과음을 내지 않는다(`quietFanfare`).
+## 홈 화면 앱 (PWA)
+
+- `public/manifest.webmanifest` + `public/sw.js`(서비스 워커, 프로덕션에서만 등록) + 아이콘.
+  아이콘은 `public/icon.svg`(코드로 그린 말랑이)에서 `scripts/render-icons.mjs`로 PNG를 만든다 — 그림을 바꿀 때만 다시 실행.
+- 서비스 워커: 페이지는 네트워크 우선, 해시 이름 빌드 파일과 글꼴은 캐시 우선. 캐시 구조를 바꾸면 `VERSION`을 올린다.
+- 설치 안내는 `components/InstallCard.tsx`, 환경 판별은 순수 모듈 `lib/installEnv.ts`(UA 테스트 있음).
+  - **인스타그램·카카오톡 등 앱 안 브라우저**(주요 유입 경로: 인스타 DM 링크)는 홈 화면 추가가 안 되고 저장 공간도 따로다.
+    → 주요 버튼 바로 아래에 "브라우저로 열기"(안드로이드 Chrome intent, iOS 17+ `x-safari-https`) + 링크 복사 + 메뉴 위치 안내.
+  - 안드로이드 Chrome은 `beforeinstallprompt`를 앱 시작 시(`app/installPrompt.ts`) 붙잡아 설치 창을 띄우고, iOS는 공유 → 홈 화면에 추가 순서를 보여 준다.
+  - 이미 앱으로 열었으면(standalone) 안내하지 않는다. 설치 카드는 닫으면 7일간 숨긴다.
+
 ## 컬렉션 (`data/collections.ts`)
 
 - 테마 세트(디저트 가게, 깊은 바다, 꿈의 끝 …). 한 말랑이가 여러 세트에 속할 수 있다.

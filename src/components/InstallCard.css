@@ -1,0 +1,98 @@
+/* 홈 화면 추가 안내 — 평평한 외곽선 패널 (눌리는 버튼만 아랫단 그림자) */
+.install {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 14px 14px 12px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+.install__icon {
+  flex: none;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+}
+
+.install__body {
+  flex: 1;
+  min-width: 0;
+  padding-right: 34px;
+}
+
+.install__title {
+  margin: 0;
+  font-size: var(--fs-s);
+}
+
+.install__text {
+  margin: 4px 0 10px;
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.install__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.install__actions .btn {
+  min-height: 44px;
+  gap: 6px;
+}
+
+.install__steps {
+  margin: 10px 0 0;
+  padding-left: 1.3em;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+}
+
+.install__steps li svg {
+  vertical-align: -5px;
+  margin-right: 4px;
+}
+
+.install__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* 앱 안 브라우저 안내: 테이프로 붙인 레몬색 쪽지 — 지금 꼭 봐야 하는 안내라 모양을 다르게 */
+.install--inapp {
+  display: block;
+  margin-top: 6px;
+  padding: 16px 14px 12px;
+  background: #fff6c9;
+  transform: rotate(-0.6deg);
+}
+
+.install--inapp::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 72px;
+  height: 20px;
+  margin-left: -36px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1.5px solid rgba(43, 34, 51, 0.15);
+  transform: rotate(2deg);
+}
+
+.install--inapp .install__text {
+  color: var(--ink);
+}

@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx';
 import { Malang } from '../components/Malang';
 import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
+import { InstallCard } from '../components/InstallCard';
 import { CapsuleIcon, JoystickIcon } from '../components/icons';
 import { CHARACTERS, getCharacter } from '../data/characters';
 import { RARITY_META } from '../data/rarity';
@@ -75,6 +76,8 @@ export function HomePage() {
         </Link>
       </div>
 
+      <InstallCard slot="in-app" />
+
       <DailyMissions />
 
       <Link to="/collection" className="home__jar" onClick={() => sfx.button()} aria-label={`도감 ${ownedCount}/${CHARACTERS.length}`}>
@@ -91,6 +94,8 @@ export function HomePage() {
           {ownedCount}/{CHARACTERS.length}
         </span>
       </Link>
+
+      <InstallCard slot="install" />
     </section>
   );
 }
