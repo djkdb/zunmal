@@ -648,6 +648,11 @@ function Playroom() {
     } else {
       const first = [st.partnerId, ...st.unboxed].find((id) => id && st.ownedMalangs[id] && st.unboxed.includes(id));
       st.soloMalang(first ?? null);
+      // 연 말랑이가 하나도 없으면(예: 봉인된 새 말랑이를 파트너로 둔 저장) 빈 매트 대신 파트너 캡슐을 둔다
+      if (!first && st.partnerId && st.ownedMalangs[st.partnerId]) {
+        setCapsules([st.partnerId]);
+        setFocusId(st.partnerId);
+      }
     }
   }, [paramId]);
 
