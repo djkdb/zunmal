@@ -80,10 +80,12 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 | 그림자 | `--shadow-card`(카드) · `--shadow-btn`(버튼) · `--shadow-btn-press`(눌림) · `--shadow-float`(모달·말풍선) · `--shadow-up`(하단 탭) | 파란 기운 rgba(26,64,128,…) |
 | 희귀도 | `--rarity-<r>`(대표색·빛) · `--rarity-<r>-tint`(배지 바탕) · `--rarity-<r>-ink`(배지 글자) | 일반 회색, 레어 파랑, 에픽 보라, 전설 금, 신화 분홍·무지개, 시크릿 밤하늘 |
 
-- **글꼴**: 제목·로고·말랑이 이름·큰 점수 = **고운돋움** `--font-display` (잉크색, 외곽선 없음, `--tracking-title` -0.02em).
-  나머지 = **Pretendard** `--font-body`; 버튼·칩·숫자는 `--font-ui` + `--fw-ui`(700). 둘 다 npm 패키지를 `main.tsx`에서 import해
-  번들한다(`@fontsource/gowun-dodum/400.css`, `pretendard/…/pretendardvariable-dynamic-subset.css`, 유니코드 범위 조각이라 쓰는 글자 조각만 받음).
-  해시 이름 `assets/` 파일이라 서비스 워커가 캐시 우선으로 보관한다. 캔버스 글자는 `"Gowun Dodum", "Pretendard Variable", sans-serif`.
+- **글꼴**: 제목·로고·말랑이 이름·큰 점수·신화 도장 = **주아** `--font-display` (두께 400 하나, 잉크색, 외곽선 없음, `--tracking-title` -0.01em).
+  나머지 = **나눔스퀘어라운드** `--font-body`; 버튼·칩·숫자는 `--font-ui` + `--fw-ui`(700). 주아는 `main.tsx`에서 `@fontsource/jua/400.css`
+  (유니코드 범위 조각), 나눔스퀘어라운드는 `global.css` @font-face + `src/assets/fonts/nanum-square-round-{400,800}.woff2`
+  (`scripts/subset-fonts.py`로 완성형 2,350자 + 앱 코드 한글만 남긴 파일 — 새 문구에 드문 글자를 넣으면 다시 실행. 600 이상은 모두 800 파일).
+  빠진 글자는 Pretendard Variable(dynamic-subset)이 대신 그린다. `html { font-synthesis: style }` — 가짜 굵게 금지.
+  해시 이름 `assets/` 파일이라 서비스 워커가 캐시 우선으로 보관한다. 캔버스 글자는 `"Jua", "NanumSquareRound", "Pretendard Variable", sans-serif`.
 - **바탕**: `body::before`(고정 그라데이션) + `body::after`(비눗방울 몇 개: 흰 45% + 1.5px 흰 테두리, 아주 느린 떠오르기 — 움직임 줄이기면 멈춤).
   `body`에는 배경을 두지 않는다(두면 z-index:-1 층을 덮는다). 캔버스 색은 `html`.
 - **면**: 카드·패널은 흰색 + `--shadow-card`, 테두리 없음. 카드 안의 칸·진행 막대 바탕·비활성은 `--surface-2`/`--sky-tint`.
@@ -91,7 +93,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   누르면 `translateY(2px) scale(.97)` + 그림자가 눌리고, 떼면 `--ease-jelly` 스프링. 비활성은 `--surface-2` + `--sub` 글자 + 가는 테두리.
   칩은 흰 알약(`.chip`) 또는 레몬(`.chip--lemon`). 하단 탭은 흰 바(위 모서리 22) + 선택 탭 딸기우유 칸. 코인은 반투명 흰 알약.
 - **아이콘**(`components/icons.tsx`): 둥근 선 + 파스텔 채움, 선 색은 `currentColor`(코인만 금빛).
-- **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 고운돋움 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
+- **홈 간판**: 영문 머리글 `.eyebrow`("CAPSULE MALANG SHOP", 시안에 있는 유일한 머리글) + 주아 "말랑 뽑기방". 파트너는 흰 받침 타원 위.
 - **캡슐 머신**: 반투명 흰 돔 + 파스텔 캡슐(흰 이음새, 부드러운 그림자) + 딸기우유 몸통 + 흰 "MALANG" 이름표 + 흰 손잡이 + 어두운 배출구.
   등급이 높을수록 연출(빛·흔들림·신화 이상 전체 화면)이 화려해지는 건 그대로다.
 - **금지**: 굵은 잉크 UI 테두리·잉크색 아랫단 그림자, 흰 글자 + 잉크 외곽선(`-webkit-text-stroke`) 제목, 크림 바탕, 스프링클 무늬,

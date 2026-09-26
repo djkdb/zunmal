@@ -346,7 +346,7 @@ function drawScene(ctx: CanvasRenderingContext2D, s: BalloonState, fx: Fx, reduc
 
   // 점수 팝업
   ctx.textAlign = 'center';
-  ctx.font = '18px "Gowun Dodum", "Pretendard Variable", sans-serif';
+  ctx.font = '18px "Jua", "NanumSquareRound", "Pretendard Variable", sans-serif';
   ctx.lineJoin = 'round';
   for (const p of fx.popups) {
     ctx.globalAlpha = Math.max(0, 1 - p.age / 700);

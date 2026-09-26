@@ -3,7 +3,7 @@
   padding-top: 0;
 }
 
-/* 간판: 영문 머리글 + 고운돋움 가게 이름 (시안 G) */
+/* 간판: 영문 머리글 + 주아 가게 이름 (시안 G) */
 .home__sign {
   display: flex;
   flex-direction: column;

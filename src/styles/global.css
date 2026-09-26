@@ -1,6 +1,21 @@
-/* 글꼴은 npm 패키지로 번들한다(main.tsx에서 import) — 해시 이름 파일이라 서비스 워커가 캐시 우선으로 보관한다.
- *  - 제목: 고운돋움 Gowun Dodum (@fontsource/gowun-dodum, 한글은 유니코드 범위별 조각으로 필요한 것만 받는다)
- *  - 본문: Pretendard Variable (pretendard 패키지의 dynamic-subset) */
+/* 글꼴은 번들한다 — 해시 이름 파일이라 서비스 워커가 캐시 우선으로 보관한다.
+ *  - 제목: 주아 Jua (@fontsource/jua, main.tsx에서 import. 한글은 유니코드 범위별 조각으로 필요한 것만 받는다. 두께는 400 하나)
+ *  - 본문: 나눔스퀘어라운드 (아래 @font-face, scripts/subset-fonts.py 로 완성형 2,350자 + 앱 글자만 남긴 파일 400·800)
+ *  - 빠진 드문 글자는 Pretendard Variable(dynamic-subset)이 대신 그린다 */
+@font-face {
+  font-family: 'NanumSquareRound';
+  src: url('../assets/fonts/nanum-square-round-400.woff2') format('woff2');
+  font-weight: 100 599;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NanumSquareRound';
+  src: url('../assets/fonts/nanum-square-round-800.woff2') format('woff2');
+  font-weight: 600 1000; /* 굵은 글자(버튼 700 포함)는 모두 ExtraBold 한 파일 — 가짜 굵게 만들지 않게 */
+  font-display: swap;
+}
+
 
 /* ------------------------------------------------------------------
  * 말랑 뽑기방 디자인 토큰 — "스카이 소다" (시안 G)
@@ -73,13 +88,14 @@
   --rarity-mythic-ink: #a83d68;
 
   /* ── 글꼴 ── */
-  --font-display: 'Gowun Dodum', 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
-  --font-body: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
+  --font-display: 'Jua', 'NanumSquareRound', 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui,
+    sans-serif;
+  --font-body: 'NanumSquareRound', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
     system-ui, sans-serif;
   /* 버튼·칩·숫자 같은 UI 글자 = 본문 글꼴의 굵은 두께 */
   --font-ui: var(--font-body);
   --fw-ui: 700;
-  --tracking-title: -0.02em;
+  --tracking-title: -0.01em;
 
   /* 타입 스케일 (1.25) */
   --fs-xs: 0.8125rem;
@@ -155,6 +171,8 @@ html {
   background: var(--sky-top);
   /* 두 번 탭 확대 방지 (연타 미니게임에서 화면이 커지지 않게) */
   touch-action: manipulation;
+  /* 주아는 두께가 하나뿐 — 굵게를 흉내 내 뭉개지 않게 */
+  font-synthesis: style;
 }
 
 body {
@@ -302,7 +320,7 @@ strong {
   padding-top: 4px;
 }
 
-/* 화면 제목: 고운돋움, 잉크색, 외곽선·그림자 없음 */
+/* 화면 제목: 주아, 잉크색, 외곽선·그림자 없음 */
 .page-title {
   align-self: center;
   text-align: center;

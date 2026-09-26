@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-// 글꼴(번들 포함, 유니코드 범위 조각이라 화면에 나온 글자 조각만 받는다): 제목 고운돋움, 본문 Pretendard
-import '@fontsource/gowun-dodum/400.css';
+// 글꼴(번들 포함, 유니코드 범위 조각이라 화면에 나온 글자 조각만 받는다): 제목 주아.
+// 본문 나눔스퀘어라운드는 global.css @font-face, Pretendard는 드문 글자 대신 그리기용
+import '@fontsource/jua/400.css';
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 // 전역 스타일을 먼저 불러와야 컴포넌트 CSS가 같은 우선순위에서 전역 규칙을 덮어쓸 수 있다
 import './styles/global.css';
