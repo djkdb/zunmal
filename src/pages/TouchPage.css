@@ -3,17 +3,41 @@
   --jelly: min(60vw, 230px, 29dvh);
 }
 
-/* 애정 게이지: 하트 + 레벨 + 막대 */
+/* 애정 게이지: 하트 + 레벨 + 막대, 아래 줄에 다음에 열릴 반응 */
 .touch__meter {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 14px 4px;
   border: var(--line) solid var(--ink);
-  border-radius: 999px;
+  border-radius: 22px;
   background: var(--paper);
   font-family: var(--font-display);
   min-width: 0;
+}
+
+.touch__meter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.touch__next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.touch__next-icon {
+  flex-shrink: 0;
 }
 
 .touch__level {
@@ -154,6 +178,7 @@
   font-family: var(--font-display);
   white-space: nowrap;
   pointer-events: none;
+  z-index: 3;
   animation: touch-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
@@ -246,6 +271,39 @@
   height: 100%;
 }
 
+/* 입자 캔버스: 3D 캔버스와 같은 상자, 그 위에. 2D 대체 모드에서도 같은 자리 */
+.touch-fx {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: calc(var(--jelly) * -0.55);
+  width: 100%;
+  height: calc(100% + var(--jelly) * 0.55);
+  pointer-events: none;
+}
+
+/* 애정 단계 축하: 등급이 높을수록 크고 화려한 딱지 */
+.touch__celebrate[data-rarity='legendary'] {
+  background: linear-gradient(180deg, #fff1a8, var(--rarity-legendary));
+  font-size: 1.08em;
+  padding: 6px 18px;
+}
+
+.touch__celebrate[data-rarity='mythic'] {
+  background: linear-gradient(100deg, #ffd6e6, var(--rarity-mythic), #ffd23f);
+  font-size: 1.12em;
+  padding: 6px 20px;
+}
+
+.touch__celebrate[data-rarity='secret'] {
+  background: linear-gradient(100deg, #2d1b5e, #5a3fa8, #2d1b5e);
+  color: #fff6c9;
+  font-size: 1.12em;
+  padding: 6px 20px;
+  box-shadow: 0 0 0 3px #fff6c9 inset;
+}
+
 /* 텍스처로 구울 원본 그림: 화면 밖, 애니메이션 없이 멈춘 모습 */
 .touch3d-src {
   position: fixed;
@@ -260,4 +318,188 @@
 .touch3d-src *::after {
   animation: none !important;
   transition: none !important;
+}
+
+/* ── 반응: 눈길·만지기 전용 얼굴·졸기 ───────────────────────── */
+
+/* 얼굴이 손가락 쪽으로 (그림 좌표 단위 = SVG 사용자 단위) */
+.touch__jelly .malang-face,
+.touch__face-extra-g {
+  transform: translate(calc(var(--gaze-x, 0) * 1px), calc(var(--gaze-y, 0) * 1px));
+}
+
+.touch__face-extra {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.touch__jelly--doze .malang {
+  transform-origin: 50% 92%;
+  animation: touch-doze 4.4s ease-in-out infinite;
+}
+
+@keyframes touch-doze {
+  50% {
+    transform: scale(1.025, 0.965);
+  }
+}
+
+.touch__celebrate-new {
+  display: block;
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
+.touch__notice {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 14px;
+  border: var(--line) solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-display);
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ── 사진 찍기 ───────────────────────────────────────────── */
+
+/* 눌리는 버튼: 두꺼운 아랫단 */
+.touch__camera {
+  position: absolute;
+  right: var(--gutter);
+  top: 2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 4px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+}
+
+.touch__camera:active:not(:disabled) {
+  transform: translateY(3px) scale(1.04, 0.94);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.touch__camera:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.touch__camera:focus-visible {
+  outline: 3px dashed var(--berry-deep);
+  outline-offset: 3px;
+}
+
+.touch__flash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #fff;
+  pointer-events: none;
+  animation: touch-flash 0.42s ease-out forwards;
+}
+
+@keyframes touch-flash {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.touch-photo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(43, 34, 51, 0.6);
+}
+
+.touch-photo__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+  padding: 16px 16px 18px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+.touch-photo__title {
+  margin: 0;
+  padding: 0 44px;
+  font-family: var(--font-display);
+  font-size: var(--fs-m, 1.1rem);
+  text-align: center;
+}
+
+.touch-photo__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(58dvh, 440px);
+  border-radius: 12px;
+  aspect-ratio: 4 / 5;
+  object-fit: contain;
+}
+
+.touch-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.touch-photo__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.touch-photo__close:focus-visible {
+  outline: 3px dashed var(--berry-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .touch__jelly--doze .malang,
+  .touch__flash {
+    animation: none;
+  }
+  .touch__camera {
+    transition: none;
+  }
 }

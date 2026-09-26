@@ -3,6 +3,10 @@ import { createSeededRng } from '../lib/rng';
 import { sfx } from './sfx';
 import {
   activeVoiceCount,
+  chime,
+  chimeGate,
+  chimeNotes,
+  CHIME_MAX_STEP,
   clamp01,
   decayTime,
   envelopeAt,
@@ -12,6 +16,14 @@ import {
   poke,
   releaseParams,
   setSquishRandom,
+  shimmer,
+  purr,
+  yawn,
+  surprised,
+  laugh,
+  dizzy,
+  jump,
+  shutter,
   squelchParams,
   squishPress,
   squishRelease,
@@ -87,6 +99,50 @@ describe('squish pure helpers', () => {
     expect(hard.vibratoDepth / hard.baseFreq).toBeGreaterThan(soft.vibratoDepth / soft.baseFreq);
     expect(hard.endFreq).toBeLessThan(hard.baseFreq);
     expect(releaseParams(0.5, () => 0.5, 3).vibratoRate).toBeCloseTo(3);
+  });
+});
+
+describe('rarity chimes', () => {
+  const kinds = ['ping', 'sparkle', 'bell', 'celestial', 'heavenly'] as const;
+
+  it('none is silent; rarer chimes have at least as many notes and ring longer', () => {
+    expect(chimeNotes('none', 0, Math.random)).toEqual([]);
+    let prevCount = 0;
+    let prevDur = 0;
+    for (const k of kinds) {
+      const notes = chimeNotes(k, 0, createSeededRng(1));
+      expect(notes.length).toBeGreaterThanOrEqual(prevCount);
+      const dur = Math.max(...notes.map((n) => n.delay + n.duration));
+      expect(dur).toBeGreaterThan(prevDur);
+      prevCount = notes.length;
+      prevDur = dur;
+      for (const n of notes) {
+        expect(n.freq).toBeGreaterThan(300);
+        expect(n.freq).toBeLessThan(6000);
+        expect(n.gain).toBeGreaterThan(0);
+        expect(n.gain).toBeLessThan(0.1);
+      }
+    }
+  });
+
+  it('combo step climbs the scale and stops at one octave', () => {
+    const f = (step: number) => chimeNotes('ping', step, () => 0.5)[0]!.freq;
+    expect(f(1)).toBeGreaterThan(f(0));
+    expect(f(CHIME_MAX_STEP)).toBeCloseTo(f(0) * 2, 0);
+    expect(f(CHIME_MAX_STEP + 10)).toBe(f(CHIME_MAX_STEP));
+    expect(f(Number.NaN)).toBe(f(0));
+  });
+
+  it('fanfare adds notes for level-ups', () => {
+    for (const k of kinds) {
+      expect(chimeNotes(k, 0, Math.random, true).length).toBe(chimeNotes(k, 0, Math.random).length + 2);
+    }
+  });
+
+  it('gate rate-limits repeats', () => {
+    expect(chimeGate(1, 0.95, 0.11)).toBe(false);
+    expect(chimeGate(1.2, 1, 0.11)).toBe(true);
+    expect(chimeGate(0, -Infinity, 0.11)).toBe(true);
   });
 });
 
@@ -221,6 +277,15 @@ describe('squish audio graph', () => {
     h.stop();
     h.stop();
     h.update(1, 1); // 멈춘 뒤 호출해도 안전
+    for (const k of ['none', 'ping', 'sparkle', 'bell', 'celestial', 'heavenly'] as const) {
+      chime(k, 2, { fanfare: true, shiny: true });
+      vi.runAllTimers();
+    }
+    shimmer();
+    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter]) {
+      fn();
+      vi.runAllTimers();
+    }
     expect(problems).toEqual([]);
     expect(starts).toBeGreaterThan(20);
     expect(created).toBe(1);

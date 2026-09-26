@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MELT_SQUASH,
   TUNING,
   createTouchState,
+  hop,
+  melt,
+  stretchUp,
   drag,
   isAtRest,
   isSettled,
@@ -193,5 +197,38 @@ describe('touch physics', () => {
     const copy = JSON.parse(JSON.stringify(s0)) as TouchState;
     step(poke(press(s0, { x: 0, y: 0 }, 1), { x: 0, y: 0 }), 16);
     expect(s0).toEqual(copy);
+  });
+});
+
+describe('reactions: melt, hop, stretchUp', () => {
+  it('melting spreads flatter than the deepest press and recovers after release', () => {
+    const pressed = run(press(createTouchState(), { x: 0, y: 0 }, 1), 1500);
+    const melted = run(melt(createTouchState(), { x: 0.4, y: 0 }, 1), 1500);
+    expect(toTransform(melted).scaleY).toBeLessThan(toTransform(pressed).scaleY);
+    expect(melted.squash.target).toBeCloseTo(MELT_SQUASH);
+    expect(melted.lean.target).toBeCloseTo(0);
+    const half = melt(createTouchState(), { x: 0, y: 0 }, 0.5);
+    expect(half.squash.target).toBeLessThan(MELT_SQUASH);
+    const back = run(release(melted), 6000);
+    expect(isAtRest(back)).toBe(true);
+    expect(melt(createTouchState(), { x: 0, y: 0 }, Number.NaN).squash.target).toBeCloseTo(TUNING.pressMax);
+  });
+
+  it('hop jumps up (negative offset) and lands back', () => {
+    let s = hop(createTouchState(), 1);
+    let minY = 0;
+    s = run(s, 6000, (f) => {
+      minY = Math.min(minY, toTransform(f).translateY);
+    });
+    expect(minY).toBeLessThan(-0.2);
+    expect(isAtRest(s)).toBe(true);
+  });
+
+  it('stretchUp makes the body taller for a moment', () => {
+    let maxY = 1;
+    run(stretchUp(createTouchState(), 1), 1000, (f) => {
+      maxY = Math.max(maxY, toTransform(f).scaleY);
+    });
+    expect(maxY).toBeGreaterThan(1.08);
   });
 });

@@ -54,6 +54,8 @@ export interface SoftState {
   /** 누적 시간 (ms) — 숨쉬기 위상 */
   timeMs: number;
   reducedMotion: boolean;
+  /** 졸고 있다: 느리고 깊게 계속 숨쉰다 */
+  doze?: boolean;
 }
 
 /** 변형에 쓰는 전체 자세 */
@@ -103,6 +105,9 @@ export const SOFT_TUNING = {
   breathFadeInMs: 700,
   breathHoldMs: 6000,
   breathFadeOutMs: 1600,
+  /** 졸 때 숨쉬기: 세기 배수, 주기 배수 */
+  dozeBreath: 1.8,
+  dozePeriod: 1.6,
 } as const;
 
 // ── 유틸 ──────────────────────────────────────────────────
@@ -154,6 +159,11 @@ export function createSoftState(options: { reducedMotion?: boolean } = {}): Soft
 
 export function setSoftReducedMotion(state: SoftState, reducedMotion: boolean): SoftState {
   return { ...state, reducedMotion };
+}
+
+/** 졸기 시작/깨기 */
+export function setSoftDoze(state: SoftState, doze: boolean): SoftState {
+  return { ...state, doze };
 }
 
 function pushDent(dents: readonly Dent[], dent: Dent): Dent[] {
@@ -327,6 +337,7 @@ export function stepSoft(state: SoftState, dtMs: number): SoftState {
 export function breathLevel(state: SoftState): number {
   if (state.reducedMotion || state.held) return 0;
   const T = SOFT_TUNING;
+  if (state.doze) return T.dozeBreath;
   const t = state.idleMs;
   return smoothstep(0, T.breathFadeInMs, t) * (1 - smoothstep(T.breathHoldMs, T.breathHoldMs + T.breathFadeOutMs, t));
 }
@@ -374,7 +385,8 @@ export function softEnergy(state: SoftState): number {
  */
 export function composePose(touch: TouchState, soft: SoftState, unit = 74): Pose {
   const t = toTransform(touch);
-  const b = 1 + SOFT_TUNING.breathAmp * breathLevel(soft) * Math.sin((2 * Math.PI * soft.timeMs) / SOFT_TUNING.breathPeriodMs);
+  const period = SOFT_TUNING.breathPeriodMs * (soft.doze ? SOFT_TUNING.dozePeriod : 1);
+  const b = 1 + SOFT_TUNING.breathAmp * breathLevel(soft) * Math.sin((2 * Math.PI * soft.timeMs) / period);
   const sy = t.scaleY * b;
   const sx = t.scaleX / Math.sqrt(b);
   return {

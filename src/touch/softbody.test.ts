@@ -6,6 +6,8 @@ import {
   REST_POSE,
   SOFT_TUNING,
   breathLevel,
+  setSoftDoze,
+  setSoftReducedMotion,
   composePose,
   createScratch,
   createSoftState,
@@ -234,5 +236,21 @@ describe('deformPoints', () => {
     deformPoints(src, 2, 80, { ...REST_POSE, lean: 0.2 }, createSoftState(), out);
     expect(out[0]).toBeCloseTo(10);
     expect(out[3]).toBeCloseTo(10 + 16);
+  });
+});
+
+describe('doze breathing', () => {
+  it('keeps breathing slowly and deeply while dozing, then can rest again', () => {
+    let s = createSoftState();
+    s = stepSoft(s, 20);
+    for (let i = 0; i < 600; i++) s = stepSoft(s, 50); // 30초
+    expect(breathLevel(s)).toBe(0);
+    expect(isSoftAtRest(s)).toBe(true);
+    s = setSoftDoze(s, true);
+    expect(breathLevel(s)).toBeGreaterThan(1);
+    expect(isSoftAtRest(s)).toBe(false);
+    s = setSoftDoze(s, false);
+    expect(isSoftAtRest(s)).toBe(true);
+    expect(breathLevel(setSoftReducedMotion(setSoftDoze(s, true), true))).toBe(0);
   });
 });

@@ -225,6 +225,42 @@ export function tickle(state: TouchState, direction: number): TouchState {
   };
 }
 
+/** 녹아내렸을 때 눌림 (가장 납작한 쉬는 자세) */
+export const MELT_SQUASH = 0.46;
+
+/**
+ * 오래 누르고 있으면 녹아내린다: amount 0..1 만큼 누름 자세에서 납작하게 퍼진 자세로.
+ * 누르고 있는 동안 반복 호출한다 (press 대신).
+ */
+export function melt(state: TouchState, point: { x: number; y: number }, amount: number): TouchState {
+  const a = clamp(Number.isFinite(amount) ? amount : 0, 0, 1);
+  const base = press(state, point, 1);
+  const pressT = base.squash.target;
+  return {
+    ...base,
+    squash: withTarget(base.squash, pressT + (MELT_SQUASH - pressT) * a),
+    lean: withTarget(base.lean, base.lean.target * (1 - a)),
+  };
+}
+
+/**
+ * 폴짝 뛰기 (애교 점프·깜짝 놀라 깨기): 위로 튀어 오르며 길쭉해졌다가 출렁이며 내려앉는다. strength 0..1.
+ */
+export function hop(state: TouchState, strength = 1): TouchState {
+  const s = clamp(Number.isFinite(strength) ? strength : 0, 0, 1);
+  return {
+    ...state,
+    offsetY: kick(state.offsetY, -(3.5 + 4 * s)),
+    squash: kick(state.squash, -(2.5 + 3 * s)),
+  };
+}
+
+/** 하품하며 기지개: 위로 쭉 늘어났다 돌아온다. strength 0..1 */
+export function stretchUp(state: TouchState, strength = 1): TouchState {
+  const s = clamp(Number.isFinite(strength) ? strength : 0, 0, 1);
+  return { ...state, squash: kick(state.squash, -(1.5 + 2 * s)) };
+}
+
 // ── 적분 ──────────────────────────────────────────────────
 
 function zetaFor(t: SpringTuning, held: boolean, reduced: boolean): number {

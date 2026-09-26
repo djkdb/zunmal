@@ -599,3 +599,380 @@ export function happy(): void {
     }
   });
 }
+
+// ── 등급별 방울 소리 (만지기) ──────────────────────────────
+
+/** 등급별 방울 층 (data/rarity.ts 의 TouchChime 과 같은 이름) */
+export type ChimeKind = 'none' | 'ping' | 'sparkle' | 'bell' | 'celestial' | 'heavenly';
+
+export interface ChimeNote {
+  delay: number;
+  freq: number;
+  duration: number;
+  gain: number;
+  /** 종처럼 어긋난 배음 비율 (1 = 기본음) */
+  partials: readonly number[];
+}
+
+/** 장조 5음 음계 (연달아 찌를수록 한 칸씩 오른다) */
+const PENTA = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2] as const;
+/** 음계 사다리 상한 (1옥타브) */
+export const CHIME_MAX_STEP = PENTA.length - 1;
+
+interface ChimeRecipe {
+  base: number;
+  notes: number;
+  spacing: number;
+  duration: number;
+  gain: number;
+  partials: readonly number[];
+}
+
+const CHIME_RECIPES: Record<Exclude<ChimeKind, 'none'>, ChimeRecipe> = {
+  // 레어: 작은 "띵" 하나
+  ping: { base: 1568, notes: 1, spacing: 0, duration: 0.22, gain: 0.045, partials: [1, 2.76] },
+  // 에픽: 두 음 반짝
+  sparkle: { base: 1319, notes: 2, spacing: 0.055, duration: 0.3, gain: 0.05, partials: [1, 2, 3.1] },
+  // 전설: 금종 세 음
+  bell: { base: 1047, notes: 3, spacing: 0.06, duration: 0.55, gain: 0.055, partials: [1, 2.76, 5.4] },
+  // 신화: 맑은 종 + 한 옥타브 위 울림
+  celestial: { base: 880, notes: 3, spacing: 0.07, duration: 0.75, gain: 0.055, partials: [1, 2, 2.76, 4.1] },
+  // 시크릿: 천상의 종 (반짝 울림은 shimmer 가 따로)
+  heavenly: { base: 784, notes: 4, spacing: 0.07, duration: 0.9, gain: 0.05, partials: [1, 2, 3, 4.2] },
+};
+
+/**
+ * 방울 음들 (순수). step = 연달아 찌른 횟수(0부터) → 음계 사다리, fanfare = 애정 단계 축하(음 두 개 더, 느리게).
+ */
+export function chimeNotes(kind: ChimeKind, step: number, r: Rand, fanfare = false): ChimeNote[] {
+  if (kind === 'none') return [];
+  const rec = CHIME_RECIPES[kind];
+  const s = Math.max(0, Math.min(CHIME_MAX_STEP, Math.floor(Number.isFinite(step) ? step : 0)));
+  const count = rec.notes + (fanfare ? 2 : 0);
+  const spacing = fanfare ? Math.max(0.08, rec.spacing * 1.6) : rec.spacing;
+  const notes: ChimeNote[] = [];
+  for (let n = 0; n < count; n++) {
+    // 위로 올라가는 아르페지오: 음계 한 칸씩 (음계 끝을 넘으면 한 옥타브 위 첫 음부터)
+    const k = s + n;
+    const ratio = k < PENTA.length ? (PENTA[k] ?? 1) : 2 * (PENTA[k - PENTA.length + 1] ?? 1);
+    notes.push({
+      delay: n * spacing,
+      freq: jitter(rec.base * ratio, 0.01, r),
+      duration: rec.duration * (fanfare ? 1.3 : 1),
+      gain: rec.gain * (n === count - 1 ? 1 : 0.8),
+      partials: rec.partials,
+    });
+  }
+  return notes;
+}
+
+/** 같은 소리 연타 간격 제한 (초). 순수 헬퍼 */
+export function chimeGate(now: number, last: number, minGap: number): boolean {
+  return !(now - last < minGap);
+}
+
+/** 방울 소리 최소 간격 — 빠르게 연타해도 어수선하지 않게 */
+export const CHIME_MIN_GAP = 0.11;
+/** 시크릿 천상의 반짝 울림 최소 간격 */
+export const SHIMMER_MIN_GAP = 1.6;
+const MAX_CHIME_VOICES = 3;
+let chimeVoices = 0;
+let lastChimeAt = -Infinity;
+let lastShimmerAt = -Infinity;
+
+function takeChimeVoice(duration: number): boolean {
+  if (chimeVoices >= MAX_CHIME_VOICES) return false;
+  chimeVoices++;
+  setTimeout(
+    () => {
+      chimeVoices = Math.max(0, chimeVoices - 1);
+    },
+    Math.ceil(duration * 1000) + 60,
+  );
+  return true;
+}
+
+function bellTone(ctx: AudioContext, out: AudioNode, t0: number, note: ChimeNote) {
+  const t = t0 + note.delay;
+  note.partials.forEach((ratio, i) => {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(note.freq * ratio, t);
+    // 높은 배음일수록 작고 빨리 사라진다 (종소리)
+    const dur = note.duration / (1 + i * 0.8);
+    envelope(env.gain, t, 0.004, note.gain / (1 + i * 1.6), t + dur);
+    osc.connect(env);
+    env.connect(out);
+    osc.start(t);
+    osc.stop(t + dur + 0.03);
+  });
+}
+
+/**
+ * 등급별 방울 소리를 젤리 소리 위에 얹는다. kind 'none' 이고 반짝이 아니면 아무것도 하지 않는다.
+ * 최소 간격(CHIME_MIN_GAP)보다 빠른 연타는 건너뛴다. 시크릿(heavenly)은 가끔 천상의 반짝 울림도 더한다.
+ */
+export function chime(kind: ChimeKind, step = 0, opts: { fanfare?: boolean; shiny?: boolean } = {}): void {
+  if (kind === 'none' && !opts.shiny) return;
+  const o = output();
+  if (!o) return;
+  const now = o.ctx.currentTime;
+  if (!opts.fanfare && !chimeGate(now, lastChimeAt, CHIME_MIN_GAP)) return;
+  const notes = chimeNotes(kind, step, rand, opts.fanfare);
+  if (opts.shiny) {
+    // 반짝: 맨 끝에 아주 높은 반짝 한 음
+    const last = notes[notes.length - 1];
+    notes.push({
+      delay: (last?.delay ?? 0) + 0.05,
+      freq: jitter(3136, 0.02, rand),
+      duration: 0.25,
+      gain: 0.025,
+      partials: [1, 2.4],
+    });
+  }
+  if (notes.length === 0) return;
+  const length = Math.max(...notes.map((n) => n.delay + n.duration));
+  if (!takeChimeVoice(length)) return;
+  lastChimeAt = now;
+  safe(() => {
+    const t0 = o.ctx.currentTime + 0.01;
+    for (const n of notes) bellTone(o.ctx, o.out, t0, n);
+  });
+  if (kind === 'heavenly' && (opts.fanfare || chimeGate(now, lastShimmerAt, SHIMMER_MIN_GAP))) {
+    lastShimmerAt = now;
+    shimmer();
+  }
+}
+
+/** 시크릿: 부드러운 천상의 반짝 울림 (높은 사인파 여럿이 천천히 피었다 사라진다) */
+export function shimmer(): void {
+  const o = output();
+  if (!o) return;
+  const dur = 1.4;
+  if (!takeChimeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.01;
+    const bus = ctx.createGain();
+    envelope(bus.gain, t0, 0.35, 1, t0 + dur);
+    bus.connect(out);
+    // 떨림(트레몰로)으로 반짝이는 느낌
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = jitter(7, 0.1, rand);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.35;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.65;
+    lfo.connect(depth);
+    depth.connect(trem.gain);
+    trem.connect(bus);
+    for (const f of [2093, 2637, 3136, 3951, 4186]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(jitter(f, 0.004, rand), t0);
+      const g = ctx.createGain();
+      g.gain.value = 0.014;
+      osc.connect(g);
+      g.connect(trem);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    }
+    lfo.start(t0);
+    lfo.stop(t0 + dur + 0.05);
+    setTimeout(() => safe(() => bus.disconnect()), (dur + 0.3) * 1000);
+  });
+}
+
+// ── 반응 소리 (만지기) ─────────────────────────────────────
+
+/** 짧은 사인 글라이드 한 음 (공용) */
+function glide(
+  ctx: AudioContext,
+  out: AudioNode,
+  t: number,
+  from: number,
+  to: number,
+  dur: number,
+  gain: number,
+  type: OscillatorType = 'sine',
+) {
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(from, t);
+  osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+  envelope(env.gain, t, Math.min(0.02, dur * 0.2), gain, t + dur);
+  osc.connect(env);
+  env.connect(out);
+  osc.start(t);
+  osc.stop(t + dur + 0.03);
+}
+
+const lastReaction: Record<string, number> = {};
+
+/** 같은 반응 소리 연타 제한 */
+function gated(name: string, ctx: AudioContext, gap: number): boolean {
+  const now = ctx.currentTime;
+  if (!chimeGate(now, lastReaction[name] ?? -Infinity, gap)) return false;
+  lastReaction[name] = now;
+  return true;
+}
+
+/**
+ * 머리 쓰다듬기: 고양이 가르랑 같은 부드러운 "르르르" (폰 스피커에서도 들리게 200Hz 위 대역 노이즈를 22Hz 로 떨게 한다)
+ */
+export function purr(): void {
+  const o = output();
+  if (!o || !gated('purr', o.ctx, 0.9)) return;
+  const dur = 0.85;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const src = noiseSource(ctx, t0, dur);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'bandpass';
+    lp.frequency.value = jitter(320, 0.1, rand);
+    lp.Q.value = 1.4;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = jitter(23, 0.08, rand);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.5;
+    lfo.connect(depth);
+    depth.connect(trem.gain);
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.12, 0.35, t0 + dur);
+    src.connect(lp);
+    lp.connect(trem);
+    trem.connect(env);
+    env.connect(out);
+    lfo.start(t0);
+    lfo.stop(t0 + dur + 0.05);
+    // 기분 좋은 "음~" 허밍
+    glide(ctx, out, t0 + 0.05, jitter(330, 0.05, rand), 300, dur * 0.8, 0.035, 'triangle');
+  });
+}
+
+/** 하품: "하아암~" (올라갔다 내려오는 모음 + 숨소리) */
+export function yawn(): void {
+  const o = output();
+  if (!o || !gated('yawn', o.ctx, 2)) return;
+  const dur = 1.1;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(260, t0);
+    osc.frequency.exponentialRampToValueAtTime(420, t0 + dur * 0.35);
+    osc.frequency.exponentialRampToValueAtTime(210, t0 + dur);
+    const formant = ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.frequency.setValueAtTime(800, t0);
+    formant.frequency.exponentialRampToValueAtTime(1100, t0 + dur * 0.4);
+    formant.frequency.exponentialRampToValueAtTime(600, t0 + dur);
+    formant.Q.value = 2;
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.18, 0.16, t0 + dur);
+    osc.connect(formant);
+    formant.connect(env);
+    env.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+    // 숨소리
+    slap(ctx, out, t0 + 0.05, 0.05, 1400, dur * 0.7);
+  });
+}
+
+/** 깜짝 놀라 깰 때: "뿅!" */
+export function surprised(): void {
+  const o = output();
+  if (!o || !gated('surprised', o.ctx, 0.5)) return;
+  if (!takeVoice(0.25)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    glide(ctx, out, t0, 520, 1560, 0.12, 0.16);
+    glide(ctx, out, t0 + 0.1, 1400, 1700, 0.1, 0.08, 'triangle');
+  });
+}
+
+/** 깔깔 웃음: 짧은 웃음 두 번, 두 번째가 더 높다 */
+export function laugh(): void {
+  const o = output();
+  if (!o || !gated('laugh', o.ctx, 0.8)) return;
+  const count = 6;
+  if (!takeVoice(count * 0.08 + 0.15)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const base = jitter(820, 0.06, rand);
+    for (let n = 0; n < count; n++) {
+      const t = t0 + n * 0.075 + (n >= 3 ? 0.06 : 0);
+      const f0 = base * (n >= 3 ? 1.12 : 1) * (1 - (n % 3) * 0.05);
+      glide(ctx, out, t, f0 * 1.15, f0 * 0.85, 0.06, 0.09, 'triangle');
+    }
+  });
+}
+
+/** 빙글빙글: 내려가며 흔들리는 "삐요요요~" */
+export function dizzy(): void {
+  const o = output();
+  if (!o || !gated('dizzy', o.ctx, 1)) return;
+  const dur = 0.9;
+  if (!takeVoice(dur)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1500, t0);
+    osc.frequency.exponentialRampToValueAtTime(500, t0 + dur);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 9;
+    const depth = ctx.createGain();
+    depth.gain.value = 120;
+    lfo.connect(depth);
+    depth.connect(osc.frequency);
+    const env = ctx.createGain();
+    envelope(env.gain, t0, 0.02, 0.1, t0 + dur);
+    osc.connect(env);
+    env.connect(out);
+    osc.start(t0);
+    lfo.start(t0);
+    osc.stop(t0 + dur + 0.05);
+    lfo.stop(t0 + dur + 0.05);
+  });
+}
+
+/** 애교 점프: 위로 "뾰롱" + 착지 "퐁" */
+export function jump(): void {
+  const o = output();
+  if (!o || !gated('jump', o.ctx, 0.5)) return;
+  if (!takeVoice(0.55)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    glide(ctx, out, t0, 400, 1200, 0.18, 0.15);
+    glide(ctx, out, t0 + 0.08, 800, 2000, 0.14, 0.05, 'triangle');
+    thump(ctx, out, t0 + 0.42, 140, 0.2, 0.1);
+  });
+}
+
+/** 사진 찍기: 기계식 셔터 "찰-칵" */
+export function shutter(): void {
+  const o = output();
+  if (!o) return;
+  if (!takeVoice(0.2)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.005;
+    slap(ctx, out, t0, 0.22, 3200, 0.03);
+    slap(ctx, out, t0 + 0.085, 0.3, 2200, 0.05);
+    thump(ctx, out, t0 + 0.085, 220, 0.08, 0.05);
+  });
+}
