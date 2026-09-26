@@ -7,8 +7,8 @@
 .mg-intro__icon {
   display: grid;
   place-items: center;
-  width: 128px;
-  height: 128px;
+  width: 96px;
+  height: 96px;
   border: var(--line) solid var(--ink);
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff 0 20%, var(--lemon) 75%);
@@ -19,8 +19,8 @@
 }
 
 .mg-intro__icon svg {
-  width: 88px;
-  height: 88px;
+  width: 66px;
+  height: 66px;
 }
 
 @keyframes intro-bob {
@@ -50,4 +50,8 @@
 
 .mg-intro .btn--big {
   margin-top: 8px;
+}
+
+.mg-intro__partner {
+  max-width: 400px;
 }

@@ -187,3 +187,48 @@
     animation: none;
   }
 }
+
+/* 파트너: 최고 기록이면 웃는 눈 + 하트 두 개가 번갈아 떠오른다 */
+.mg-result__partner {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.mg-result__heart {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+}
+
+.mg-result__heart--0 {
+  top: 6px;
+  right: -18px;
+}
+
+.mg-result__heart--1 {
+  top: 26px;
+  left: -16px;
+  width: 20px;
+  height: 20px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mg-result__heart {
+    animation: mg-heart-float 1.6s ease-in-out infinite;
+  }
+
+  .mg-result__heart--1 {
+    animation-delay: -0.8s;
+  }
+}
+
+@keyframes mg-heart-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(8deg);
+  }
+}

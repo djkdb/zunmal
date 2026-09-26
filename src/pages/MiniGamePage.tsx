@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { MiniGameLobby } from '../components/MiniGameLobby';
 import { MiniGameResult } from '../components/MiniGameResult';
+import { PartnerPicker, usePartnerShiny } from '../components/PartnerPicker';
 import { getCharacter } from '../data/characters';
 import { holdCounter } from '../lib/coinFx';
 import { getMiniGame } from '../minigames/registry';
@@ -40,6 +41,7 @@ type Phase =
 function MiniGameRunner({ game }: { game: MiniGame }) {
   const navigate = useNavigate();
   const partnerId = useGameStore((s) => s.partnerId);
+  const partnerShiny = usePartnerShiny();
   const finishMiniGame = useGameStore((s) => s.finishMiniGame);
   const [phase, setPhase] = useState<Phase>({ kind: 'intro' });
   const best = useGameStore((s) => s.miniGameRecords[game.id]?.bestScore ?? 0);
@@ -80,6 +82,7 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
         </h1>
         <p className="mg-intro__desc">{game.description}</p>
         {game.controls && <p className="mg-intro__controls">{game.controls}</p>}
+        <PartnerPicker className="mg-intro__partner" />
         <p className="mg-intro__best">{best > 0 ? `내 최고 기록 ${best.toLocaleString()}점` : '첫 도전이에요!'}</p>
         <button
           type="button"
@@ -104,6 +107,7 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
       <MiniGameResult
         gameName={game.name}
         partner={partner}
+        partnerShiny={partnerShiny}
         payload={phase.payload}
         result={phase.result}
         onRetry={() => {
@@ -118,7 +122,7 @@ function MiniGameRunner({ game }: { game: MiniGame }) {
   const Game = game.Component;
   return (
     <section className="page minigame-stage" aria-label={game.name}>
-      <Game key={phase.round} partner={partner} onFinish={onFinish} onExit={onExit} sfx={sfx} />
+      <Game key={phase.round} partner={partner} partnerShiny={partnerShiny} onFinish={onFinish} onExit={onExit} sfx={sfx} />
     </section>
   );
 }

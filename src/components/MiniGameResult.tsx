@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import type { Character } from '../data/characters';
+import { moodCharacter } from '../minigames/shared/partner';
 import type { MiniGameResultPayload } from '../minigames/types';
 import { PULL_PRICE } from '../economy/config';
 import { useCountUp } from '../hooks/useCountUp';
@@ -16,6 +17,8 @@ import './MiniGameResult.css';
 interface MiniGameResultProps {
   gameName: string;
   partner: Character;
+  /** 파트너를 반짝 모습으로 */
+  partnerShiny?: boolean;
   payload: MiniGameResultPayload;
   result: MiniGameFinishResult;
   onRetry(): void;
@@ -66,8 +69,22 @@ function Confetti() {
   );
 }
 
+/** 최고 기록일 때 파트너 옆에 떠오르는 하트 두 개 */
+function CheerHearts() {
+  const heart = 'M12 20 C4 14 2 10 4.5 6.5 C7 3.5 10.5 4.5 12 7.5 C13.5 4.5 17 3.5 19.5 6.5 C22 10 20 14 12 20 Z';
+  return (
+    <>
+      {[0, 1].map((i) => (
+        <svg key={i} className={`mg-result__heart mg-result__heart--${i}`} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d={heart} fill={i === 0 ? '#ff7aa2' : '#ffd23f'} stroke="#2b2233" strokeWidth="2" strokeLinejoin="round" />
+        </svg>
+      ))}
+    </>
+  );
+}
+
 /** 모든 미니게임 공통 결과 화면 */
-export function MiniGameResult({ gameName, partner, payload, result, onRetry }: MiniGameResultProps) {
+export function MiniGameResult({ gameName, partner, partnerShiny = false, payload, result, onRetry }: MiniGameResultProps) {
   const { reward, isNewBest, previousBest } = result;
   const isFirst = isNewBest && previousBest === 0;
   const coins = useGameStore((s) => s.coins);
@@ -101,7 +118,17 @@ export function MiniGameResult({ gameName, partner, payload, result, onRetry }: 
             {isFirst ? '첫 기록이에요!' : isNewBest ? '최고 기록 갱신!' : '다 했어요!'}
           </h1>
         </div>
-        <Malang character={partner} size={122} animation={isNewBest ? 'bounce' : 'idle'} decorative aura="auto" />
+        <div className={`mg-result__partner${isNewBest ? ' is-cheering' : ''}`}>
+          <Malang
+            character={isNewBest ? moodCharacter(partner, 'happy') : partner}
+            size={122}
+            animation={isNewBest ? 'bounce' : 'idle'}
+            shiny={partnerShiny}
+            decorative
+            aura="auto"
+          />
+          {isNewBest && <CheerHearts />}
+        </div>
         <p className="mg-result__score">
           <span className="small muted">점수</span>
           <strong aria-hidden="true">{score.toLocaleString()}</strong>

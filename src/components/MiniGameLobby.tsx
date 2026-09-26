@@ -1,60 +1,20 @@
-import { josa } from '../lib/josa';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
-import { CHARACTERS, getCharacter } from '../data/characters';
-import { DAILY_CAP, PARTNER_RARITY_BONUS, PER_GAME_CAP } from '../economy/config';
+import { DAILY_CAP, PER_GAME_CAP } from '../economy/config';
 import { MINI_GAMES } from '../minigames/registry';
 import { useGameStore } from '../store/useGameStore';
-import { Malang } from './Malang';
-import { RarityBadge } from './RarityBadge';
+import { PartnerPicker } from './PartnerPicker';
 import './MiniGameLobby.css';
 
 /** 미니게임 로비: 파트너 선택 + 게임 목록 (registry 기반) */
 export function MiniGameLobby() {
-  const owned = useGameStore((s) => s.ownedMalangs);
-  const partnerId = useGameStore((s) => s.partnerId);
-  const setPartner = useGameStore((s) => s.setPartner);
   const records = useGameStore((s) => s.miniGameRecords);
   const dailyEarned = useGameStore((s) => s.dailyEarnedCoins);
-  const partner = partnerId ? getCharacter(partnerId) : undefined;
-  const ownedChars = CHARACTERS.filter((c) => owned[c.id]);
   const dailyLeft = Math.max(0, DAILY_CAP - dailyEarned);
 
   return (
     <div className="lobby">
-      <section className="lobby__partner" aria-labelledby="lobby-partner-title">
-        <h2 id="lobby-partner-title" className="visually-hidden">
-          함께할 파트너
-        </h2>
-        <div className="lobby__partners" role="radiogroup" aria-labelledby="lobby-partner-title">
-          {ownedChars.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              role="radio"
-              aria-checked={partnerId === c.id}
-              aria-label={c.name}
-              className={`lobby__partner-btn${partnerId === c.id ? ' is-selected' : ''}`}
-              onClick={() => {
-                sfx.button();
-                setPartner(c.id);
-              }}
-            >
-              <Malang character={c} size={52} animation="none" decorative />
-            </button>
-          ))}
-        </div>
-        {partner && (
-          <p className="lobby__partner-info">
-            {josa(partner.name, '과/와')} 함께{' '}
-            {PARTNER_RARITY_BONUS[partner.rarity] > 0 ? (
-              <span className="lobby__bonus">코인 +{Math.round(PARTNER_RARITY_BONUS[partner.rarity] * 100)}%</span>
-            ) : (
-              <RarityBadge rarity={partner.rarity} compact />
-            )}
-          </p>
-        )}
-      </section>
+      <PartnerPicker />
 
       {MINI_GAMES.length === 0 ? (
         <p className="card">미니게임을 준비하고 있어요.</p>
