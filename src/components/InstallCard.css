@@ -8,6 +8,8 @@
   border: var(--line) solid var(--ink);
   border-radius: var(--radius-panel);
   background: var(--paper);
+  /* 한국어는 어절 단위로 줄바꿈 ("열/려요" 같은 끊김 방지) */
+  word-break: keep-all;
 }
 
 .install__icon {
@@ -95,4 +97,15 @@
 
 .install--inapp .install__text {
   color: var(--ink);
+}
+
+/* 앱 안 브라우저: 기록 코드 복사 (브라우저로 옮기기 전에) */
+.install__save {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2.5px dashed rgba(43, 34, 51, 0.25);
+}
+
+.install__save .install__text {
+  margin-top: 0;
 }

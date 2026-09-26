@@ -1,0 +1,86 @@
+/* 기록 옮기기: 평평한 안내 패널(누르는 것만 아랫단 그림자를 가진다). 교환권처럼 점선으로 한 칸 나눈다. */
+.save-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-slot);
+  background:
+    radial-gradient(circle at 0 50%, var(--cream) 0 9px, transparent 9.5px),
+    radial-gradient(circle at 100% 50%, var(--cream) 0 9px, transparent 9.5px),
+    var(--paper);
+}
+
+.save-transfer__title {
+  font-size: var(--fs-m);
+}
+
+.save-transfer__text,
+.save-transfer__note,
+.save-transfer__confirm p {
+  font-size: var(--fs-s);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  word-break: keep-all;
+}
+
+.save-transfer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.save-transfer__form,
+.save-transfer__confirm,
+.save-transfer__manual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 2.5px dashed rgba(43, 34, 51, 0.28);
+}
+
+.save-transfer__form .btn {
+  align-self: flex-start;
+}
+
+.save-transfer__label {
+  font-size: var(--fs-s);
+}
+
+.save-transfer__code {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--radius-s);
+  background: #fff;
+  color: var(--ink);
+  font: 0.8125rem/1.35 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  word-break: break-all;
+  resize: vertical;
+}
+
+.save-transfer__code:focus-visible {
+  outline: 3px solid var(--soda);
+  outline-offset: 2px;
+}
+
+.save-transfer__confirm p {
+  color: var(--ink);
+}
+
+.save-transfer__note.is-error {
+  color: #c2334a;
+}
+
+.save-transfer__note.is-ok {
+  color: var(--ink);
+}
+
+/* 복사 버튼 옆(가로 줄)에 붙어도 한 줄을 통째로 쓴다 */
+.save-transfer__manual {
+  flex: 1 1 100%;
+  min-width: 0;
+}

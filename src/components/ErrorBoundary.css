@@ -1,0 +1,63 @@
+/* 오류 화면: 반쯤 열린 캡슐 + 한 가지 할 일(다시 불러오기) */
+.crash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: var(--max-w);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px var(--gutter) 32px;
+  text-align: center;
+}
+
+.crash__capsule {
+  width: 120px;
+  height: 120px;
+}
+
+.crash__title {
+  font-size: var(--fs-xl);
+  line-height: 1.15;
+  color: var(--paper);
+  -webkit-text-stroke: 8px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--ink);
+  word-break: keep-all;
+}
+
+.crash__text {
+  max-width: 30ch;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.crash__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.crash__save {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 2.5px dashed rgba(43, 34, 51, 0.25);
+}
+
+.crash__code {
+  width: 100%;
+  padding: 8px 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: var(--radius-s);
+  background: #fff;
+  font: 0.8125rem/1.35 ui-monospace, Menlo, monospace;
+  word-break: break-all;
+}
