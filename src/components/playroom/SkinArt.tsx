@@ -96,7 +96,7 @@ export function drawSkin2d(els: BodyEls, s: Surface2d): void {
       const y = VIEWBOX.y + d.y * VIEWBOX.w;
       const r = d.r * VIEWBOX.w * (0.85 + 0.25 * d.depth);
       dent.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${r.toFixed(3)})`);
-      dent.setAttribute('opacity', Math.min(1, d.depth * 1.3).toFixed(3));
+      dent.setAttribute('opacity', (Math.min(1, d.depth * 1.3) * d.shade).toFixed(3));
       const cr = dent.lastElementChild;
       if (cr) cr.setAttribute('opacity', (d.crease * 0.55).toFixed(3));
     } else if (dent.getAttribute('opacity') !== '0') {

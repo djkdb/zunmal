@@ -937,10 +937,10 @@
 
 .pr-shelf__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 22px 10px;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 34px 6px;
   margin: 0;
-  padding: 0 0 6px;
+  padding: 0 0 24px;
   list-style: none;
 }
 
@@ -1022,6 +1022,24 @@
   font-size: 0.625rem;
   line-height: 1.4;
   letter-spacing: 0.02em;
+}
+
+/* 연 말랑이 이름: 받침 아래 한 줄 (길면 말줄임) */
+.pr-shelf__name {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .pr-shelf__rarity {
@@ -1690,6 +1708,25 @@
   box-shadow: var(--shadow-card);
   aspect-ratio: 4 / 5;
   object-fit: contain;
+}
+
+/* 길게 눌러 저장: 이 사진만 길게 누르기 메뉴(iOS 사진 저장)를 허용 — 전역·놀이방의 touch-callout 막음의 예외 */
+.touch-photo__img--hold {
+  max-height: min(66dvh, 560px);
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  user-select: auto;
+  -webkit-user-drag: auto;
+  pointer-events: auto;
+  touch-action: auto;
+}
+
+.touch-photo__hint {
+  margin: 0;
+  font-size: var(--fs-s);
+  line-height: 1.45;
+  color: var(--sub);
+  text-align: center;
 }
 
 .touch-photo__actions {

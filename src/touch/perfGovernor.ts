@@ -19,6 +19,11 @@ export interface PerfState {
   sampledMs: number;
   /** 한 번 올리면 다시 올리지 않는다 (왔다 갔다 방지) */
   upgraded: boolean;
+  /**
+   * 첫 판단을 마쳤다 — 그 전에는 상한이 곧 바뀔 수 있어(폰 3 → 5) 화면에 "N/상한"을 보이지 않는다.
+   * 데스크톱은 처음부터 가장 큰 상한이라 바로 true.
+   */
+  settled: boolean;
 }
 
 export const PERF_TUNING = {
@@ -49,6 +54,7 @@ export function createPerf(options: { phone: boolean; quality: RenderQuality }):
     samples: 0,
     sampledMs: 0,
     upgraded: false,
+    settled: !options.phone,
   };
 }
 
@@ -60,7 +66,7 @@ export function samplePerf(state: PerfState, gapMs: number): PerfState {
   const sampledMs = state.sampledMs + gapMs;
   const next = { ...state, emaMs, samples, sampledMs };
   if (samples < PERF_TUNING.minSamples && sampledMs < PERF_TUNING.minSampledMs) return next;
-  const reset = { samples: 0, sampledMs: 0 };
+  const reset = { samples: 0, sampledMs: 0, settled: true };
   if (state.quality === '3d' && emaMs > PERF_TUNING.slow3dMs) {
     return { ...next, ...reset, quality: '2d' };
   }
@@ -70,7 +76,15 @@ export function samplePerf(state: PerfState, gapMs: number): PerfState {
   if (!state.upgraded && samples >= PERF_TUNING.minSamples && emaMs <= PERF_TUNING.goodMs && state.cap < PERF_TUNING.maxCap) {
     return { ...next, ...reset, cap: PERF_TUNING.maxCap, upgraded: true };
   }
-  return next;
+  return state.settled ? next : { ...next, settled: true };
+}
+
+/**
+ * 3D → 2D 로 지금 바꿔도 되나. 손가락이 닿아 있는 동안에는 미룬다 — 바꾸는 순간 3D 몸·캔버스가 사라져
+ * 누르던 손짓이 끊겨 보이기 때문이다. 손을 모두 떼면(pointersDown 0) 바로 바꾼다.
+ */
+export function readyToDowngrade(state: PerfState, mode: RenderQuality | 'loading', pointersDown: number): boolean {
+  return state.quality === '2d' && mode !== '2d' && !(pointersDown > 0);
 }
 
 /** 이 화면을 폰으로 볼까 (굵은 손가락 입력이거나 짧은 변이 600px 미만) */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SOLO_SPRITE_MAX, computeMatLayout, matBounds, remapPoint, soloSpot, squeezePose, toScreen, toWorld } from './matView';
+import { FOCUS_ZOOM, SOLO_SPRITE_MAX, computeMatLayout, groupSpriteFor, stepFocusZoom, matBounds, remapPoint, soloSpot, squeezePose, toScreen, toWorld } from './matView';
 import { REST_POSE } from './softbody';
 
 describe('mat layout', () => {
@@ -76,3 +76,67 @@ describe('mat layout', () => {
     expect(Number.isFinite(nan.scaleX)).toBe(true);
   });
 });
+
+describe('여럿일 때 크기 (수에 따라)', () => {
+  const phones = [
+    [360, 640, 118, 578],
+    [390, 844, 124, 780],
+  ] as const;
+
+  it('둘이면 160px 이상, 셋은 그 사이, 넷·다섯은 예전 크기 — 수가 늘수록 작아지기만', () => {
+    for (const [w, h, top, bottom] of phones) {
+      const size = (n: number) => computeMatLayout(w, h, { top, bottom }, { count: n }).sprite;
+      expect(size(2)).toBeGreaterThanOrEqual(160);
+      expect(size(3)).toBeLessThanOrEqual(size(2));
+      expect(size(3)).toBeGreaterThanOrEqual(size(4));
+      expect(size(4)).toBe(size(5));
+      expect(size(5)).toBe(computeMatLayout(w, h, { top, bottom }).sprite);
+      expect(size(2)).toBeLessThan(computeMatLayout(w, h, { top, bottom }, { solo: true }).sprite + 1);
+      // 소품 크기 기준은 수와 상관없이 같다
+      expect(computeMatLayout(w, h, { top, bottom }, { count: 2 }).groupSprite).toBe(size(5));
+    }
+    expect(groupSpriteFor(360, 640, 1)).toBe(groupSpriteFor(360, 640, 2));
+  });
+
+  it('모두 매트 안에 선다: 바닥은 HUD 아래·선반 위, 가로 넘침 없음, 몸 N개가 겹치지 않고 놓일 넓이', () => {
+    // 말랑이 몸 반지름 (세계 단위, 가장 넓은 모양) ≈ 0.34
+    const r = 0.34;
+    for (const [w, h, top, bottom] of phones) {
+      for (const n of [2, 3, 4, 5]) {
+        const l = computeMatLayout(w, h, { top, bottom }, { count: n });
+        expect(l.floorTop).toBeGreaterThan(top);
+        expect(l.floorTop + l.floorH).toBeLessThanOrEqual(bottom);
+        expect(l.floorLeft + l.floorW).toBeLessThanOrEqual(w);
+        const b = matBounds(l);
+        // 둘은 나란히 설 만큼, 나머지는 격자 칸 수만큼
+        expect(b.w).toBeGreaterThanOrEqual(4 * r);
+        const cols = Math.floor(b.w / (2 * r));
+        const rows = Math.floor(b.d / (2 * r));
+        expect(cols * rows).toBeGreaterThanOrEqual(n);
+      }
+    }
+  });
+});
+
+describe('잡은 말랑이 살짝 확대 (stepFocusZoom)', () => {
+  it('잡으면 부드럽게 1.15배까지, 놓으면 1로 돌아온다', () => {
+    let z = 1;
+    const seen: number[] = [];
+    for (let t = 0; t < 600; t += 16) {
+      z = stepFocusZoom(z, true, 16);
+      seen.push(z);
+    }
+    expect(seen[0]).toBeGreaterThan(1);
+    expect(seen[0]).toBeLessThan(1.1);
+    expect(z).toBe(FOCUS_ZOOM);
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThanOrEqual(seen[i - 1]!);
+    for (let t = 0; t < 600; t += 16) z = stepFocusZoom(z, false, 16);
+    expect(z).toBe(1);
+  });
+  it('움직임 줄이기면 바로, 이상한 값은 범위 안으로', () => {
+    expect(stepFocusZoom(1, true, 16, true)).toBe(FOCUS_ZOOM);
+    expect(stepFocusZoom(Number.NaN, false, Number.NaN)).toBe(1);
+    expect(stepFocusZoom(9, true, 0)).toBe(FOCUS_ZOOM);
+  });
+});
+

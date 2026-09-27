@@ -18,8 +18,14 @@ import {
   stretchAmount,
   tickle,
   toTransform,
+  toTransform2d,
+  maxStretch2d,
+  fitStretch,
+  NEUTRAL_FEEL,
   type TouchState,
 } from './physics';
+import { MATERIALS } from '../data/materials';
+import { meltAmount } from './reactions';
 
 const FRAME = 1000 / 60;
 
@@ -200,6 +206,80 @@ describe('touch physics', () => {
   });
 });
 
+describe('2D 늘어남 (toTransform2d)', () => {
+  const pulled = (feel = NEUTRAL_FEEL, d = { x: 3, y: 0 }) =>
+    run(drag(press(createTouchState({ feel }), { x: 0, y: 0 }, 0.3), d), 1500);
+
+  it('쉬는 자세는 늘어남 없음, toTransform 과 같다', () => {
+    const s = createTouchState();
+    const t = toTransform2d(s);
+    expect(t.along).toBe(1);
+    expect(t.across).toBe(1);
+    expect(t.scaleY).toBeCloseTo(toTransform(s).scaleY);
+  });
+
+  it('옆으로 당기면 기울기보다 당긴 축으로 길어지고 가로지르는 쪽은 가늘어진다', () => {
+    const s = pulled();
+    const old = toTransform(s);
+    const t = toTransform2d(s);
+    expect(Math.abs(t.axisDeg)).toBeLessThan(5);
+    expect(t.along).toBeGreaterThan(1.3);
+    expect(t.across).toBeCloseTo(1 / Math.sqrt(t.along));
+    expect(Math.abs(t.skewXDeg)).toBeLessThan(Math.abs(old.skewXDeg) * 0.5);
+    // 당긴 쪽으로 조금 옮겨 간다 (반대쪽 옆구리는 거의 제자리)
+    expect(t.translateX).toBeGreaterThan(old.translateX);
+    const left = toTransform2d(pulled(NEUTRAL_FEEL, { x: -3, y: 0 }));
+    expect(Math.abs(Math.abs(left.axisDeg) - 180)).toBeLessThan(5);
+  });
+
+  it('위로 당겨도 두 번 늘어나지 않는다 (세로 늘어남을 축 늘림으로 바꾼다)', () => {
+    const s = pulled(NEUTRAL_FEEL, { x: 0, y: -3 });
+    const t = toTransform2d(s);
+    expect(t.axisDeg).toBeCloseTo(-90, 0);
+    expect(t.scaleY).toBeLessThanOrEqual(1.05);
+    expect(t.along).toBeLessThanOrEqual(maxStretch2d(NEUTRAL_FEEL) + 1e-9);
+  });
+
+  it('아래로 끌면 늘어나지 않고 눌림만 (바닥을 뚫지 않게)', () => {
+    const t = toTransform2d(pulled(NEUTRAL_FEEL, { x: 0, y: 3 }));
+    expect(t.along).toBeCloseTo(1);
+  });
+
+  it('촉감 한계: 쭉쭉이는 2.5배까지, 기본은 1.6배, 쭉쭉이가 같은 거리에서 더 길다', () => {
+    expect(maxStretch2d(MATERIALS.stretchy.feel)).toBeCloseTo(2.5);
+    expect(maxStretch2d(NEUTRAL_FEEL)).toBeCloseTo(1.6);
+    for (const m of Object.values(MATERIALS)) {
+      const t = toTransform2d(pulled(m.feel, { x: 1e6, y: 0 }));
+      expect(t.along).toBeLessThanOrEqual(maxStretch2d(m.feel) + 1e-9);
+      expect(Number.isFinite(t.translateX)).toBe(true);
+    }
+    const far = { x: 4, y: 0 };
+    expect(toTransform2d(pulled(MATERIALS.stretchy.feel, far)).along).toBeGreaterThan(
+      toTransform2d(pulled(MATERIALS.jelly.feel, far)).along + 0.3,
+    );
+    expect(toTransform2d(pulled(MATERIALS.stretchy.feel, far)).along).toBeGreaterThan(2);
+  });
+
+  it('화면 안에 남게: 옆 한계·위 한계로 줄이고, 1 아래로는 줄이지 않는다', () => {
+    const room = { x: 1.3, up: 2 };
+    expect(fitStretch(2.5, 0, room)).toBeCloseTo(1.3);
+    expect(fitStretch(2.5, 180, room)).toBeCloseTo(1.3);
+    expect(fitStretch(2.5, -90, room)).toBeCloseTo(2);
+    expect(fitStretch(1.2, 0, room)).toBeCloseTo(1.2);
+    expect(fitStretch(2.5, 0, { x: 0.5, up: 0.5 })).toBe(1);
+    expect(fitStretch(Number.NaN, Number.NaN, { x: Number.NaN, up: 2 })).toBe(1);
+    const t = toTransform2d(pulled(MATERIALS.stretchy.feel, { x: 1e6, y: 0 }), room);
+    expect(t.along).toBeLessThanOrEqual(1.3 + 1e-9);
+    expect(t.across).toBeCloseTo(1 / Math.sqrt(t.along));
+  });
+
+  it('놓으면 출렁이며 쉬는 자세로 돌아온다', () => {
+    const back = run(release(pulled(MATERIALS.stretchy.feel)), 8000);
+    expect(isAtRest(back)).toBe(true);
+    expect(toTransform2d(back).along).toBeCloseTo(1, 2);
+  });
+});
+
 describe('reactions: melt, hop, stretchUp', () => {
   it('melting spreads flatter than the deepest press and recovers after release', () => {
     const pressed = run(press(createTouchState(), { x: 0, y: 0 }, 1), 1500);
@@ -211,7 +291,26 @@ describe('reactions: melt, hop, stretchUp', () => {
     expect(half.squash.target).toBeLessThan(MELT_SQUASH);
     const back = run(release(melted), 6000);
     expect(isAtRest(back)).toBe(true);
-    expect(melt(createTouchState(), { x: 0, y: 0 }, Number.NaN).squash.target).toBeCloseTo(TUNING.pressMax);
+    expect(melt(createTouchState(), { x: 0, y: 0 }, Number.NaN).squash.target).toBeCloseTo(TUNING.pressCap);
+  });
+
+  it('기본 꾹 누르기(Lv.1)는 오래 눌러도 "눌림"까지만 — 녹아내리기(Lv.5)와 한눈에 다르다', () => {
+    // 말랑이 머리 쪽을 2.6초 꾹: Lv.1 은 녹아내리기가 잠겨 있어 press 만
+    expect(meltAmount(2600, 1)).toBe(0);
+    let basic = createTouchState();
+    for (let t = 0; t < 2600; t += FRAME) basic = step(press(basic, { x: 0, y: -0.8 }, Math.min(1, t / 900)), FRAME);
+    expect(basic.squash.target).toBeLessThanOrEqual(TUNING.pressCap + 1e-9);
+    // Lv.5 에서 같은 시간: 녹아내린다
+    const amount = meltAmount(3400, 5);
+    expect(amount).toBeGreaterThan(0.9);
+    let melted = createTouchState();
+    for (let t = 0; t < 2600; t += FRAME) melted = step(melt(melted, { x: 0, y: -0.8 }, amount), FRAME);
+    const b = toTransform(basic);
+    const m = toTransform(melted);
+    expect(b.scaleY).toBeGreaterThan(0.68);
+    expect(m.scaleY).toBeLessThan(0.56);
+    expect(b.scaleY - m.scaleY).toBeGreaterThan(0.15);
+    expect(MELT_SQUASH - TUNING.pressCap).toBeGreaterThanOrEqual(0.15);
   });
 
   it('hop jumps up (negative offset) and lands back', () => {

@@ -93,6 +93,7 @@ import {
 } from '../touch/interactions';
 import {
   computeMatLayout,
+  stepFocusZoom,
   matBounds,
   remapPoint,
   soloSpot,
@@ -101,7 +102,9 @@ import {
   toWorld,
   type MatLayout,
 } from '../touch/matView';
-import { createPerf, looksLikePhone, samplePerf, type PerfState } from '../touch/perfGovernor';
+import { createPerf, looksLikePhone, readyToDowngrade, samplePerf, type PerfState } from '../touch/perfGovernor';
+import { detectInstallEnv } from '../lib/installEnv';
+import { afterShareFailed, photoSaveMethod } from '../lib/photoSave';
 import {
   frameGroup,
   groupCaption,
@@ -205,6 +208,16 @@ interface Photo {
   blob: Blob;
   fileName: string;
   canShare: boolean;
+  /** 길게 눌러 저장하기 안내 (앱 안 브라우저·iOS: 내려받기가 조용히 실패한다) */
+  hold?: boolean;
+}
+
+/** 이 기기의 실행 환경 (사진 저장 방법 고르기) */
+function currentEnv() {
+  const standalone =
+    (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return detectInstallEnv({ userAgent: navigator.userAgent, standalone, maxTouchPoints: navigator.maxTouchPoints });
 }
 
 function toRect(r: DOMRect) {
@@ -259,6 +272,10 @@ function Playroom() {
   const solo = matCount <= 1;
   const soloRef = useRef(solo);
   soloRef.current = solo;
+  // 여럿일 때 크기: 둘이면 크게, 셋은 조금 작게, 넷 이상은 예전 크기 (matView.groupSpriteFor)
+  const sizeClass = solo ? 1 : Math.min(matCount, 4);
+  const countRef = useRef(matCount);
+  countRef.current = matCount;
 
   const [mode, setMode] = useState<RenderMode>(() => (reduced || isJelly3dUnsupported() ? '2d' : 'loading'));
   const [stage, setStage] = useState<JellyStage | null>(null);
@@ -292,6 +309,8 @@ function Playroom() {
   );
   const perfRef = useRef<PerfState>(createPerf({ phone, quality: mode === '2d' ? '2d' : '3d' }));
   const [cap, setCap] = useState(perfRef.current.cap);
+  // 성능 조절이 첫 판단을 마치기 전에는 상한이 곧 바뀔 수 있다 (폰 3 → 5) → 선반 손잡이에 "N/상한" 대신 마릿수만
+  const [capSettled, setCapSettled] = useState(perfRef.current.settled);
   const capRef = useRef(cap);
   capRef.current = cap;
   const worldRef = useRef(createWorld({ w: 3, d: 3 }, { cap: 5, reducedMotion: reduced }));
@@ -354,7 +373,8 @@ function Playroom() {
     const wb = getBody(worldRef.current, rec.key);
     if (!L || !wb) return null;
     const spot = toScreen(L, wb.x, wb.y, wb.z);
-    const S = L.sprite;
+    // 잡은 말랑이는 그림이 살짝 커진다 (바닥 가운데 기준) → 손가락 판정·입자·자국 자리도 같은 상자로
+    const S = L.sprite * rec.zoom;
     if (rec.kind === 'capsule') return { left: spot.x - S * 0.26, top: spot.y - S * 0.46, size: S * 0.52 };
     const frac = bodyFrac(SHAPES[rec.character.shape]);
     return { left: spot.x - S / 2, top: spot.y - S * frac.bottom, size: S };
@@ -392,6 +412,7 @@ function Playroom() {
         listeners: new Set(),
         still: false,
         lastSqueeze: 0,
+        zoom: 1,
       };
       if (kind === 'malang') {
         const shape = SHAPES[character.shape];
@@ -457,7 +478,12 @@ function Playroom() {
     const measuredShelfTop = (shelfRef.current?.getBoundingClientRect().top ?? r.bottom - 70) - r.top;
     if (!shelfOpenRef.current) closedShelfTopRef.current = measuredShelfTop;
     const shelfTop = Math.min(closedShelfTopRef.current ?? measuredShelfTop, r.height - 40);
-    const L = computeMatLayout(r.width, r.height, { top: hudBottom, bottom: shelfTop }, { solo: soloRef.current });
+    const L = computeMatLayout(
+      r.width,
+      r.height,
+      { top: hudBottom, bottom: shelfTop },
+      { solo: soloRef.current, count: countRef.current },
+    );
     // 매트가 화면 (0,0)에 붙어 있지 않을 수도 있으니 client 좌표로 옮긴다
     const Lc: MatLayout = { ...L, floorLeft: L.floorLeft + r.left, floorTop: L.floorTop + r.top };
     const prev = layoutRef.current;
@@ -660,12 +686,15 @@ function Playroom() {
     }
   }, [paramId]);
 
-  // 혼자 ↔ 여럿이 바뀌면 배치를 다시 잰다 (혼자면 크게). 다시 혼자가 되면 남은 말랑이를 가운데로 데려온다
+  // 혼자 ↔ 여럿, 여럿의 수가 바뀌면 배치를 다시 잰다 (혼자면 가장 크게, 둘이면 크게 …). 다시 혼자가 되면 남은 말랑이를 가운데로 데려온다
   const prevSoloRef = useRef(solo);
+  const prevSizeRef = useRef(sizeClass);
   useLayoutEffect(() => {
+    if (prevSizeRef.current === sizeClass) return;
+    prevSizeRef.current = sizeClass;
+    measure();
     if (prevSoloRef.current === solo) return;
     prevSoloRef.current = solo;
-    measure();
     if (!solo) return;
     const world = worldRef.current;
     const only = world.bodies.length === 1 ? world.bodies[0] : undefined;
@@ -679,7 +708,7 @@ function Playroom() {
     }
     for (const rec of recsRef.current.values()) rec.still = false;
     requestFrame();
-  }, [solo, measure, requestFrame]);
+  }, [solo, sizeClass, measure, requestFrame]);
 
   // 집중한 말랑이: 없거나 매트에서 사라지면 첫 말랑이로
   useEffect(() => {
@@ -1014,6 +1043,13 @@ function Playroom() {
     [openCapsule, requestFrame, setCapVisual],
   );
 
+  /** 손가락·키로 누르고 있는 말랑이 수 (모드를 바꾸지 않고 기다린다) */
+  const heldCount = () => {
+    let n = 0;
+    for (const rec of recsRef.current.values()) if (rec.actor?.touched) n++;
+    return n;
+  };
+
   // ── 한 프레임 ────────────────────────────────────────────
 
   frameRef.current = (ts: number) => {
@@ -1072,7 +1108,17 @@ function Playroom() {
       const els = rec.els;
       if (!wb || !els.wrap) continue;
       const spot = toScreen(L, wb.x, wb.y, wb.z);
-      els.wrap.style.transform = `translate3d(${spot.x.toFixed(1)}px, ${spot.y.toFixed(1)}px, 0)`;
+      // 여럿이 놀 때 손가락으로 잡은 말랑이는 살짝 커진다 (놓으면 돌아온다). 혼자일 때는 이미 크다
+      if (rec.actor) {
+        const z = stepFocusZoom(rec.zoom, rec.actor.held && !soloRef.current, dt, reducedRef.current);
+        if (z !== rec.zoom) {
+          rec.zoom = z;
+          busy = true;
+        }
+      }
+      const zoom = rec.zoom;
+      els.wrap.style.transform =
+        `translate3d(${spot.x.toFixed(1)}px, ${spot.y.toFixed(1)}px, 0)` + (zoom !== 1 ? ` scale(${zoom.toFixed(4)})` : '');
       els.wrap.style.zIndex = String(Math.round(spot.depth));
       if (els.shadow) {
         const k = Math.max(0.45, 1 - spot.lift / (L.sprite * 1.6));
@@ -1099,7 +1145,7 @@ function Playroom() {
         rec.view.place({
           x: spot.x,
           y: spot.y,
-          unit: L.sprite / VIEWBOX.w,
+          unit: (L.sprite * zoom) / VIEWBOX.w,
           depth: spot.depth - viewH,
           lift: spot.lift,
         });
@@ -1111,11 +1157,30 @@ function Playroom() {
         if (fill) rec.view.setFill(fill.glow, fill.swirl);
       }
       if (els.sprite && (!rec.view || modeRef.current !== '3d')) {
-        const t = actor.transform2d();
+        // 늘어나도 화면 안에: 몸 가운데에서 화면 옆 끝·위 끝까지의 여유를 몸 반폭·키로 나눈 배수
+        const frac = bodyFrac(SHAPES[rec.character.shape]);
+        const Sz = L.sprite * zoom;
+        // 그림 반폭 (귀·날개 같은 장식까지 — 몸통보다 조금 넓다)
+        const halfW = Math.max(1, Sz * Math.max(0.46, (frac.right - frac.left) / 2 + 0.08));
+        const bodyH = Math.max(1, Sz * (frac.bottom - frac.top));
+        // 매트 오른쪽 끝 (바닥 양옆 여백이 같다 — 매 프레임 레이아웃을 읽지 않게 배치에서 계산)
+        const edge = L.floorLeft * 2 + L.floorW;
+        const room = {
+          // 늘어난 만큼 당긴 쪽으로 0.3 × (배수 − 1) × 반지름 옮겨 가는 것까지 (physics.toTransform2d)
+          x: (Math.min(spot.x, edge - spot.x) - 10 + 0.3 * (L.sprite / 2)) / (halfW + 0.3 * (L.sprite / 2)),
+          up: (spot.y - 12) / bodyH,
+        };
+        const t = actor.transform2d(room);
         const sqp = squeezePose(REST_POSE, wb.squeezeX, wb.squeezeY, wb.squeezeZ);
         const r = L.sprite / 2;
+        // 당긴 쪽으로 길게 (바닥 가운데 기준 — 혼자일 때도 몸은 제자리에서 늘어나기만): rotate·scale·rotate 로 축을 따라
+        const pull =
+          t.along > 1.0005
+            ? `rotate(${t.axisDeg.toFixed(2)}deg) scale(${t.along.toFixed(4)}, ${t.across.toFixed(4)}) rotate(${(-t.axisDeg).toFixed(2)}deg) `
+            : '';
         els.sprite.style.transform =
           `translate(${(t.translateX * r).toFixed(2)}px, ${(t.translateY * r).toFixed(2)}px) ` +
+          pull +
           `skewX(${(t.skewXDeg - sqp.lean * 20).toFixed(2)}deg) ` +
           `scale(${(t.scaleX * sqp.scaleX).toFixed(4)}, ${(t.scaleY * sqp.scaleY).toFixed(4)})`;
         els.sprite.style.setProperty('--gaze-x', gaze.x.toFixed(2));
@@ -1142,8 +1207,14 @@ function Playroom() {
         const prev = perfRef.current;
         perfRef.current = next;
         if (next.cap !== prev.cap) setCap(next.cap);
-        if (next.quality === '2d' && prev.quality === '3d' && modeRef.current !== '2d') setMode('2d');
+        if (next.settled !== prev.settled) setCapSettled(next.settled);
       }
+    }
+    // 3D → 2D: 손가락이 닿아 있는 동안에는 미룬다 (바꾸는 순간 3D 몸이 사라져 누르던 손짓이 끊겨 보인다).
+    // 모두 떼면 다음 프레임에 바꾼다 — 놓은 뒤 출렁임은 2D 가 같은 물리 값으로 이어 그린다
+    if (readyToDowngrade(perfRef.current, modeRef.current, pointersRef.current.size + heldCount())) {
+      modeRef.current = '2d';
+      setMode('2d');
     }
     if (busy || worldMoving || pointersRef.current.size > 0) {
       // 이 프레임 안의 반응(부딪힘·말랑이끼리)이 이미 requestFrame 으로 다음 프레임을 잡았으면 또 잡지 않는다 —
@@ -1298,10 +1369,11 @@ function Playroom() {
     for (const e of sorted) {
       if (e.rec.kind !== 'malang' || (e.rec.view && modeRef.current === '3d')) continue;
       const frac = bodyFrac(SHAPES[e.rec.character.shape]);
+      const Sz = S * e.rec.zoom;
       const cx = e.spot.x;
-      const cy = e.spot.y - S * (frac.bottom - (frac.top + frac.bottom) / 2);
-      const rx = (S * (frac.right - frac.left)) / 2 + 6;
-      const ry = (S * (frac.bottom - frac.top)) / 2 + 6;
+      const cy = e.spot.y - Sz * (frac.bottom - (frac.top + frac.bottom) / 2);
+      const rx = (Sz * (frac.right - frac.left)) / 2 + 6;
+      const ry = (Sz * (frac.bottom - frac.top)) / 2 + 6;
       if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) return { rec: e.rec, hit: null };
     }
     // 폰에서 손가락이 커도 잘 잡히게: 몸 가운데에서 가까우면 그 말랑이
@@ -1853,26 +1925,50 @@ function Playroom() {
     });
   }, []);
 
+  /**
+   * 저장: 내려받기가 되는 곳은 내려받고, 앱 안 브라우저·iOS 는 사진을 크게 보여 주며 길게 눌러 저장하게 한다.
+   * 성공을 알 수 없는 방법(내려받기·길게 누르기)에서는 "저장했어요"라고 말하지 않는다.
+   */
+  const saveWith = async (method: 'download' | 'long-press') => {
+    if (!photo) return;
+    if (method === 'download') {
+      const mod = await import('../components/touch3d/photo');
+      const r = mod.savePhoto(photo.blob, photo.fileName);
+      if (r === 'downloaded') {
+        say('사진 내려받기를 시작했어요', 2400);
+        closePhoto();
+        return;
+      }
+      if (r === 'opened') {
+        say('새 창의 사진을 길게 눌러 저장하세요', 3200);
+        closePhoto();
+        return;
+      }
+    }
+    setPhoto((prev) => (prev ? { ...prev, hold: true } : prev));
+  };
+
   const sharePhoto = async () => {
     if (!photo) return;
     sfx.button();
+    if (!photo.canShare) {
+      await saveWith(photoSaveMethod(currentEnv(), false) === 'download' ? 'download' : 'long-press');
+      return;
+    }
     const mod = await import('../components/touch3d/photo');
-    const r = photo.canShare ? await mod.sharePhoto(photo.blob, photo.fileName, '놀이방에서 찍은 사진') : mod.savePhoto(photo.blob, photo.fileName);
-    if (r === 'shared' || r === 'downloaded' || r === 'opened') {
-      say(r === 'shared' ? '사진을 공유했어요' : '사진을 저장했어요', 2200);
+    const r = await mod.sharePhoto(photo.blob, photo.fileName, '놀이방에서 찍은 사진');
+    if (r === 'shared') {
+      say('사진을 공유했어요', 2200);
       closePhoto();
     } else if (r === 'failed') {
-      mod.savePhoto(photo.blob, photo.fileName);
+      await saveWith(afterShareFailed(currentEnv()));
     }
   };
 
   const savePhoto = async () => {
     if (!photo) return;
     sfx.button();
-    const mod = await import('../components/touch3d/photo');
-    mod.savePhoto(photo.blob, photo.fileName);
-    say('사진을 저장했어요', 2200);
-    closePhoto();
+    await saveWith(photoSaveMethod(currentEnv(), false) === 'download' ? 'download' : 'long-press');
   };
 
   const photoRef = useRef(photo);
@@ -2176,6 +2272,7 @@ function Playroom() {
           entries={shelfEntries}
           onMat={matCount}
           cap={Math.max(cap, matCount)}
+          capKnown={capSettled}
           shinyIds={shinyIds}
           onToggle={toggleShelf}
           onPick={onShelfPick}
@@ -2211,6 +2308,7 @@ function Playroom() {
         <PhotoDialog
           url={photo.url}
           canShare={photo.canShare}
+          hold={photo.hold === true}
           onShare={() => void sharePhoto()}
           onSave={() => void savePhoto()}
           onClose={closePhoto}
@@ -2224,37 +2322,66 @@ function Playroom() {
 function PhotoDialog({
   url,
   canShare,
+  hold,
   onShare,
   onSave,
   onClose,
 }: {
   url: string;
   canShare: boolean;
+  /** 길게 눌러 저장하기 안내 (내려받기가 안 되는 앱 안 브라우저·iOS) */
+  hold: boolean;
   onShare(): void;
   onSave(): void;
   onClose(): void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLButtonElement>(null);
   useDialogFocus(rootRef, onClose, shareRef);
+  // 길게 누르기 안내로 바뀌면 사라진 버튼 대신 "다 했어요"로 초점
+  useEffect(() => {
+    if (hold) doneRef.current?.focus({ preventScroll: true });
+  }, [hold]);
   return (
-    <div ref={rootRef} className="touch-photo" role="dialog" aria-modal="true" aria-labelledby="touch-photo-title">
+    <div
+      ref={rootRef}
+      className={`touch-photo${hold ? ' is-hold' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="touch-photo-title"
+      aria-describedby={hold ? 'touch-photo-hold' : undefined}
+    >
       <div className="touch-photo__panel">
         <h2 id="touch-photo-title" className="touch-photo__title">
-          찰칵! 사진을 찍었어요
+          {hold ? '사진을 길게 눌러 저장하세요' : '찰칵! 사진을 찍었어요'}
         </h2>
-        <img className="touch-photo__img" src={url} alt="놀이방 매트 사진 카드" />
-        <div className="touch-photo__actions">
-          <button ref={shareRef} type="button" className="btn btn--primary" onClick={onShare}>
-            <ShareIcon size={22} />
-            {canShare ? '공유하기' : '저장하기'}
-          </button>
-          {canShare && (
-            <button type="button" className="btn" onClick={onSave}>
-              저장하기
+        {/* 길게 누르기 안내 중에는 이 사진만 길게 누르기 메뉴를 허용한다 (전역 touch-callout 막음의 예외) */}
+        <img className={`touch-photo__img${hold ? ' touch-photo__img--hold' : ''}`} src={url} alt="놀이방 매트 사진 카드" />
+        {hold ? (
+          <>
+            <p id="touch-photo-hold" className="touch-photo__hint" role="status">
+              사진을 꾹 누르면 나오는 메뉴에서 &lsquo;사진 앱에 저장&rsquo;이나 &lsquo;이미지 저장&rsquo;을 골라 주세요.
+            </p>
+            <div className="touch-photo__actions">
+              <button ref={doneRef} type="button" className="btn btn--primary" onClick={onClose}>
+                다 했어요
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="touch-photo__actions">
+            <button ref={shareRef} type="button" className="btn btn--primary" onClick={onShare}>
+              <ShareIcon size={22} />
+              {canShare ? '공유하기' : '저장하기'}
             </button>
-          )}
-        </div>
+            {canShare && (
+              <button type="button" className="btn" onClick={onSave}>
+                저장하기
+              </button>
+            )}
+          </div>
+        )}
         <button type="button" className="touch-photo__close" aria-label="닫기" onClick={onClose}>
           <CloseIcon size={22} />
         </button>

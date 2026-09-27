@@ -29,13 +29,31 @@ export interface MatInsets {
 export const SOLO_SPRITE_MAX = 240;
 
 /**
- * 화면 크기 → 매트 배치. 말랑이 크기는 화면에 맞추고(여럿이면 100~180px, 혼자면 더 크게 ~240px),
- * 머리가 HUD 에 가리지 않게 바닥을 내린다.
+ * 여럿이 놀 때 말랑이 크기 (px): 매트 위 수가 적을수록 크게 — 둘이면 160px 넘게(360 폭), 셋이면 조금 작게,
+ * 넷·다섯이면 예전 크기(100~180px). 모두가 360×640 매트 안에 설 만큼만 키운다.
  */
-export function computeMatLayout(viewW: number, viewH: number, insets: MatInsets, options: { solo?: boolean } = {}): MatLayout {
+export function groupSpriteFor(w: number, h: number, count: number): number {
+  const many = Math.max(100, Math.min(180, w * 0.34, h * 0.22));
+  if (count <= 2) return Math.max(many, Math.min(200, w * 0.46, h * 0.27));
+  if (count === 3) return Math.max(many, Math.min(190, w * 0.4, h * 0.25));
+  return many;
+}
+
+/**
+ * 화면 크기 → 매트 배치. 말랑이 크기는 화면에 맞추고(여럿이면 수에 따라 100~200px, 혼자면 더 크게 ~240px),
+ * 머리가 HUD 에 가리지 않게 바닥을 내린다. count 를 주지 않으면 가장 많을 때(넷 이상) 크기.
+ */
+export function computeMatLayout(
+  viewW: number,
+  viewH: number,
+  insets: MatInsets,
+  options: { solo?: boolean; count?: number } = {},
+): MatLayout {
   const w = Number.isFinite(viewW) && viewW > 0 ? viewW : 360;
   const h = Number.isFinite(viewH) && viewH > 0 ? viewH : 640;
-  const group = Math.max(100, Math.min(180, w * 0.34, h * 0.22));
+  const many = groupSpriteFor(w, h, 5);
+  const count = Number.isFinite(options.count) ? Math.max(1, Math.round(options.count ?? 5)) : 5;
+  const group = groupSpriteFor(w, h, count);
   const sprite = Math.round(options.solo ? Math.max(group, Math.min(SOLO_SPRITE_MAX, w * 0.62, h * 0.34)) : group);
   // 날개·귀 같은 장식이 매트 밖으로 나가지 않게 (몸 반폭보다 그림이 약 0.2 더 넓다)
   const side = 10 + sprite * 0.2;
@@ -47,8 +65,26 @@ export function computeMatLayout(viewW: number, viewH: number, insets: MatInsets
     floorW: Math.max(sprite, w - side * 2),
     floorH: floorBottom - floorTop,
     sprite,
-    groupSprite: Math.round(group),
+    groupSprite: Math.round(many),
   };
+}
+
+/** 손가락으로 잡은 말랑이가 살짝 커지는 배수 (여럿이 놀 때 — 손가락 아래가 잘 보이게) */
+export const FOCUS_ZOOM = 1.15;
+/** 커지고 작아지는 시정수 (ms) */
+const FOCUS_ZOOM_TAU_MS = 90;
+
+/**
+ * 잡은 말랑이 확대 배수를 한 프레임 진행 (지수 곡선으로 부드럽게). 움직임 줄이기면 바로 목표로.
+ * 확대는 그림에만 — 세계 좌표·몸 크기는 그대로다 (화면 상자는 페이지가 이 배수로 넓혀 손가락 판정과 맞춘다).
+ */
+export function stepFocusZoom(current: number, held: boolean, dtMs: number, reduced = false): number {
+  const target = held ? FOCUS_ZOOM : 1;
+  const cur = Number.isFinite(current) ? Math.min(FOCUS_ZOOM, Math.max(1, current)) : 1;
+  if (reduced) return target;
+  const dt = Number.isFinite(dtMs) ? Math.max(0, Math.min(100, dtMs)) : 0;
+  const next = target + (cur - target) * Math.exp(-dt / FOCUS_ZOOM_TAU_MS);
+  return Math.abs(next - target) < 0.002 ? target : next;
 }
 
 /** 배치가 바뀔 때(화면 회전·혼자 ↔ 여럿) 세계 좌표를 옮겨 화면 위 같은 자리에 머물게 한다 */
