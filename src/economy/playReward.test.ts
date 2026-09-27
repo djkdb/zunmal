@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DAILY_CAP, GAME_MULTIPLIERS, GAME_TYPICAL_SCORES, PER_GAME_CAP } from './config';
+import { COINS_PER_PLAY_MINUTE, DAILY_CAP, GAME_MULTIPLIERS, GAME_PLAY_SECONDS, GAME_TYPICAL_SCORES } from './config';
 import { seoulDateKey } from './daily';
-import { computeReward } from './economy';
+import { computeReward, gameCap, playMinutes, targetCoinsPerPlay } from './economy';
 import {
   dailyProgress,
   earnedAfter,
@@ -19,12 +19,62 @@ describe('보통 점수', () => {
     expect(Object.keys(GAME_TYPICAL_SCORES).sort()).toEqual(Object.keys(GAME_MULTIPLIERS).sort());
   });
 
-  it('보통 점수로 한 판 ≈ 100~150코인 (config 설계 목표)', () => {
+  it('배율이 있는 게임은 모두 플레이 시간도 있다', () => {
+    expect(Object.keys(GAME_PLAY_SECONDS).sort()).toEqual(Object.keys(GAME_MULTIPLIERS).sort());
+    for (const [id, sec] of Object.entries(GAME_PLAY_SECONDS)) {
+      expect(sec.typical, id).toBeGreaterThan(0);
+      expect(sec.typical, id).toBeLessThanOrEqual(sec.max);
+    }
+  });
+
+  it('보통 점수로 한 판 = 분당 코인 목표 ±15% (게임마다 같은 효율)', () => {
     for (const id of Object.keys(GAME_TYPICAL_SCORES)) {
       const r = computeReward({ gameId: id, score: typicalScore(id), partnerRarity: undefined, dailyEarned: 0 });
-      expect(r.grantedCoins, id).toBeGreaterThanOrEqual(100);
-      expect(r.grantedCoins, id).toBeLessThanOrEqual(150);
+      const perMin = r.grantedCoins / playMinutes(id)!;
+      expect(perMin, id).toBeGreaterThanOrEqual(COINS_PER_PLAY_MINUTE * 0.85);
+      expect(perMin, id).toBeLessThanOrEqual(COINS_PER_PLAY_MINUTE * 1.15);
+      // 로비 "약 N코인"은 보통 한 판 목표와 ±20% 안
+      const e = expectedCoins({ gameId: id, record: undefined, partnerRarity: undefined, dailyEarned: 0 });
+      expect(Math.abs(e.about - targetCoinsPerPlay(id)!) / targetCoinsPerPlay(id)!, id).toBeLessThanOrEqual(0.2);
+      // 보통 한 판은 상한에 걸리지 않는다
+      expect(r.cappedByGame, id).toBe(false);
     }
+  });
+
+  it('가장 효율 좋은 게임과 나쁜 게임의 분당 코인 차이는 1.3배 안 (예전 9배)', () => {
+    const rates = Object.keys(GAME_TYPICAL_SCORES).map((id) => {
+      const r = computeReward({ gameId: id, score: typicalScore(id), partnerRarity: undefined, dailyEarned: 0 });
+      return r.grantedCoins / playMinutes(id)!;
+    });
+    expect(Math.max(...rates) / Math.min(...rates)).toBeLessThanOrEqual(1.3);
+  });
+
+  it('20초 게임은 약 40~60, 2분 게임은 약 180~220코인', () => {
+    const short = expectedCoins({ gameId: 'button-malang', record: undefined, partnerRarity: undefined, dailyEarned: 0 });
+    expect(short.exact).toBeGreaterThanOrEqual(40);
+    expect(short.exact).toBeLessThanOrEqual(60);
+    const long = expectedCoins({ gameId: 'malang-merge', record: undefined, partnerRarity: undefined, dailyEarned: 0 });
+    expect(long.exact).toBeGreaterThanOrEqual(180);
+    expect(long.exact).toBeLessThanOrEqual(220);
+  });
+
+  it('한 판 상한은 가장 긴 판에 비례한다 — 짧은 게임을 아주 잘해도 분당 상한은 같다', () => {
+    expect(gameCap('button-malang')).toBe(80);
+    expect(gameCap('malang-merge')).toBe(300);
+    for (const id of Object.keys(GAME_PLAY_SECONDS)) {
+      const capPerMin = gameCap(id) / playMinutes(id, 'max')!;
+      expect(capPerMin, id).toBeGreaterThan(COINS_PER_PLAY_MINUTE * 1.3);
+      expect(capPerMin, id).toBeLessThan(COINS_PER_PLAY_MINUTE * 1.7);
+    }
+  });
+
+  it('보통 날(미니게임 15분 + 미션 + 가게 + 선물)이면 10연 뽑기까지 이틀이 넘지 않는다', () => {
+    const games = 15 * COINS_PER_PLAY_MINUTE;
+    const missionsHalf = 50 + 80; // 쉬움·보통만
+    const shopStarter = 150; // 일반 직원 하나, 하루 16시간
+    const gift = 60;
+    expect(games + missionsHalf + shopStarter + gift).toBeGreaterThanOrEqual(1000 / 2);
+    expect(games).toBeLessThan(DAILY_CAP);
   });
 
   it('모르는 게임도 보통 점수가 있다', () => {
@@ -76,7 +126,7 @@ describe('expectedCoins', () => {
       partnerRarity: 'secret',
       dailyEarned: 0,
     });
-    expect(e.exact).toBe(PER_GAME_CAP);
+    expect(e.exact).toBe(gameCap('button-malang'));
   });
 
   it('오늘 남은 한도만큼만, 다 쓰면 dailyFull', () => {
@@ -138,7 +188,7 @@ describe('결과 화면 영수증', () => {
     const normal = computeReward({ gameId: 'stack', score: 100, partnerRarity: undefined, dailyEarned: 0 });
     expect(rewardNote(normal)).toBeNull();
     const perGame = computeReward({ gameId: 'stack', score: 5000, partnerRarity: undefined, dailyEarned: 0 });
-    expect(rewardNote(perGame)).toBe(`한 판에는 ${PER_GAME_CAP}코인까지 받아요.`);
+    expect(rewardNote(perGame)).toBe(`이 게임은 한 판에 ${gameCap('stack')}코인까지 받아요.`);
     const daily = computeReward({ gameId: 'stack', score: 300, partnerRarity: undefined, dailyEarned: DAILY_CAP - 40 });
     expect(rewardNote(daily)).toBe('오늘 상한에 닿아 40코인만 받았어요.');
     const none = computeReward({ gameId: 'stack', score: 300, partnerRarity: undefined, dailyEarned: DAILY_CAP });

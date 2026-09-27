@@ -3,7 +3,7 @@
  * 코인 수는 모두 computeReward 하나로 계산한다 — 화면에 보이는 값과 실제로 받는 값이 어긋나지 않게.
  */
 import type { Rarity } from '../data/rarity';
-import { DAILY_CAP, DEFAULT_TYPICAL_SCORE, EXPECTED_COINS_ROUNDING, GAME_TYPICAL_SCORES, PER_GAME_CAP } from './config';
+import { DAILY_CAP, DEFAULT_TYPICAL_SCORE, EXPECTED_COINS_ROUNDING, GAME_TYPICAL_SCORES } from './config';
 import { seoulDateKey } from './daily';
 import { computeReward, type RewardBreakdown } from './economy';
 
@@ -110,6 +110,6 @@ export function rewardNote(reward: RewardBreakdown): string | null {
     if (reward.grantedCoins <= 0) return '오늘 받을 코인을 모두 받았어요. 자정에 다시 채워져요.';
     return `오늘 상한에 닿아 ${reward.grantedCoins.toLocaleString('ko-KR')}코인만 받았어요.`;
   }
-  if (reward.cappedByGame) return `한 판에는 ${PER_GAME_CAP.toLocaleString('ko-KR')}코인까지 받아요.`;
+  if (reward.cappedByGame) return `이 게임은 한 판에 ${reward.gameCap.toLocaleString('ko-KR')}코인까지 받아요.`;
   return null;
 }

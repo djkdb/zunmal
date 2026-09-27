@@ -35,7 +35,8 @@ const TEMPLATES: readonly MissionTemplate[] = [
   { kind: 'play-games', targets: { easy: 2, normal: 3, hard: 5 } },
   { kind: 'pull', targets: { easy: 1, normal: 3, hard: 10 } },
   { kind: 'pet', targets: { easy: 15, normal: 30, hard: 60 } },
-  { kind: 'earn-coins', targets: { easy: 200, normal: 400, hard: 700 } },
+  // 미니게임은 실제 1분에 약 90코인(economy/config.ts COINS_PER_PLAY_MINUTE) — 약 2분·3분 반·6분
+  { kind: 'earn-coins', targets: { easy: 150, normal: 300, hard: 500 } },
   { kind: 'new-best', targets: { easy: 1, normal: 1, hard: 2 } },
 ];
 

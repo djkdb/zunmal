@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINI_GAMES, RECOMMENDED_GAME_ID, getMiniGame } from './registry';
 import { formatPlayLength } from './types';
-import { GAME_MULTIPLIERS, GAME_TYPICAL_SCORES } from '../economy/config';
+import { GAME_MULTIPLIERS, GAME_PLAY_SECONDS, GAME_TYPICAL_SCORES } from '../economy/config';
 
 describe('minigame registry', () => {
   it('id는 고유한 kebab-case', () => {
@@ -32,6 +32,15 @@ describe('minigame registry', () => {
     for (const g of MINI_GAMES) {
       expect(GAME_MULTIPLIERS[g.id], g.id).toBeGreaterThan(0);
       expect(GAME_TYPICAL_SCORES[g.id], g.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('코인 계산의 가장 긴 판(GAME_PLAY_SECONDS.max)은 게임 길이와 맞다 (시작 전 여유 5초까지)', () => {
+    for (const g of MINI_GAMES) {
+      const sec = GAME_PLAY_SECONDS[g.id];
+      expect(sec, g.id).toBeDefined();
+      expect(sec!.max, g.id).toBeGreaterThanOrEqual(g.durationMs / 1000);
+      expect(sec!.max, g.id).toBeLessThanOrEqual(g.durationMs / 1000 + 5);
     }
   });
 

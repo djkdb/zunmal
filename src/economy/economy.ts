@@ -1,16 +1,48 @@
 import type { Rarity } from '../data/rarity';
 import {
+  COINS_PER_PLAY_MINUTE,
   DAILY_CAP,
   DEFAULT_GAME_MULTIPLIER,
+  EXPECTED_COINS_ROUNDING,
   GAME_MULTIPLIERS,
+  GAME_PLAY_SECONDS,
   PARTNER_RARITY_BONUS,
   PER_GAME_CAP,
+  PER_GAME_CAP_FACTOR,
+  PLAY_OVERHEAD_SECONDS,
   PULL_PRICE,
 } from './config';
 import { seoulDateKey } from './daily';
 
 export function getGameMultiplier(gameId: string): number {
   return GAME_MULTIPLIERS[gameId] ?? DEFAULT_GAME_MULTIPLIER;
+}
+
+/**
+ * 한 판에 실제로 쓰는 시간(분) — 플레이 초 + 카운트다운·결과 화면. 분당 코인을 맞추는 기준.
+ * 플레이 시간이 등록되지 않은 게임은 null.
+ */
+export function playMinutes(gameId: string, which: 'typical' | 'max' = 'typical'): number | null {
+  const sec = GAME_PLAY_SECONDS[gameId];
+  if (!sec) return null;
+  return (sec[which] + PLAY_OVERHEAD_SECONDS) / 60;
+}
+
+/** 보통 한 판의 목표 코인 = 분당 코인 × 실제 시간(분). 플레이 시간이 없으면 null. */
+export function targetCoinsPerPlay(gameId: string): number | null {
+  const min = playMinutes(gameId, 'typical');
+  return min === null ? null : COINS_PER_PLAY_MINUTE * min;
+}
+
+/**
+ * 게임별 한 판 상한 (파트너 보너스 포함): 가장 오래 한 판의 목표 코인 × PER_GAME_CAP_FACTOR, 10 단위 반올림.
+ * 짧은 게임은 상한도 작다 — 한 판을 아주 잘해도 긴 게임 한 판보다 크게 받지 않는다.
+ */
+export function gameCap(gameId: string): number {
+  const min = playMinutes(gameId, 'max');
+  if (min === null) return PER_GAME_CAP;
+  const step = EXPECTED_COINS_ROUNDING;
+  return Math.max(step, Math.round((COINS_PER_PLAY_MINUTE * min * PER_GAME_CAP_FACTOR) / step) * step);
 }
 
 export interface RewardInput {
@@ -28,6 +60,8 @@ export interface RewardBreakdown {
   /** 파트너 희귀도 보너스 비율 (0~0.5). 결과 화면이 "+10%"로 보여 준다 */
   partnerBonusRate: number;
   partnerBonus: number;
+  /** 이 게임의 한 판 상한 (gameCap) */
+  gameCap: number;
   /** 판당 상한 적용 후 */
   earnedCoins: number;
   /** 일일 상한 적용 후 실제 지급액 */
@@ -49,7 +83,7 @@ export function normalizeScore(score: number): number {
  *
  *   baseCoins    = floor(score × gameMultiplier)
  *   partnerBonus = floor(baseCoins × partnerRarityBonus)
- *   earnedCoins  = min(baseCoins + partnerBonus, PER_GAME_CAP)
+ *   earnedCoins  = min(baseCoins + partnerBonus, gameCap(gameId))
  *   granted      = min(earnedCoins, DAILY_CAP − dailyEarned)
  */
 export function computeReward(input: RewardInput): RewardBreakdown {
@@ -58,7 +92,8 @@ export function computeReward(input: RewardInput): RewardBreakdown {
   const bonusRate = input.partnerRarity ? PARTNER_RARITY_BONUS[input.partnerRarity] : 0;
   const partnerBonus = Math.floor(baseCoins * bonusRate);
   const uncapped = baseCoins + partnerBonus;
-  const earnedCoins = Math.min(uncapped, PER_GAME_CAP);
+  const cap = gameCap(input.gameId);
+  const earnedCoins = Math.min(uncapped, cap);
 
   const dailyEarned = Math.max(0, Math.floor(input.dailyEarned));
   const remainingBefore = Math.max(0, DAILY_CAP - dailyEarned);
@@ -69,9 +104,10 @@ export function computeReward(input: RewardInput): RewardBreakdown {
     baseCoins,
     partnerBonusRate: bonusRate,
     partnerBonus,
+    gameCap: cap,
     earnedCoins,
     grantedCoins,
-    cappedByGame: uncapped > PER_GAME_CAP,
+    cappedByGame: uncapped > cap,
     cappedByDaily: grantedCoins < earnedCoins,
     dailyRemaining: remainingBefore - grantedCoins,
   };

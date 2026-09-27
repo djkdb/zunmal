@@ -4,7 +4,7 @@ import { sfx } from '../audio/sfx';
 import type { Character } from '../data/characters';
 import { moodCharacter } from '../minigames/shared/partner';
 import type { MiniGameResultPayload } from '../minigames/types';
-import { DAILY_CAP, PER_GAME_CAP, PULL_PRICE } from '../economy/config';
+import { DAILY_CAP, PULL_PRICE } from '../economy/config';
 import { dailyProgress, earnedAfter, rewardNote, rewardTrims } from '../economy/playReward';
 import { useCountUp } from '../hooks/useCountUp';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -243,7 +243,7 @@ export function MiniGameResult({ gameName, partner, partnerShiny = false, payloa
           </div>
           {trims.gameTrim > 0 && (
             <div className="mg-receipt__trim">
-              <dt>한 판 상한 {fmt(PER_GAME_CAP)}코인</dt>
+              <dt>한 판 상한 {fmt(reward.gameCap)}코인</dt>
               <dd>-{fmt(trims.gameTrim)}</dd>
             </div>
           )}

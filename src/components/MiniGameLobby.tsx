@@ -2,7 +2,6 @@ import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { sfx } from '../audio/sfx';
 import { getCharacter } from '../data/characters';
-import { PER_GAME_CAP } from '../economy/config';
 import { dailyProgress, expectedCoins, todayEarned } from '../economy/playReward';
 import { LOBBY_FILTERS, LOBBY_FILTER_LABELS, filterGames, isLobbyFilter, type LobbyFilter } from '../minigames/lobby';
 import { MINI_GAMES, RECOMMENDED_GAME_ID } from '../minigames/registry';
@@ -174,7 +173,7 @@ export function MiniGameLobby() {
       )}
 
       <p className="lobby__foot">
-        예상 코인은 내 기록으로 계산해요. 한 판에 최대 {fmt(PER_GAME_CAP)}코인까지 받아요.
+        예상 코인은 내 기록으로 계산해요. 긴 게임일수록 한 판에 더 많이 받아요.
       </p>
     </div>
   );

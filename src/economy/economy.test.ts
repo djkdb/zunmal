@@ -9,7 +9,7 @@ import {
   PULL_PRICE,
 } from './config';
 import { seoulDateKey, isValidDateKey } from './daily';
-import { applyDailyReset, coinsNeededForPull, computeReward, getGameMultiplier, normalizeScore, payForPull } from './economy';
+import { applyDailyReset, coinsNeededForPull, computeReward, gameCap, getGameMultiplier, normalizeScore, payForPull } from './economy';
 
 describe('config', () => {
   it('뽑기 가격: 1회 100, 10연 1000 (할인 없음)', () => {
@@ -46,7 +46,10 @@ describe('computeReward', () => {
 
   it('판당 상한 적용', () => {
     const r = computeReward({ gameId: 'button-malang', score: 100_000, partnerRarity: 'mythic', dailyEarned: 0 });
-    expect(r.earnedCoins).toBe(PER_GAME_CAP);
+    expect(r.earnedCoins).toBe(gameCap('button-malang'));
+    expect(r.gameCap).toBe(gameCap('button-malang'));
+    // 플레이 시간이 없는 게임은 공통 상한
+    expect(gameCap('unknown-game')).toBe(PER_GAME_CAP);
     expect(r.cappedByGame).toBe(true);
   });
 
