@@ -7,7 +7,7 @@ import {
   registerCapsuleTap,
   wrapAngle,
 } from './capsule';
-import { PERF_TUNING, createPerf, looksLikePhone, samplePerf, type PerfState } from './perfGovernor';
+import { PERF_TUNING, createPerf, looksLikePhone, readyToDowngrade, samplePerf, type PerfState } from './perfGovernor';
 import { buildShelf, shelfAction, shelfOrder } from './shelf';
 
 function feed(state: PerfState, gapMs: number, n: number): PerfState {
@@ -29,6 +29,30 @@ describe('perf governor', () => {
 
   it('데스크톱은 5마리로 시작', () => {
     expect(createPerf({ phone: false, quality: '3d' }).cap).toBe(5);
+    expect(createPerf({ phone: false, quality: '3d' }).settled).toBe(true);
+  });
+
+  it('첫 판단 전에는 상한이 정해지지 않았다 (화면에 N/상한을 보이지 않는다)', () => {
+    let s = createPerf({ phone: true, quality: '3d' });
+    expect(s.settled).toBe(false);
+    s = feed(s, 16.6, PERF_TUNING.minSamples - 10);
+    expect(s.settled).toBe(false);
+    s = feed(s, 16.6, 20);
+    expect(s).toMatchObject({ settled: true, cap: 5 });
+    // 보통 속도라 상한이 그대로여도 첫 판단 뒤에는 정해진 것
+    let m = createPerf({ phone: true, quality: '3d' });
+    m = feed(m, 22, PERF_TUNING.minSamples + 1);
+    expect(m).toMatchObject({ settled: true, cap: 3 });
+  });
+
+  it('3D → 2D 는 손가락을 모두 뗀 뒤에 바꾼다', () => {
+    const slow = feed(createPerf({ phone: true, quality: '3d' }), 40, PERF_TUNING.minSamples + 1);
+    expect(slow.quality).toBe('2d');
+    expect(readyToDowngrade(slow, '3d', 1)).toBe(false);
+    expect(readyToDowngrade(slow, '3d', 0)).toBe(true);
+    expect(readyToDowngrade(slow, 'loading', 0)).toBe(true);
+    expect(readyToDowngrade(slow, '2d', 0)).toBe(false);
+    expect(readyToDowngrade(createPerf({ phone: true, quality: '3d' }), '3d', 0)).toBe(false);
   });
 
   it('3D 가 계속 느리면 2D 로, 2D 도 느리면 상한을 2까지 줄인다', () => {

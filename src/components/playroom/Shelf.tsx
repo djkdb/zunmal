@@ -13,6 +13,8 @@ interface ShelfProps {
   entries: ShelfEntry[];
   onMat: number;
   cap: number;
+  /** 상한이 정해졌나 — 아직이면(성능 조절이 곧 올릴 수 있음) 마릿수만 보인다 */
+  capKnown?: boolean;
   shinyIds: ReadonlySet<string>;
   onToggle: () => void;
   onPick: (entry: ShelfEntry) => void;
@@ -36,6 +38,7 @@ export function Shelf({
   entries,
   onMat,
   cap,
+  capKnown = true,
   shinyIds,
   onToggle,
   onPick,
@@ -68,9 +71,7 @@ export function Shelf({
         <span className="pr-shelf__grip" aria-hidden="true" />
         <span className="pr-shelf__handle-text">
           {open ? '선반 닫기' : solo ? '친구 꺼내기' : '선반 열기'}
-          <span className="pr-shelf__count">
-            매트 {onMat}/{cap}
-          </span>
+          <span className="pr-shelf__count">{capKnown ? `매트 ${onMat}/${cap}` : `매트 ${onMat}마리`}</span>
         </span>
         {!open && sealedCount > 0 && (
           <span className="pr-shelf__new" aria-label={`새 캡슐 ${sealedCount}개`}>
@@ -136,10 +137,14 @@ export function Shelf({
                     </>
                   )}
                 </button>
-                {/* 봉인된 캡슐: 이름 대신 등급만 (색 + 모양 + 글자) */}
-                {e.sealed && (
+                {/* 봉인된 캡슐: 이름 대신 등급만 (색 + 모양 + 글자). 연 말랑이는 이름 (버튼 이름에 이미 있어 읽지 않는다) */}
+                {e.sealed ? (
                   <span className="pr-shelf__rarity" aria-hidden="true">
                     <RarityBadge rarity={c.rarity} compact />
+                  </span>
+                ) : (
+                  <span className="pr-shelf__name" aria-hidden="true">
+                    {c.name}
                   </span>
                 )}
               </li>

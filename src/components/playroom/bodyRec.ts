@@ -53,6 +53,8 @@ export interface BodyRec {
   /** 마지막으로 3D 정점을 계산한 뒤 모양이 그대로인가 */
   still: boolean;
   lastSqueeze: number;
+  /** 손가락으로 잡은 동안 살짝 커지는 배수 (그림만 — 세계 좌표는 그대로, `matView.stepFocusZoom`) */
+  zoom: number;
 }
 
 export function bodyKey(kind: MatKind, id: string): string {
