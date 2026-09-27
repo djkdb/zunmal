@@ -27,7 +27,7 @@ src/
   lib/            rng.ts (주입형/시드 RNG), share.ts (자랑하기 글·보내기 순서), josa.ts, couponLink.ts …
   hooks/          useReducedMotion, useDialogFocus(<dialog> 아닌 창의 초점 규칙) 등 공용 훅
   data/           characters.ts (말랑이 32종), rarity.ts (희귀도 메타·확률 가중치), collections.ts (테마 세트), materials.ts (촉감·특별한 속),
-                  materialIds.ts (촉감 id·이름만 — 첫 화면용), affection.ts (애정 단계 levelOf + 단계별 반응 표 REACTION_UNLOCKS), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
+                  materialIds.ts (촉감 id·이름·`materialCoverage` — 첫 화면용), affection.ts (애정 단계 levelOf + 단계별 반응 표 REACTION_UNLOCKS), collectionProgress.ts (도감·세트 진행 요약), playroomDecor.ts (놀이방 무늬 id·소품·저장 검사), matPatterns.ts (매트 무늬 타일 그림, 놀이방 청크 전용)
   gacha/          engine.ts — 순수 가챠 엔진 (UI/Zustand/DOM 의존 금지)
   economy/        config.ts (모든 밸런스 숫자), economy.ts (보상/구매 계산), daily.ts (서울 날짜),
                   playReward.ts (로비 예상 코인·오늘 막대·결과 영수증), shop.ts (디저트 가게 방치 수입),
@@ -154,8 +154,13 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **중복**: 이미 보유(같은 10연 내 앞선 결과 포함)한 캐릭터는 희귀도별 환급 코인을 지급.
   단, 반짝 버전을 처음 얻은 경우는 새 수집으로 보고 환급하지 않는다.
 - 천장 때문에 실질 전설 이상 확률은 약 4.2% — 확률표에 함께 공개한다. 확률 입구는 뽑기 화면 아래 "확률 안내 보기" 하나.
-- **결과 창**(`PullResult`): 10연 캡슐은 열기 전에도 등급이 보인다(사용자 요청). 반짝 결과에는 등급과 따로 "반짝!" 딱지(최고 카드는 "최고 반짝!"),
-  "최고" 리본은 카드 위 왼쪽(환급 딱지는 안쪽 위 오른쪽). 새 말랑이가 있으면 "새 말랑이는 놀이방에서 캡슐째 기다려요" +
+- **1회는 머신 캡슐이 곧 열기**: 머신의 캡슐을 누르면 결과 창이 이미 열린 채 뜬다(`seenIndex=0` + `seenByMachine` — 결과음·빛 조각·전설 번쩍은
+  창이 뜰 때 낸다). 신화 이상은 그대로 전체 화면 연출이 먼저. 결과 창에서 다시 까는 회색 캡슐은 없다(대체로 남은 `SingleCapsule`도 윗뚜껑은 등급 색).
+  세 번째 열기(놀이방에서 손으로 까기)는 그대로 — 안내 줄이 "놀이방에서 직접 까 보세요"로 미리 알려 준다.
+- **결과 창**(`PullResult`): 10연 캡슐은 열기 전에도 등급이 보인다(사용자 요청). 열기 전 카드는 앞면(이름·그림)을 아예 그리지 않는다 —
+  DOM·스크린리더에 결과가 새지 않게, 이름표는 "레어 캡슐 3 열기"뿐. 연 카드 이름표는 "이름, 등급, 촉감, 새 말랑이". 반짝 결과에는 등급과 따로 "반짝!" 딱지(최고 카드는 "최고 반짝!"),
+  "최고" 리본은 카드 위 왼쪽(환급 딱지는 안쪽 위 오른쪽, 촉감 그림은 안쪽 위 왼쪽 — 1회 결과는 등급 배지 옆 촉감 딱지).
+  새 말랑이가 있으면 "새 말랑이는 캡슐째 기다려요. 놀이방에서 직접 까 보세요"(여럿이면 "새 말랑이 N마리는 놀이방에서 직접 까 보세요") +
   "지금 만지러 가기"(가장 좋은 새 말랑이 `summarizePulls().bestNewIndex` → `/touch/:id`, 놀이방이 그 캡슐을 매트에 떨어뜨린다).
   - 딱지는 어디서나 같은 모양: NEW(처음 만남 + 첫 반짝) · 중복 [코인]+N(좁은 10연 카드만 "중복" 글자 생략) · 반짝!. 설명 띠에도 같은 딱지.
   - 다 열면 요약 줄(`dl`, 칸으로 나눔): 새 말랑이 N(= NEW 딱지 수) · 반짝 N · 환급 +N · 도감 N/32(도감 링크) · 전설 이상까지 N회(뽑은 뒤 천장).
@@ -225,8 +230,15 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **자랑하기**(`lib/share.ts` 순수·테스트 + `components/ShareButton.tsx`): 뽑기 결과에 에픽 이상·반짝·새 말랑이가 있으면
   (`pullReveal.shareHighlightIndex`) 결과 창에, 도감 상세에는 항상. 글 = 한 줄(“방금 신화 말랑이 은하 말랑을 뽑았어요!” / “내 파트너 말랑이를
   소개해요!” + 이름·친밀도 Lv) + "내 말랑 도감 N/32" + "나도 말랑이 뽑기", 주소는 `SHARE_URL`(`https://zunmal.pages.dev/`, 쿠폰·추적 값 없음).
-  이모지는 공유 글에만(반짝일 때 하나) — 화면에는 없다. 보내기: Web Share(글 + 주소) → 클립보드("링크를 복사했어요" 말풍선) → 직접 복사
-  (`.selectable` 글 상자). 공유 창을 닫으면(AbortError) 조용히. 말풍선은 버튼 위(모달 안에서도 보이게 같은 층).
+  이모지는 공유 글에만(반짝일 때 하나) — 화면에는 없다.
+  - **카드 그림**(인스타그램은 글보다 그림): 파일 공유가 되는 브라우저(`canShare({ files })`)면 버튼이 보일 때 한가할 때 PNG를 미리 만든다
+    (`components/share/shareCard.ts` 지연 청크 → 놀이방 사진과 같은 `touch3d/photo.ts` `composePhoto`: 하늘 도트 매트 위 말랑이 한 마리 + 등급 칩 + 이름 +
+    하트 한 줄 + 아래 왼쪽 주소 `zunmal.pages.dev` + 가게 이름). 원본은 버튼 옆 화면 밖 `<Malang>`(`.share__src`)을 굽는다. 글(제목·한 줄·파일 이름)은
+    순수 `shareCardText`("방금 처음 만났어요"/"방금 뽑았어요", 도감은 "[내 파트너] 친밀도 Lv.N"). 뽑기 결과는 `shareHighlightIndex`의 말랑이, 도감 상세는 그 말랑이(보고 있는 반짝 모습).
+    누른 뒤 그림을 1.2초까지만 기다린다(공유 창은 사용자 입력 직후에만 열려서) — 못 만들면 글만.
+  - 보내기(`runShare(c, env, files)`): 그림 + 글 + 주소 → Web Share(글 + 주소) → 클립보드 → 직접 복사(`.selectable` 글 상자).
+    어느 단계든 공유 창을 닫으면(AbortError) 조용히. 복사하면 말풍선 대신 **버튼 글자가 잠깐 민트 체크 "복사했어요"**(알림 영역은 "링크를 복사했어요") —
+    도감 상세 2×2 행동에서 말풍선이 옆 버튼을 가리던 문제.
 - 링크 미리보기: `index.html`의 og/twitter 메타 + `public/og.png`(1200×630, `scripts/render-og.mjs`로 실제 말랑이 SVG에서 생성 — 스카이 소다:
   하늘 바탕·머리글·제목 글꼴 Jua(`@fontsource/jua`, 본문은 `src/assets/fonts`의 NanumSquareRound가 있으면)·흰 칩·도트 매트 위 말랑이). 배포 주소 `https://zunmal.pages.dev`.
 
@@ -251,7 +263,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   (시크릿은 밤하늘 캡슐 + 금 이음새). 이름 자리는 "???". 실루엣 색은 `Malang`의 `.malang-silhouette`(`--malang-silhouette`) 변수로 입힌다.
 - **진열장 칸**: NEW 딱지(딸기우유 알약 — 뽑기 결과·선반과 같은 모양)는 `isNewInCollection` = 아직 캡슐 속(봉인)이거나 처음 얻은 지
   `COLLECTION_NEW_MS`(24시간) 안. 파트너 딱지가 있으면 NEW 는 쉰다. 반짝 표시, 친밀도 2단계부터 창 오른쪽 아래 작은 하트 + 단계.
-- **상세 창**: 가진 수·반짝·코인 보너스 칸 + **친밀도 칸**(`AffectionMeter`) + 반짝 모습 보기 + 창 아래에 붙은 행동 2×2(파트너로 정하기·만지기 / 자랑하기·닫기).
+- **상세 창**: 등급 배지 + **촉감 딱지**(`MaterialTag`: 촉감 그림 + 이름) → 이름 → 가진 수·반짝·코인 보너스 칸 + **친밀도 칸**(`AffectionMeter`) + 반짝 모습 보기
+  + 창 아래에 붙은 행동 2×2(파트너로 정하기·만지기 / 자랑하기·닫기).
+- **촉감 보이기**: 촉감은 말랑이 팬이 고르는 기준이라 고르는 자리마다 보인다 — 첫 말랑이 고르기 카드(촉감 딱지 + `STARTER_FEELS` 한 줄 "천천히 차오르는 모찌"),
+  도감 상세, 뽑기 결과(1회 = 딱지, 10연 = 그림만 + 이름표), 도감 요약 "촉감 4종 중 N종" 알약(`materialCoverage`, 다 만나면 민트).
+  첫 화면용 그림은 `components/MaterialIcon.tsx` — 놀이방 `playroom/MaterialIcon`과 같은 그림을 따로 둔다(한 모듈을 나눠 쓰면 번들러가 첫 화면을 조각 9개로 쪼갠다, 측정). 그림을 고치면 둘 다.
 - 세트 보상을 그 자리에서 받으면(`useSetClaim(onClaimed)`) 도감의 상태 줄이 "○○ 세트 보상 N코인을 받았어요"를 읽는다.
 - 첫 말랑이 고르기 화면은 도감 설명 대신 `STARTER_BLURBS`(`data/characters.ts`, 등급 이야기 없는 따뜻한 존댓말 한 줄)를 보여 준다.
 
@@ -548,7 +564,8 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   말랑 선물(고르는 말랑이·코인·하루 한 번), 가게 글자(`components/shop/perks.test.ts`: 칩·남은 시간·변화 딱지·세트 한 줄),
   가게 요약(`msUntilFull`·다음 칸)·직원 바꾸기 미리 보기(`shopPreview.test.ts`: 화면과 같은 계산, 세트 짝을 빼거나 들이면 다른 직원도 바뀜, 쭉쭉 도움, 자리 바꾸기 = 그대로),
   다시 뽑기 모자란 코인(`coinsNeededForPull`).
-- 자랑하기: 글(조사·또·반짝 이모지 ≤2·도감 숫자 자르기), 보내기 순서(Web Share → AbortError 조용히 → 클립보드 → 직접), 공유 주소는 쿠폰 링크가 아님(`lib/share.test.ts`),
+- 자랑하기: 글(조사·또·반짝 이모지 ≤2·도감 숫자 자르기), 보내기 순서(그림 공유 → Web Share → AbortError 조용히 → 클립보드 → 직접, canShare가 파일을 거절하면 글만),
+  카드 글(한 줄·반짝 제목·파일 이름·주소), 공유 주소는 쿠폰 링크가 아님(`lib/share.test.ts`), 촉감 모음·시작 말랑이 촉감 한 줄(`data/materialIds.test.ts`),
   자랑할 결과 고르기(`pullReveal.shareHighlightIndex`).
 - 저장: 손상/구버전 데이터 migrate.
 - 화면 청크: 경로 → 미리 받을 청크(`app/routeChunks.test.ts`, 홈·모르는 경로·`constructor` 같은 이름은 받지 않음).
