@@ -63,9 +63,21 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
         setShowSteps(true);
       }
     };
-    // 버튼으로 바로 못 여는 곳(iOS 16 이하 등은 버튼이 있어도 안 열릴 수 있다)을 위해 메뉴 순서는 "자세히"에 접어 둔다.
-    // 바로 여는 주소가 없으면 처음부터 펼친다.
-    const detailsOpen = showSteps || !openUrl;
+    // 늘 접힌 두 줄 + 주 버튼 하나(바로 여는 주소가 있으면 "브라우저로 열기", 없으면 "링크 복사") + "자세히".
+    // 메뉴 순서·링크 복사·기록 코드는 모두 "자세히" 안에 — 저절로 펼치지 않는다(돌아올 때마다 글이 늘어나던 문제).
+    const detailsOpen = showSteps;
+    const copyButton = (primary: boolean) => (
+      <button
+        type="button"
+        className={`btn ${primary ? 'btn--primary' : 'btn--secondary'} btn--small`}
+        onClick={() => {
+          sfx.button();
+          void copy();
+        }}
+      >
+        {copied ? '복사했어요' : '링크 복사'}
+      </button>
+    );
     return (
       <aside className="install install--inapp" aria-labelledby="install-inapp-title">
         <p id="install-inapp-title" className="install__title">
@@ -73,28 +85,25 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
         </p>
         <p className="install__text">브라우저로 열어야 기록이 안전하고 홈 화면에 추가할 수 있어요.</p>
         <div className="install__actions">
-          {openUrl && (
+          {openUrl ? (
             <a className="btn btn--primary btn--small" href={openUrl} onClick={() => sfx.button()}>
               브라우저로 열기
             </a>
+          ) : (
+            copyButton(true)
           )}
-          <button type="button" className="btn btn--secondary btn--small" onClick={() => void copy()}>
-            {copied ? '복사했어요' : '링크 복사'}
+          <button
+            type="button"
+            className="install__more"
+            aria-expanded={detailsOpen}
+            aria-controls="install-inapp-details"
+            onClick={() => {
+              sfx.button();
+              setShowSteps((v) => !v);
+            }}
+          >
+            {detailsOpen ? '접기' : '자세히'}
           </button>
-          {openUrl && (
-            <button
-              type="button"
-              className="install__more"
-              aria-expanded={detailsOpen}
-              aria-controls="install-inapp-details"
-              onClick={() => {
-                sfx.button();
-                setShowSteps((v) => !v);
-              }}
-            >
-              {detailsOpen ? '접기' : '자세히'}
-            </button>
-          )}
         </div>
         {detailsOpen && (
           <div id="install-inapp-details" className="install__details">
@@ -109,6 +118,7 @@ export function InstallCard({ slot }: { slot: 'in-app' | 'install' }) {
                 </li>
               ))}
             </ol>
+            {openUrl && <div className="install__actions">{copyButton(false)}</div>}
             {hasProgress && (
               <div className="install__save">
                 <p className="install__text">
