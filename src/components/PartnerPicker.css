@@ -195,3 +195,47 @@
 .partner-sheet__done {
   flex: none;
 }
+
+/* 파트너를 바꾸고 창을 닫으면 잠깐 뜨는 한 줄 (홈 파트너도 같이 바뀐다고 알려 준다).
+ * 알림 영역은 늘 있어야 화면 읽기가 읽으므로 비어 있을 때는 투명하게만 한다. */
+.partner-toast {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 10px 18px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+  word-break: keep-all;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s var(--ease-jelly);
+}
+
+.partner-toast:empty {
+  padding: 0;
+  box-shadow: none;
+}
+
+.partner-toast.is-shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .partner-toast {
+    transition: none;
+  }
+}

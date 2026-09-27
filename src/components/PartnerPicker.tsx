@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { sfx } from '../audio/sfx';
 import { CHARACTERS, getCharacter, type Character } from '../data/characters';
 import { rarityRank } from '../data/rarity';
@@ -38,6 +38,14 @@ export function PartnerPicker({ className }: PartnerPickerProps) {
   const partnerId = useGameStore((s) => s.partnerId);
   const shiny = usePartnerShiny();
   const [open, setOpen] = useState(false);
+  // 바꾸기 창을 열 때의 파트너 — 닫을 때 바뀌었으면 "홈 파트너도 바뀌었어요" 한 줄을 잠깐 띄운다
+  const openedWith = useRef<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
   const partner = partnerId ? getCharacter(partnerId) : undefined;
   if (!partner) return null;
 
@@ -62,12 +70,26 @@ export function PartnerPicker({ className }: PartnerPickerProps) {
         aria-haspopup="dialog"
         onClick={() => {
           sfx.button();
+          openedWith.current = partnerId;
+          setToast(null);
           setOpen(true);
         }}
       >
         바꾸기
       </button>
-      {open && <PartnerSheet onClose={() => setOpen(false)} />}
+      {open && (
+        <PartnerSheet
+          onClose={() => {
+            setOpen(false);
+            const now = useGameStore.getState().partnerId;
+            const c = now ? getCharacter(now) : undefined;
+            if (c && now !== openedWith.current) setToast(`홈 파트너도 ${josa(c.name, '으로/로')} 바뀌었어요`);
+          }}
+        />
+      )}
+      <p className={`partner-toast${toast ? ' is-shown' : ''}`} role="status">
+        {toast}
+      </p>
     </section>
   );
 }
@@ -94,7 +116,7 @@ function PartnerSheet({ onClose }: { onClose(): void }) {
       <h2 id={titleId} className="partner-sheet__title">
         함께할 말랑이 고르기
       </h2>
-      <p className="partner-sheet__hint small muted">희귀할수록 미니게임 코인을 더 받아요.</p>
+      <p className="partner-sheet__hint small muted">희귀할수록 미니게임 코인을 더 받아요. 홈 파트너도 바뀌어요.</p>
 
       {currentHasShiny && current && (
         <button
