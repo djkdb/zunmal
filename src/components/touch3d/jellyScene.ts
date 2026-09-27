@@ -57,7 +57,8 @@ import { DEFAULT_MATERIAL, MATERIALS, type MaterialLook } from '../../data/mater
 import { SHAPES } from '../malang/shapes';
 import { VIEWBOX } from '../malang/helpers';
 import { buildCardGrid, buildJellyMesh, computeNormals, flattenPath, type JellyMesh } from '../../touch/jellyMesh';
-import { createScratch, deformJelly, deformPoints, type Pose, type SoftHit, type SoftState } from '../../touch/softbody';
+import { createScratch, deformJelly, deformPoints, SOFT_TUNING, type Pose, type SoftHit, type SoftState } from '../../touch/softbody';
+import { rippleFront, rippleHeight, SURFACE_TUNING } from '../../touch/surface';
 import { rasterizeMalang, type RasterRect } from './rasterMalang';
 import { faceExtras, type TouchFace } from '../../touch/faceExtras';
 
@@ -290,6 +291,8 @@ function shadowTexture(soft: boolean): CanvasTexture {
 
 /** 주광 방향 (월드 = 보기 공간: 카메라는 돌지 않는다) — 왼쪽 위 앞 */
 const KEY_DIR = new Vector3(-0.55, 0.9, 0.8).normalize();
+/** 화소 범프 세기 (정점 변형 위에 얹는 손끝 자국·주름·물결의 법선) */
+const SKIN_BUMP = 0.85;
 /** 동시에 셰이더로 넘기는 자국 수 (softbody SOFT_TUNING.maxDents 와 같게) */
 const MAX_DENTS = 3;
 
@@ -316,6 +319,18 @@ interface JellyUniforms {
   uDentD: { value: Vector3 };
   /** 몸 높이 (쉬는 자세) */
   uHeight: { value: number };
+  /** 표면 질감: x 자국 바닥 평평함, y 둘레 테, z 손가락 아래 어둡기, w 손가락 그늘 반지름 */
+  uSkin: { value: Vector4 };
+  /** 손가락이 닿은 곳 (쉬는 자세 몸 좌표) + w 닿은 세기 */
+  uContact: { value: Vector4 };
+  /** 표면 질감 2: x 폼 주름, y 손끝 타원 세로 비율, z 범프 세기 */
+  uSkin2: { value: Vector4 };
+  /** 물결: xyz 시작점 (쉬는 자세), w 지금 높이 */
+  uRipple: { value: Vector4 };
+  /** 물결 앞머리 거리 (몸 좌표 단위) */
+  uRippleFront: { value: number };
+  /** 몸 좌표 1 단위가 장면에서 몇 단위인가 (범프 높이 맞추기) */
+  uUnit: { value: number };
 }
 
 function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look: MaterialLook, env: Texture): MeshPhysicalMaterial {
@@ -344,10 +359,11 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
         'void main() {',
         /* glsl */ `attribute vec3 aRest;
       attribute float aFront;
-      uniform vec4 uDentC[${MAX_DENTS}];
-      uniform vec3 uDentD;
       uniform float uHeight;
-      varying float vDent;
+      uniform vec4 uSkin;
+      uniform vec4 uContact;
+      varying vec3 vRest;
+      varying float vContact;
       varying float vFront;
       varying float vHn;
       void main() {`,
@@ -356,16 +372,14 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
         '#include <begin_vertex>',
         /* glsl */ `#include <begin_vertex>
       {
-        // 자국 바닥이 얼마나 가려졌나 (쉬는 자세 좌표로 재니 몸이 어떻게 변형돼도 같은 자리)
-        float ao = 0.0;
-        for (int i = 0; i < ${MAX_DENTS}; i++) {
-          float dd = uDentD[i];
-          if (dd <= 0.0) continue;
-          vec3 d = aRest - uDentC[i].xyz;
-          float r = uDentC[i].w;
-          ao = max(ao, exp(-dot(d, d) / (r * r)) * min(1.0, dd / r));
+        // 쉬는 자세 좌표: 자국·물결을 화소마다 다시 잰다 (몸이 어떻게 변형돼도 같은 자리)
+        vRest = aRest;
+        // 손가락이 닿아 있는 자리: 손가락에 가려 빛이 덜 든다
+        {
+          vec3 c = aRest - uContact.xyz;
+          float cr = max(uSkin.w, 1.0);
+          vContact = uContact.w * exp(-dot(c, c) / (cr * cr));
         }
-        vDent = ao;
         vFront = aFront;
         vHn = aRest.y / max(uHeight, 1.0);
       }`,
@@ -389,9 +403,60 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
       #define BODY_EXPOSURE 0.84
       // 소프트박스 창 방향: 카메라 가까이 왼쪽 위 (앞면 가운데에서 조금 비낀 곳에 비친다)
       #define SOFTBOX_DIR vec3(-0.33, 0.47, 0.82)
-      varying float vDent;
+      varying vec3 vRest;
+      varying float vContact;
       varying float vFront;
       varying float vHn;
+      uniform vec4 uSkin;
+      uniform vec4 uSkin2;
+      uniform vec4 uDentC[${MAX_DENTS}];
+      uniform vec3 uDentD;
+      uniform vec4 uRipple;
+      uniform float uRippleFront;
+      uniform float uUnit;
+      // 자국 바닥 그늘 (화소마다 jellySkin 이 채운다)
+      float vDent;
+      /**
+       * 표면 질감 높이 (쉬는 자세 몸 좌표 단위, 밖 +): 손끝 자국(평평한 바닥·솟은 테·폼 주름) + 젤리 물결.
+       * touch/surface.ts 의 dentProfile·creaseDip·rippleAt 과 같은 곡선. 메시 정점보다 촘촘하게 화소마다 잰다 → 범프로 법선에.
+       */
+      float jellySkin(vec3 p) {
+        float h = 0.0;
+        float ao = 0.0;
+        for (int i = 0; i < ${MAX_DENTS}; i++) {
+          float dd = uDentD[i];
+          if (dd <= 0.0) continue;
+          vec3 d = p - uDentC[i].xyz;
+          float r = max(uDentC[i].w, 1.0);
+          vec2 q = vec2(d.x, d.y / uSkin2.y);
+          float u = (dot(q, q) + d.z * d.z) / (r * r);
+          float inner = exp(-pow(u, 1.0 + uSkin.x));
+          float rn = sqrt(u);
+          float rimD = (rn - ${SURFACE_TUNING.rimAt.toFixed(2)}) / ${SURFACE_TUNING.rimWidth.toFixed(2)};
+          float prof = inner - uSkin.y * exp(-rimD * rimD);
+          if (uSkin2.x > 0.0) {
+            float df = smoothstep(${SURFACE_TUNING.creaseStart.toFixed(2)}, 1.0, dd / ${SOFT_TUNING.dentMax.toFixed(1)});
+            float ring = smoothstep(${SURFACE_TUNING.creaseFrom.toFixed(2)}, ${(SURFACE_TUNING.creaseFrom + 0.35).toFixed(2)}, rn)
+              * (1.0 - smoothstep(${(SURFACE_TUNING.creaseFrom + 0.6).toFixed(2)}, ${SURFACE_TUNING.creaseTo.toFixed(2)}, rn));
+            float ph = fract(sin(dot(uDentC[i].xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+            float k = 0.5 + 0.5 * cos(${SURFACE_TUNING.creaseCount.toFixed(1)} * atan(q.y, q.x + 1e-4) + ph);
+            prof += ${SURFACE_TUNING.creaseDepth.toFixed(2)} * uSkin2.x * df * ring * k * k * k;
+          }
+          h -= dd * prof;
+          ao = max(ao, inner * min(1.0, dd / r));
+        }
+        vDent = ao;
+        if (uRipple.w > 0.0) {
+          float dist = length(p - uRipple.xyz);
+          float behind = uRippleFront - dist;
+          float L = ${SURFACE_TUNING.waveLength.toFixed(1)};
+          float edge = smoothstep(-L * 0.5, L * 0.25, behind);
+          float tail = exp(-max(0.0, behind) / (${SURFACE_TUNING.wavePacket.toFixed(2)} * L));
+          float reach = 1.0 / (1.0 + dist / ${SURFACE_TUNING.waveReach.toFixed(1)});
+          h += uRipple.w * sin(6.2831853 * behind / L) * edge * tail * reach * smoothstep(0.0, 16.0, p.y);
+        }
+        return h * smoothstep(0.02, 0.45, vFront);
+      }
       vec3 jellyHue(float h) {
         return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
       }
@@ -483,6 +548,19 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
       .replace(
         '#include <normal_fragment_maps>',
         /* glsl */ `#include <normal_fragment_maps>
+      {
+        // 손끝 자국·주름·물결을 화소마다 범프로 (정점만으로는 가장자리가 계단져 보인다). 잔결과 같은 Mikkelsen 범프
+        float sh = jellySkin(vRest) * uUnit;
+        if (uSkin2.z > 0.0) {
+          vec3 dpdx = dFdx(-vViewPosition);
+          vec3 dpdy = dFdy(-vViewPosition);
+          vec3 r1 = cross(dpdy, normal);
+          vec3 r2 = cross(normal, dpdx);
+          float det = dot(dpdx, r1);
+          vec3 grad = sign(det) * (dFdx(sh) * r1 + dFdy(sh) * r2);
+          normal = normalize(abs(det) * normal - uSkin2.z * grad);
+        }
+      }
       #ifdef USE_MAP
       if (uGrain.x > 0.0) {
         // 잔결: 높이 노이즈를 화면 미분으로 법선에 얹는다 (Mikkelsen 범프, 텍스처·접선 없음)
@@ -507,7 +585,7 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
         /* glsl */ `#include <aomap_fragment>
       {
         // 자국 바닥: 둘레 벽에 가려 방 반사가 덜 든다 (색 그늘은 아래 opaque 에서)
-        float dentAo = 1.0 - 0.6 * vDent;
+        float dentAo = (1.0 - 0.6 * vDent) * (1.0 - uSkin.z * vContact);
         reflectedLight.indirectSpecular *= dentAo;
         // 속 비침 (1): 몸속에서 흩어진 빛이 그늘진 쪽까지 감싼다
         float wrap = clamp((dot(normal, uKeyDir) + 0.7) / 1.7, 0.0, 1.0);
@@ -526,6 +604,8 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
         outgoingLight = mix(outgoingLight, diffuseColor.rgb * 0.92 + 0.01, uLook.z * nv * nv);
         // 자국 바닥: 회색이 아니라 몸색 쪽으로 짙어진다 (실제 실리콘 자국처럼)
         outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.75 + 0.05, vDent * 0.6);
+        // 손가락 아래: 살짝 그늘 (몸색 쪽으로)
+        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.7 + 0.08, uSkin.z * vContact * 0.55);
         // 속 비침 (2): 두꺼운 가운데는 색이 진하고 맑게 (몸색을 한 번 더 곱한다)
         float thick = nv * mix(0.55, 1.0, vFront);
         outgoingLight = mix(outgoingLight, outgoingLight * (diffuseColor.rgb * 1.1 + 0.02), tl * thick * 0.7);
@@ -746,6 +826,12 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       uDentC: { value: Array.from({ length: MAX_DENTS }, () => new Vector4(0, 0, 0, 1)) },
       uDentD: { value: new Vector3(0, 0, 0) },
       uHeight: { value: mesh.height },
+      uSkin: { value: new Vector4(0, 0, 0, 14) },
+      uContact: { value: new Vector4(0, 0, 0, 0) },
+      uSkin2: { value: new Vector4(0, SURFACE_TUNING.fingerAspect, SKIN_BUMP, 0) },
+      uRipple: { value: new Vector4(0, 0, 0, 0) },
+      uRippleFront: { value: 0 },
+      uUnit: { value: 1 },
     };
     // 얼굴 영역 (텍스처 좌표): 눈과 볼을 넉넉히 감싼다
     uniforms.uFaceUv.value.set((60 - bodyRect.x) / bodyRect.w, 1 - (shape.faceY + 3 - bodyRect.y) / bodyRect.h);
@@ -908,6 +994,7 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
       const py = p.y - rect.top;
       root.position.set((px - cssW / 2) * k, (cssH / 2 - py) * k, zg);
       root.scale.setScalar(p.unit * k);
+      uniforms.uUnit.value = p.unit * k;
       liftUnits = p.unit > 0 ? Math.max(0, p.lift / p.unit) : 0;
       applyShadow();
     };
@@ -934,6 +1021,21 @@ export function createJellyStage(opts: JellyStageOptions): JellyStage {
         dd.setComponent(i, depth);
         if (d) dc[i]!.set(d.center.x, d.center.y, d.center.z, Math.max(1, d.radius));
       }
+      // 표면 질감 + 손가락이 닿은 자리 (누르는 동안·당기는 동안)
+      const sk = soft.skin;
+      const active = soft.dents.find((d) => d.active);
+      uniforms.uSkin.value.set(sk?.flat ?? 0, sk?.rim ?? 0, sk?.contactDark ?? 0, (active?.radius ?? 15) * 1.2);
+      uniforms.uSkin2.value.x = sk?.crease ?? 0;
+      const rp = soft.ripple ?? null;
+      if (rp) {
+        uniforms.uRipple.value.set(rp.x, rp.y, rp.z, rippleHeight(rp));
+        uniforms.uRippleFront.value = rippleFront(rp);
+      } else {
+        uniforms.uRipple.value.w = 0;
+      }
+      const grab = soft.held ? (active?.center ?? soft.grab) : null;
+      if (grab) uniforms.uContact.value.set(grab.x, grab.y, grab.z, 1);
+      else uniforms.uContact.value.w = 0;
       // 발자국: 가장 낮은 정점 근처 정점들의 폭 (당김·기울기·눌림을 그대로 따른다)
       let lo = Infinity;
       for (let i = 1; i < out.length; i += 3) if (out[i]! < lo) lo = out[i]!;

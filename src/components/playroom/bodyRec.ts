@@ -31,6 +31,9 @@ export interface BodyEls {
   sprite: HTMLSpanElement | null;
   shadow: HTMLSpanElement | null;
   button: HTMLButtonElement | null;
+  /** 2D 겹 그림: 손끝 자국·젤리 물결 (SkinArt) */
+  dent: SVGGElement | null;
+  ripple: SVGGElement | null;
 }
 
 export interface BodyRec {

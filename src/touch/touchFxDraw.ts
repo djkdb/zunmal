@@ -2,6 +2,7 @@
  * 말랑 만지기 입자 그리기 (Canvas 2D). 움직임은 순수 모듈 `touchFx.ts`.
  * 그림자 흐림(shadowBlur)·필터 없이 채우기/선만 써서 저사양 폰에서도 가볍다.
  */
+import type { GooDraw } from './goo';
 import type { FxParticle, FxSystem } from './touchFx';
 
 const INK = '#2b2233';
@@ -253,6 +254,117 @@ export function drawFx(ctx: CanvasRenderingContext2D, sys: FxSystem, width: numb
       if (!p.alive) continue;
       if ((p.shape === 'glow') !== (pass === 0)) continue;
       drawOne(ctx, p, scale);
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+/** '#rrggbb' 을 잉크 쪽으로 k 만큼 (실 가닥이 같은 색 몸 위에서도 보이게) */
+function shade(hex: string, k: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m || !m[1]) return hex;
+  const n = parseInt(m[1], 16);
+  const mix = (c: number, ink: number) => Math.round(c + (ink - c) * k);
+  return `rgb(${mix((n >> 16) & 255, 43)},${mix((n >> 8) & 255, 34)},${mix(n & 255, 51)})`;
+}
+
+/**
+ * 찐득이 실 가닥 (`touch/goo.ts`): 양 끝은 굵고 가운데는 가는 끈적한 실 + 젖은 반사 한 줄, 끊어진 뒤엔 방울.
+ * cx·cy·r = 몸 가운데·반지름 (캔버스 CSS px), color = 몸 색. 입자 위에 그린다 (지우지 않는다).
+ */
+export function drawGoo(
+  ctx: CanvasRenderingContext2D,
+  draws: readonly GooDraw[],
+  cx: number,
+  cy: number,
+  r: number,
+  color: string,
+  scale: number,
+): void {
+  if (draws.length === 0) return;
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const deep = shade(color, 0.12);
+  const N = 12;
+  const lx: number[] = [];
+  const ly: number[] = [];
+  const rx: number[] = [];
+  const ry: number[] = [];
+  for (const d of draws) {
+    if (d.alpha <= 0.01) continue;
+    const x0 = cx + d.x0 * r;
+    const y0 = cy + d.y0 * r;
+    const x1 = cx + d.x1 * r;
+    const y1 = cy + d.y1 * r;
+    const qx = cx + d.cx * r;
+    const qy = cy + d.cy * r;
+    const w0 = Math.max(0.4, d.width * r);
+    const wm = Math.max(0.25, d.waist * r);
+    if (Math.hypot(x1 - x0, y1 - y0) > 0.5) {
+      lx.length = 0;
+      ly.length = 0;
+      rx.length = 0;
+      ry.length = 0;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const a = (1 - t) * (1 - t);
+        const b = 2 * (1 - t) * t;
+        const c = t * t;
+        const px = a * x0 + b * qx + c * x1;
+        const py = a * y0 + b * qy + c * y1;
+        // 접선 → 법선
+        const tx = 2 * (1 - t) * (qx - x0) + 2 * t * (x1 - qx);
+        const ty = 2 * (1 - t) * (qy - y0) + 2 * t * (y1 - qy);
+        const tl = Math.hypot(tx, ty) || 1;
+        // 몸 쪽은 넓게 붙은 밑동(텐트), 가운데는 가는 목, 손가락 쪽은 조금 굵은 끝
+        const hw = (w0 * 2.4 * (1 - t) * (1 - t) + wm * 2 * t * (1 - t) + w0 * 0.9 * t * t) / 2;
+        lx.push(px - (ty / tl) * hw);
+        ly.push(py + (tx / tl) * hw);
+        rx.push(px + (ty / tl) * hw);
+        ry.push(py - (tx / tl) * hw);
+      }
+      ctx.beginPath();
+      ctx.moveTo(lx[0] ?? x0, ly[0] ?? y0);
+      for (let i = 1; i <= N; i++) ctx.lineTo(lx[i] ?? x0, ly[i] ?? y0);
+      for (let i = N; i >= 0; i--) ctx.lineTo(rx[i] ?? x1, ry[i] ?? y1);
+      ctx.closePath();
+      // 몸 위에서도 보이게 몸색보다 조금 짙게 + 가는 잉크 테두리
+      ctx.globalAlpha = d.alpha * 0.92;
+      ctx.fillStyle = deep;
+      ctx.fill();
+      ctx.globalAlpha = d.alpha * 0.65;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      // 젖은 반사: 가닥을 따라 가는 흰 줄 (한쪽으로 비켜서)
+      const off = wm * 0.25;
+      ctx.globalAlpha = d.alpha * 0.8;
+      ctx.lineWidth = Math.max(0.5, wm * 0.4);
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(x0 - off, y0 - off);
+      ctx.quadraticCurveTo(qx - off, qy - off, x1 - off, y1 - off);
+      ctx.stroke();
+    }
+    if (d.drop) {
+      const dx = cx + d.drop.x * r;
+      const dy = cy + d.drop.y * r;
+      const dr = Math.max(0.6, d.drop.r * r);
+      ctx.globalAlpha = d.alpha;
+      ctx.fillStyle = deep;
+      ctx.beginPath();
+      ctx.arc(dx, dy, dr, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = d.alpha * 0.3;
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      ctx.globalAlpha = d.alpha * 0.85;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(dx - dr * 0.35, dy - dr * 0.35, dr * 0.3, 0, TAU);
+      ctx.fill();
     }
   }
   ctx.restore();

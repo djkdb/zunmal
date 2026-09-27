@@ -240,6 +240,22 @@
   transform: translate(calc(var(--gaze-x, 0) * 1px), calc(var(--gaze-y, 0) * 1px));
 }
 
+/* 2D 표면 질감 겹 그림 (손끝 자국·젤리 물결): 몸 윤곽 안에만, 스프라이트와 함께 눌리고 기운다 */
+.pr-skin {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* 자국 그늘은 곱하기: 회색 얼룩이 아니라 몸색이 짙어진다 */
+.pr-skin__pit,
+.pr-skin__creases {
+  mix-blend-mode: multiply;
+}
+
 .pr-body__extra {
   position: absolute;
   inset: 0;

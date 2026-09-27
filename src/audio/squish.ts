@@ -9,12 +9,14 @@
  *
  * 파라미터 계산은 순수 함수로 분리해 단위 테스트한다.
  *
- * 촉감(flavor)마다 맛이 다르다 (`FLAVOR_TONES`): 슬로우 라이징은 낮고 조용한 "푸슉", 탱탱 젤리는 높고 탱글한
- * "뾰잉", 쭉쭉이는 늘어날수록 올라가는 "쭈우욱", 찐득이는 축축한 거품 + 떼어낼 때 "쩍"(`peel`).
- * 촉감을 주지 않으면('plain') 예전 소리 그대로다.
+ * 촉감(flavor)마다 맛이 다르다 (`FLAVOR_TONES`): 슬로우 라이징은 낮고 조용하게, 탱탱 젤리는 높고 탱글하게,
+ * 찐득이는 축축한 거품 + 떼어낼 때 "쩍"(`peel`). 촉감을 주지 않으면('plain') 예전 소리 그대로다.
+ * 젤리 누름 "쮸웁"(`squelch`), 쭉쭉이 튕김 "퉁"(`thwap`)도 여기. 만지는 동안 이어지는 소리(누름 공기·문지름·삐걱·
+ * 출렁임 "뾰잉"·폼 들숨·찐득이 칙칙)는 `touchVoice.ts` 의 연속 목소리가 물리를 따라 낸다.
  */
 import type { MaterialId } from '../data/materials';
 import { sfx } from './sfx';
+import { duckTouchVoices } from './touchVoice';
 
 export type Rand = () => number;
 
@@ -32,16 +34,14 @@ export interface FlavorTone {
   bubbles: number;
   /** 길이 배수 */
   length: number;
-  /** 놓을 때 비브라토(출렁임) 깊이 배수 */
-  wobble: number;
 }
 
 export const FLAVOR_TONES: Readonly<Record<SquishFlavor, FlavorTone>> = {
-  plain: { pitch: 1, gain: 1, bright: 1, bubbles: 1, length: 1, wobble: 1 },
-  slowRise: { pitch: 0.78, gain: 0.55, bright: 0.55, bubbles: 0.4, length: 1.5, wobble: 0.15 },
-  jelly: { pitch: 1.45, gain: 1, bright: 1.35, bubbles: 1.2, length: 0.8, wobble: 1.5 },
-  stretchy: { pitch: 1.05, gain: 0.95, bright: 1, bubbles: 0.8, length: 1.1, wobble: 1.2 },
-  sticky: { pitch: 0.85, gain: 0.9, bright: 0.8, bubbles: 1.8, length: 1.25, wobble: 0.35 },
+  plain: { pitch: 1, gain: 1, bright: 1, bubbles: 1, length: 1 },
+  slowRise: { pitch: 0.78, gain: 0.55, bright: 0.55, bubbles: 0.4, length: 1.5 },
+  jelly: { pitch: 1.45, gain: 1, bright: 1.35, bubbles: 1.2, length: 0.8 },
+  stretchy: { pitch: 1.05, gain: 0.95, bright: 1, bubbles: 0.8, length: 1.1 },
+  sticky: { pitch: 0.85, gain: 0.9, bright: 0.8, bubbles: 1.8, length: 1.25 },
 };
 
 // ── 순수 헬퍼 ─────────────────────────────────────────────
@@ -146,86 +146,6 @@ export function squelchParams(intensity: number, rand: Rand): SquelchParams {
   };
 }
 
-export interface StretchTargets {
-  /** 끈적한 노이즈 층 볼륨 */
-  noiseGain: number;
-  /** 노이즈 밴드패스 중심 주파수 */
-  cutoff: number;
-  /** 낮은 삐걱임 음 볼륨 */
-  toneGain: number;
-  /** 삐걱임 음높이 */
-  toneFreq: number;
-  /** 끈적임(스틱-슬립) 떨림 속도 Hz */
-  creakRate: number;
-  /** 쭉쭉이 "쭈우욱" 고무 음 (0 이면 없음) — 늘어난 길이만큼 올라간다 */
-  squeakGain: number;
-  squeakFreq: number;
-}
-
-/**
- * 늘어난 정도(0..1)와 끄는 속도(0..1) → 늘림 소리 목표값.
- * length 는 기본 말랑 늘림 한계 대비 실제 길이 (쭉쭉이는 2 를 넘는다) — 쭉쭉이의 "쭈우욱" 음높이.
- */
-export function stretchTargets(amount: number, speed: number, flavor: SquishFlavor = 'plain', length = 0): StretchTargets {
-  const a = clamp01(amount);
-  const s = clamp01(speed);
-  const t = FLAVOR_TONES[flavor] ?? FLAVOR_TONES.plain;
-  // 가만히 늘려 두면 조용하고, 빠르게 끌수록 크고 밝아진다
-  const motion = 0.25 + 0.75 * s;
-  const len = Number.isFinite(length) ? Math.max(0, Math.min(3, length)) : 0;
-  const squeaky = flavor === 'stretchy';
-  return {
-    noiseGain: (0.02 + 0.14 * a) * motion * t.gain,
-    cutoff: (350 + 1100 * a + 900 * s) * t.bright,
-    toneGain: (0.015 + 0.06 * a) * (0.4 + 0.6 * s) * t.gain,
-    toneFreq: (70 + 70 * a + 40 * s) * t.pitch,
-    // 찐득이는 더 끈적하게(느리고 굵은 떨림)
-    creakRate: (9 + 26 * s + 10 * a) * (flavor === 'sticky' ? 0.55 : 1),
-    squeakGain: squeaky ? (0.012 + 0.05 * clamp01(len / 2.2)) * (0.35 + 0.65 * s) : 0,
-    squeakFreq: squeaky ? 260 + 420 * len : 0,
-  };
-}
-
-export interface ReleaseParams {
-  duration: number;
-  gain: number;
-  baseFreq: number;
-  endFreq: number;
-  /** 비브라토 깊이 (Hz) — 시간에 따라 감쇠 */
-  vibratoDepth: number;
-  vibratoRate: number;
-  slapGain: number;
-}
-
-/** 놓는 소리에 촉감 맛을 입힌다 (순수) */
-export function flavorRelease(p: ReleaseParams, flavor: SquishFlavor = 'plain'): ReleaseParams {
-  const t = FLAVOR_TONES[flavor] ?? FLAVOR_TONES.plain;
-  if (t === FLAVOR_TONES.plain) return p;
-  return {
-    ...p,
-    duration: p.duration * t.length,
-    gain: p.gain * t.gain,
-    baseFreq: p.baseFreq * t.pitch,
-    endFreq: p.endFreq * t.pitch * (flavor === 'slowRise' ? 0.9 : 1),
-    vibratoDepth: p.vibratoDepth * t.pitch * t.wobble,
-    slapGain: p.slapGain * t.gain * (flavor === 'sticky' ? 1.4 : 1),
-  };
-}
-
-export function releaseParams(intensity: number, rand: Rand, wobbleRateHz = 6): ReleaseParams {
-  const i = clamp01(intensity);
-  const base = jitter(lerp(210, 150, i), 0.08, rand);
-  return {
-    duration: 0.35 + 0.35 * i,
-    gain: 0.1 + 0.18 * i,
-    baseFreq: base,
-    endFreq: base * 0.72,
-    vibratoDepth: base * (0.12 + 0.2 * i),
-    vibratoRate: jitter(wobbleRateHz, 0.06, rand),
-    slapGain: 0.08 + 0.18 * i,
-  };
-}
-
 // ── 오디오 그래프 ─────────────────────────────────────────
 
 const MAX_VOICES = 8;
@@ -243,7 +163,15 @@ export function activeVoiceCount(): number {
   return activeVoices;
 }
 
+let outputOverride: { ctx: AudioContext; out: GainNode } | null = null;
+
+/** 오프라인 렌더(소리 확인 스크립트)용: 출력 바꾸기. null 이면 sfx 효과음 버스 */
+export function setSquishOutput(o: { ctx: BaseAudioContext; out: AudioNode } | null): void {
+  outputOverride = o as { ctx: AudioContext; out: GainNode } | null;
+}
+
 function output(): { ctx: AudioContext; out: GainNode } | null {
+  if (outputOverride) return outputOverride;
   try {
     const r = sfx.getOutput();
     if (!r || r.ctx.state === 'closed') return null;
@@ -277,6 +205,8 @@ function noiseBuffer(ctx: AudioContext): AudioBuffer {
 function takeVoice(duration: number): boolean {
   if (activeVoices >= MAX_VOICES) return false;
   activeVoices++;
+  // 계속 울리는 만지기 목소리는 일회성 소리 아래로 잠깐 비켜 준다
+  duckTouchVoices(Math.min(0.5, duration), -5);
   setTimeout(
     () => {
       activeVoices = Math.max(0, activeVoices - 1);
@@ -411,211 +341,6 @@ export function squishPress(intensity = 0.6, flavor: SquishFlavor = 'plain'): vo
 
     thump(ctx, out, t0, p.thumpFreq, p.thumpGain);
     for (const b of p.bubbles) bubble(ctx, out, t0, b);
-  });
-}
-
-export interface StretchHandle {
-  /** amount: 늘어난 정도 0..1, speed: 끄는 속도 0..1, length: 기본 대비 늘어난 길이 (쭉쭉이 음높이) */
-  update(amount: number, speed: number, length?: number): void;
-  /** 딸깍 없이 페이드아웃. 여러 번 불러도 안전하다. */
-  stop(): void;
-}
-
-const NOOP_STRETCH: StretchHandle = { update() {}, stop() {} };
-
-/**
- * 쭉 늘릴 때의 끈적하고 삐걱이는 연속음.
- * 노이즈(밴드패스) + 낮은 삼각파를 스틱-슬립 LFO 로 떨리게 하고,
- * 빠르게 끌면 가끔 작은 "쩍" 소리(떨어지는 실)를 더한다.
- */
-export function startStretch(flavor: SquishFlavor = 'plain'): StretchHandle {
-  const o = output();
-  if (!o) return NOOP_STRETCH;
-  const { ctx, out } = o;
-  let stopped = false;
-  let lastPop = 0;
-  const nodes: { stop(when?: number): void }[] = [];
-
-  try {
-    const t0 = ctx.currentTime + 0.005;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, t0);
-    master.gain.setTargetAtTime(1, t0, 0.03);
-    master.connect(out);
-
-    // 끈적한 노이즈 층
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuffer(ctx);
-    src.loop = true;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.Q.value = 2.2;
-    bp.frequency.value = 500;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0;
-
-    // 스틱-슬립 떨림: 톱니 LFO 가 노이즈 볼륨을 주기적으로 뚝뚝 끊는다
-    const creakGain = ctx.createGain();
-    creakGain.gain.value = 0.5; // 기본 0.5 ± LFO
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sawtooth';
-    lfo.frequency.value = 12;
-    const lfoDepth = ctx.createGain();
-    lfoDepth.gain.value = 0.45;
-    lfo.connect(lfoDepth);
-    lfoDepth.connect(creakGain.gain);
-
-    src.connect(bp);
-    bp.connect(noiseGain);
-    noiseGain.connect(creakGain);
-    creakGain.connect(master);
-
-    // 낮은 삐걱임 음: 삼각파 → 로우패스, 음높이가 LFO 로 살짝 흔들림
-    const tone = ctx.createOscillator();
-    tone.type = 'triangle';
-    tone.frequency.value = 90;
-    const toneLp = ctx.createBiquadFilter();
-    toneLp.type = 'lowpass';
-    toneLp.frequency.value = 420;
-    toneLp.Q.value = 3;
-    const toneGain = ctx.createGain();
-    toneGain.gain.value = 0;
-    const vib = ctx.createGain();
-    vib.gain.value = 6;
-    lfo.connect(vib);
-    vib.connect(tone.frequency);
-    tone.connect(toneLp);
-    toneLp.connect(toneGain);
-    toneGain.connect(master);
-
-    src.start(t0, rand() * 0.5);
-    lfo.start(t0);
-    tone.start(t0);
-    nodes.push(src, lfo, tone);
-
-    // 쭉쭉이: 늘어날수록 올라가는 고무 "쭈우욱" (사인 + 약한 3배음, 스틱-슬립으로 살짝 떨림)
-    let squeak: OscillatorNode | null = null;
-    let squeakGain: GainNode | null = null;
-    if (flavor === 'stretchy') {
-      squeak = ctx.createOscillator();
-      squeak.type = 'triangle';
-      squeak.frequency.value = 260;
-      squeakGain = ctx.createGain();
-      squeakGain.gain.value = 0;
-      const sqVib = ctx.createGain();
-      sqVib.gain.value = 14;
-      lfo.connect(sqVib);
-      sqVib.connect(squeak.frequency);
-      squeak.connect(squeakGain);
-      squeakGain.connect(master);
-      squeak.start(t0);
-      nodes.push(squeak);
-    }
-
-    const handle: StretchHandle = {
-      update(amount, speed, length = 0) {
-        if (stopped) return;
-        safe(() => {
-          const now = ctx.currentTime;
-          const tg = stretchTargets(amount, speed, flavor, length);
-          noiseGain.gain.setTargetAtTime(tg.noiseGain, now, 0.05);
-          bp.frequency.setTargetAtTime(tg.cutoff, now, 0.06);
-          toneGain.gain.setTargetAtTime(tg.toneGain, now, 0.06);
-          tone.frequency.setTargetAtTime(tg.toneFreq, now, 0.08);
-          lfo.frequency.setTargetAtTime(tg.creakRate, now, 0.1);
-          if (squeak && squeakGain) {
-            squeakGain.gain.setTargetAtTime(tg.squeakGain, now, 0.06);
-            squeak.frequency.setTargetAtTime(tg.squeakFreq, now, 0.07);
-          }
-          // 빠르게 당기면 가끔 실이 끊기는 듯한 작은 쩍 소리
-          const s = clamp01(speed);
-          if (s > 0.35 && now - lastPop > 0.09 && rand() < s * 0.35) {
-            lastPop = now;
-            bubble(ctx, master, now, {
-              delay: 0,
-              freq: lerp(900, 2200, rand()),
-              drop: 0.45,
-              duration: 0.03,
-              gain: 0.025 + 0.035 * clamp01(amount),
-            });
-          }
-        });
-      },
-      stop() {
-        if (stopped) return;
-        stopped = true;
-        safe(() => {
-          const now = ctx.currentTime;
-          master.gain.cancelScheduledValues(now);
-          master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
-          master.gain.setTargetAtTime(0, now, 0.045);
-          for (const n of nodes) n.stop(now + 0.35);
-        });
-        // 연결 해제는 페이드가 끝난 뒤
-        setTimeout(() => safe(() => master.disconnect()), 450);
-      },
-    };
-    return handle;
-  } catch {
-    stopped = true;
-    safe(() => nodes.forEach((n) => n.stop()));
-    return NOOP_STRETCH;
-  }
-}
-
-/**
- * 놓았을 때: 비브라토가 점점 잦아드는 "뾰잉~" + 작은 찰싹.
- * wobbleRateHz 로 화면의 출렁임과 비브라토 속도를 맞출 수 있다.
- */
-export function squishRelease(intensity = 0.6, wobbleRateHz?: number, flavor: SquishFlavor = 'plain'): void {
-  const o = output();
-  if (!o) return;
-  const p = flavorRelease(releaseParams(intensity, rand, wobbleRateHz), flavor);
-  if (!takeVoice(p.duration + 0.1)) return;
-  safe(() => {
-    const { ctx, out } = o;
-    const t0 = ctx.currentTime + 0.005;
-    const end = t0 + p.duration;
-
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(p.baseFreq * 1.15, t0);
-    osc.frequency.exponentialRampToValueAtTime(p.endFreq, end);
-
-    // 감쇠하는 비브라토
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = p.vibratoRate;
-    const depth = ctx.createGain();
-    depth.gain.setValueAtTime(p.vibratoDepth, t0);
-    depth.gain.exponentialRampToValueAtTime(Math.max(0.5, p.vibratoDepth * 0.05), end);
-    lfo.connect(depth);
-    depth.connect(osc.frequency);
-
-    // 살짝 두툼하게: 한 옥타브 위 배음을 약하게
-    const over = ctx.createOscillator();
-    over.type = 'triangle';
-    over.frequency.setValueAtTime(p.baseFreq * 2.3, t0);
-    over.frequency.exponentialRampToValueAtTime(p.endFreq * 2, end);
-    depth.connect(over.frequency);
-    const overGain = ctx.createGain();
-    overGain.gain.value = 0.18;
-
-    const env = ctx.createGain();
-    envelope(env.gain, t0, 0.015, p.gain, end);
-    osc.connect(env);
-    over.connect(overGain);
-    overGain.connect(env);
-    env.connect(out);
-
-    osc.start(t0);
-    over.start(t0);
-    lfo.start(t0);
-    osc.stop(end + 0.05);
-    over.stop(end + 0.05);
-    lfo.stop(end + 0.05);
-
-    slap(ctx, out, t0, p.slapGain, jitter(1000, 0.15, rand));
   });
 }
 
@@ -1139,28 +864,123 @@ export function peel(strength = 0.6): void {
   });
 }
 
-/** 슬로우 라이징이 천천히 차오를 때: 아주 작은 공기 "스으으" (길이 = 차오르는 시간, 초) */
-export function riseSigh(duration = 1.6): void {
+export interface WetSquelchParams {
+  duration: number;
+  gain: number;
+  /** 공명 필터가 빠르게 쓸려 내려간다 (젖은 "쮸웁") */
+  from: number;
+  to: number;
+  q: number;
+  /** 입술 떨어지는 듯한 작은 방울 음 */
+  blipFrom: number;
+  blipTo: number;
+  blipGain: number;
+}
+
+/**
+ * 젤리를 꾹 누를 때 젖은 "쮸웁" (순수): 노이즈 한 줌이 좁은 공명(저중역) 필터를 지나며 음이 빠르게 내려간다.
+ * strength 0..1. 찐득이(flavor sticky)는 더 낮고 느리다.
+ */
+export function wetSquelchParams(strength: number, r: Rand, flavor: SquishFlavor = 'jelly'): WetSquelchParams {
+  const s = clamp01(strength);
+  const low = flavor === 'sticky' ? 0.7 : 1;
+  const from = jitter((1150 + 650 * s) * low, 0.1, r);
+  return {
+    duration: jitter(0.1 + 0.05 * s, 0.1, r) / low,
+    gain: (0.2 + 0.2 * s) * jitter(1, 0.08, r),
+    from,
+    to: jitter(300 * low, 0.1, r),
+    q: jitter(6 + 3 * s, 0.12, r),
+    blipFrom: jitter(760 * low, 0.1, r),
+    blipTo: jitter(290 * low, 0.1, r),
+    blipGain: 0.05 + 0.05 * s,
+  };
+}
+
+/** 젤리 누름 "쮸웁" — 짧은 젖은 공명 + 작은 방울 */
+export function squelch(strength = 0.6, flavor: SquishFlavor = 'jelly'): void {
   const o = output();
-  if (!o || !gated('rise', o.ctx, 1.2)) return;
-  const dur = Math.max(0.5, Math.min(3, Number.isFinite(duration) ? duration : 1.6));
-  if (!takeVoice(dur)) return;
+  if (!o || !gated('squelch', o.ctx, 0.08)) return;
+  const p = wetSquelchParams(strength, rand, flavor);
+  if (!takeVoice(p.duration + 0.1)) return;
   safe(() => {
     const { ctx, out } = o;
-    const t0 = ctx.currentTime + 0.01;
-    const src = noiseSource(ctx, t0, dur);
+    const t0 = ctx.currentTime + 0.004;
+    const end = t0 + p.duration;
+    const src = noiseSource(ctx, t0, p.duration);
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.Q.value = 0.9;
-    bp.frequency.setValueAtTime(700, t0);
-    bp.frequency.exponentialRampToValueAtTime(1500, t0 + dur);
+    bp.Q.value = p.q;
+    bp.frequency.setValueAtTime(p.from, t0);
+    bp.frequency.exponentialRampToValueAtTime(p.to, t0 + p.duration * 0.8);
+    const bp2 = ctx.createBiquadFilter();
+    bp2.type = 'bandpass';
+    bp2.Q.value = p.q * 1.3;
+    bp2.frequency.setValueAtTime(p.from * 2.3, t0);
+    bp2.frequency.exponentialRampToValueAtTime(p.to * 2.3, t0 + p.duration * 0.7);
+    const g2 = ctx.createGain();
+    g2.gain.value = 0.35;
     const env = ctx.createGain();
-    env.gain.setValueAtTime(0.0001, t0);
-    env.gain.exponentialRampToValueAtTime(0.035, t0 + dur * 0.35);
-    env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    envelope(env.gain, t0, 0.005, p.gain, end);
+    const makeup = ctx.createGain();
+    makeup.gain.value = 2.6;
     src.connect(bp);
+    src.connect(bp2);
     bp.connect(env);
-    env.connect(out);
+    bp2.connect(g2);
+    g2.connect(env);
+    env.connect(makeup);
+    makeup.connect(out);
+    glide(ctx, out, t0 + p.duration * 0.35, p.blipFrom, p.blipTo, 0.05, p.blipGain);
+  });
+}
+
+export interface ThwapParams {
+  /** 고무 몸통 "퉁" (세모파, 음이 내려간다) */
+  bodyFrom: number;
+  bodyTo: number;
+  bodyGain: number;
+  bodyDur: number;
+  /** 튕기는 순간 밝은 "탁" */
+  slapGain: number;
+  slapFreq: number;
+  /** 고무줄 같은 짧은 울림 */
+  ringFreq: number;
+  ringGain: number;
+  ringDur: number;
+}
+
+/** 쭉쭉이를 놓아 튕겨 돌아올 때 고무 "퉁" (순수). strength 0..1 = 늘어났던 정도 */
+export function thwapParams(strength: number, r: Rand): ThwapParams {
+  const s = clamp01(strength);
+  const body = jitter(250 + 60 * s, 0.08, r);
+  return {
+    bodyFrom: body,
+    bodyTo: body * 0.55,
+    bodyGain: 0.12 + 0.13 * s,
+    bodyDur: 0.08 + 0.05 * s,
+    slapGain: 0.06 + 0.1 * s,
+    slapFreq: jitter(1700 + 700 * s, 0.1, r),
+    ringFreq: jitter(430 + 160 * s, 0.06, r),
+    ringGain: 0.03 + 0.04 * s,
+    ringDur: 0.12 + 0.12 * s,
+  };
+}
+
+/** 쭉쭉이 튕겨 돌아옴: 고무 "퉁" + 밝은 탁 + 짧은 울림 */
+export function thwap(strength = 0.6): void {
+  const o = output();
+  if (!o || !gated('thwap', o.ctx, 0.12)) return;
+  const p = thwapParams(strength, rand);
+  if (!takeVoice(p.ringDur + 0.1)) return;
+  safe(() => {
+    const { ctx, out } = o;
+    const t0 = ctx.currentTime + 0.003;
+    glide(ctx, out, t0, p.bodyFrom, p.bodyTo, p.bodyDur, p.bodyGain, 'triangle');
+    // 폰에서도 들리게 몸통의 3배음 노크
+    glide(ctx, out, t0, p.bodyFrom * 3, p.bodyFrom * 1.8, p.bodyDur * 0.5, p.bodyGain * 0.3, 'triangle');
+    slap(ctx, out, t0, p.slapGain, p.slapFreq, 0.022);
+    glide(ctx, out, t0 + 0.01, p.ringFreq, p.ringFreq * 0.93, p.ringDur, p.ringGain);
   });
 }
 

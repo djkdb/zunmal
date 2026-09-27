@@ -10,6 +10,7 @@ import { fillKindIndex } from '../../touch/filling';
 import { fxStylesFor } from '../../touch/touchFx';
 import type { BodyRec } from './bodyRec';
 import { FillingArt } from './FillingArt';
+import { SkinArt } from './SkinArt';
 
 /** 3D 에서 구워 두는 얼굴 (필요할 때 굽는다) */
 const JELLY_FACES: readonly JellyFace[] = ['default', 'happy', 'sleepy', 'wide', 'dizzy', 'yawn', 'blush', 'strain'];
@@ -177,6 +178,7 @@ export function MatBody({ rec, mode, stage, reduced, focused, level, onKeyDown, 
       >
         <Malang character={shown} size={148} animation="none" decorative aura="auto" shiny={shiny} />
         {filling && <FillingArt id={rec.id} shape={shape} filling={filling} />}
+        {!(ready3d && mode === '3d') && <SkinArt id={rec.id} shape={shape} els={rec.els} />}
         {extras.length > 0 && (
 
           <svg className="pr-body__extra" viewBox={VIEWBOX_ATTR} aria-hidden="true" focusable="false">

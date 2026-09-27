@@ -7,11 +7,31 @@
  * - 촉감(`data/materials.ts`): 물리 상태에 feel 을 넣고(슬로우 라이징·젤리·쭉쭉이·찐득이), 소리는 촉감 맛(flavor),
  *   찐득이는 손을 떼도 잠깐 붙어 있다가 "쩍" 떨어진다(`peelPlan`). 전설 이상은 몸속 특별한 속(filling)이 눌림에 반응.
  * - 말랑이끼리 반응(볼 비비기·끙·깜짝·흘끔·같이 졸기)은 페이지가 `touch/interactions.ts` 로 골라 여기 메서드를 부른다.
+ * - 손맛 목소리(`audio/touchVoice.ts`): 누르는 순간 시작해 매 프레임 물리 읽기(`touch/touchSense.ts`)로 따라가고,
+ *   놓은 뒤에도 몸이 출렁이거나 차오르는 동안 이어지다 조용해지면 멈춘다. 촉감 진동도 같은 읽기에서.
+ * - 표면 질감(`touch/surface.ts`): 손끝 크기 자국·젤리 물결 — 3D 는 softbody, 2D 는 `surface2d()` 로 겹 그림.
+ *   찐득이를 떼어내면 실 가닥(`touch/goo.ts`)을 입자 캔버스에 넘긴다.
  */
 import * as squish from '../../audio/squish';
+import { startTouchVoice, touchVoiceParams, VOICE_TIMBRES, type TouchVoice } from '../../audio/touchVoice';
 import type { Character } from '../../data/characters';
 import type { FillingSpec, MaterialSpec } from '../../data/materials';
 import { createFill, isFillAtRest, stepFill, type FillState } from '../../touch/filling';
+import { createGoo, gooPeelSpeed, stepGoo, type Goo } from '../../touch/goo';
+import { fingerRadius, rippleFront, rippleHeight, stepRipple, SURFACE_TUNING } from '../../touch/surface';
+import {
+  createHapticMemory,
+  createSenseMemory,
+  grainTick,
+  hapticDue,
+  markHaptic,
+  readSense,
+  snapStrength,
+  touchHaptic,
+  type HapticMemory,
+  type SenseMemory,
+  type TouchHapticKind,
+} from '../../touch/touchSense';
 import type { TouchFxSpec } from '../../data/rarity';
 import { haptic } from '../../lib/haptics';
 import { VIEWBOX } from '../malang/helpers';
@@ -48,19 +68,16 @@ import {
   peelPlan,
   poke,
   press,
-  recoverMs,
   release,
   setReducedMotion,
   snapToTargets,
   squashAmount,
   step,
   stretchAmount,
-  stretchLength,
   stretchUp,
   tickle,
   toTransform,
   wobbleEnergy,
-  wobbleHz,
   type TouchState,
   type Transform,
 } from '../../touch/physics';
@@ -144,7 +161,6 @@ interface Gesture {
   radius: number;
   moved: boolean;
   squishCount: number;
-  stretch: squish.StretchHandle | null;
   lastDirX: number;
   reversals: number[];
   keyDisp: { x: number; y: number };
@@ -155,6 +171,12 @@ interface Gesture {
   melted: boolean;
   /** 들어서 옮기는 중 (world 가 몸을 옮긴다) */
   carrying: boolean;
+}
+
+/** 2D 겹 그림용 표면 (스프라이트 상자 비율 0..1) */
+export interface Surface2d {
+  dent: { x: number; y: number; r: number; depth: number; crease: number } | null;
+  ripple: { x: number; y: number; r: number; alpha: number } | null;
 }
 
 export interface EndResult {
@@ -198,13 +220,54 @@ export class MalangActor {
   private peeling = false;
   /** 몸속 특별한 속의 밝기·소용돌이 */
   fill: FillState = createFill();
+  /** 손맛 목소리 (누르는 동안 + 놓은 뒤 출렁이는 동안) */
+  private voice: TouchVoice | null = null;
+  private senseMem: SenseMemory = createSenseMemory();
+  private hapticMem: HapticMemory = createHapticMemory();
+  /** 지난 프레임 뒤 손가락이 움직인 가장 빠른 속도 (px/ms) */
+  private fingerSpeed = 0;
+  /** 찐득이 실 (소리의 떼어내는 빠르기) */
+  private goo: Goo | null = null;
+  /** 2D 자국 자리 (스프라이트 정규화 −1..1) */
+  private contact: { x: number; y: number } | null = null;
 
   constructor(env: ActorEnv) {
     this.env = env;
     const reduced = env.reduced();
     const feel = env.material.feel;
     this.touch = createTouchState({ reducedMotion: reduced, feel });
-    this.soft = createSoftState({ reducedMotion: reduced, feel });
+    this.soft = createSoftState({ reducedMotion: reduced, feel, skin: env.material.skin });
+  }
+
+  /** 손끝 크기 자국 반지름 (몸 좌표 단위) — 화면에서 약 10mm */
+  private fingerR(): number {
+    const geo = this.env.geom();
+    return fingerRadius(geo && geo.size > 0 ? VIEWBOX.w / geo.size : 0);
+  }
+
+  private buzz(kind: TouchHapticKind, now = performance.now()) {
+    if (!hapticDue(this.hapticMem, kind, now)) return;
+    if (touchHaptic(kind, this.env.reduced())) this.hapticMem = markHaptic(this.hapticMem, kind, now);
+  }
+
+  /** 2D 에서 누른 곳을 3D 몸 좌표로 흉내 (자국·물결 자리) */
+  private pseudoHit(point: { x: number; y: number }): SoftHit {
+    const svgX = BOX_CX + point.x * BODY_UNIT;
+    const svgY = BOX_CY + point.y * BODY_UNIT;
+    return { point: { x: svgX - 60, y: this.env.shape.bottom - svgY, z: 24 }, normal: { x: 0, y: 0, z: 1 } };
+  }
+
+  /** 몸통 가운데·반지름 (client px) — 입자 캔버스의 몸 상자와 같게 */
+  private bodyBox(): { x: number; y: number; r: number } | null {
+    const geo = this.env.geom();
+    if (!geo) return null;
+    const k = geo.size / VIEWBOX.w;
+    const sh = this.env.shape;
+    return {
+      x: geo.left + (60 - VIEWBOX.x) * k,
+      y: geo.top + ((sh.top + sh.bottom) / 2 - VIEWBOX.y) * k,
+      r: Math.max(1, ((sh.right - sh.left) / 2) * k),
+    };
   }
 
   /** 소리 맛 = 촉감 */
@@ -501,8 +564,16 @@ export class MalangActor {
     this.yawned = false;
     const woke = this.wake();
     const view = this.env.view();
-    const h = hit ?? (view && source === 'key' ? view.frontHit() : null);
-    if (h) this.soft = softTouch(this.soft, h);
+    // 3D 레이캐스트가 비껴 맞았거나(가장자리·폰용 넉넉한 거리) 2D 면 누른 곳을 몸 좌표로 흉내 — 자국·물결 자리가 두 화면에서 같다
+    const h = hit ?? (view && source === 'key' ? view.frontHit() : this.pseudoHit(point));
+    if (h) this.soft = softTouch(this.soft, h, this.fingerR());
+    this.contact = { ...point };
+    // 손맛 목소리: 누르는 순간부터 (이전 목소리가 남아 있으면 끊고 새로)
+    this.voice?.stop();
+    this.voice = startTouchVoice(this.env.material.id);
+    this.senseMem = createSenseMemory();
+    this.fingerSpeed = 0;
+    this.goo = null;
     this.g = {
       source,
       hit: h,
@@ -519,7 +590,6 @@ export class MalangActor {
       radius,
       moved: false,
       squishCount: 0,
-      stretch: null,
       lastDirX: 0,
       reversals: [],
       keyDisp: { x: 0, y: 0 },
@@ -546,6 +616,7 @@ export class MalangActor {
     const g = this.g;
     if (!g || g.carrying) return;
     g.carrying = true;
+    this.contact = null;
     squish.poke(0.35);
   }
 
@@ -558,10 +629,7 @@ export class MalangActor {
     const now = performance.now();
     const dxTotal = clientX - g.startX - shiftX;
     const dyTotal = clientY - g.startY - shiftY;
-    if (!g.moved && Math.hypot(clientX - g.startX, clientY - g.startY) > DRAG_START_PX) {
-      g.moved = true;
-      g.stretch = squish.startStretch(this.flavor);
-    }
+    if (!g.moved && Math.hypot(clientX - g.startX, clientY - g.startY) > DRAG_START_PX) g.moved = true;
     this.lookAt(clientX, clientY);
     const dt = Math.max(1, now - g.lastT);
     const vx = (clientX - g.lastX) / dt;
@@ -569,8 +637,13 @@ export class MalangActor {
     g.vx = g.vx * 0.4 + vx * 0.6;
     g.vy = g.vy * 0.4 + vy * 0.6;
     const stepPx = Math.hypot(clientX - g.lastX, clientY - g.lastY);
-    const speed = Math.min(1, stepPx / dt / 1.5);
     const stepX = clientX - g.lastX;
+    // 문지름 소리: 손가락이 누른 자리 가까이에서 오가면 표면을 스친다. 멀리 끌면 문지름이 아니라 당김(삐걱)이다
+    if (!g.carrying) {
+      const away = Math.hypot(dxTotal, dyTotal) / g.radius;
+      const slide = 1 - Math.min(1, Math.max(0, (away - 0.2) / 0.3));
+      this.fingerSpeed = Math.max(this.fingerSpeed, (stepPx / dt) * slide);
+    }
     g.lastX = clientX;
     g.lastY = clientY;
     g.lastT = now;
@@ -579,7 +652,7 @@ export class MalangActor {
     const disp = { x: dxTotal / g.radius, y: dyTotal / g.radius };
     this.touch = drag(this.touch, disp);
     if (g.hit) this.soft = softPull(this.soft, { x: disp.x * BODY_UNIT, y: -disp.y * BODY_UNIT });
-    g.stretch?.update(stretchAmount(this.touch), speed, stretchLength(this.touch));
+    if (Math.hypot(disp.x, disp.y) > 0.25) this.contact = null;
     this.env.fx()?.trail(clientX, clientY);
 
     // 머리를 좌우로 문지르면 쓰다듬기 (애정 2단계). 옮기는 중에는 아니다
@@ -625,7 +698,7 @@ export class MalangActor {
     }
     if (!g.moved) {
       g.moved = true;
-      g.stretch = squish.startStretch(this.flavor);
+      this.contact = null;
     }
     const nx = g.keyDisp.x + ax * KEY_DRAG_STEP;
     const ny = g.keyDisp.y + ay * KEY_DRAG_STEP;
@@ -634,7 +707,6 @@ export class MalangActor {
     g.keyDisp = { x: nx * k, y: ny * k };
     this.touch = drag(this.touch, g.keyDisp);
     if (g.hit) this.soft = softPull(this.soft, { x: g.keyDisp.x * BODY_UNIT, y: -g.keyDisp.y * BODY_UNIT });
-    g.stretch?.update(Math.min(1, Math.hypot(g.keyDisp.x, g.keyDisp.y) / 1.5), 0.5, stretchLength(this.touch));
     this.env.requestFrame();
   }
 
@@ -650,7 +722,13 @@ export class MalangActor {
     this.g = null;
     const now = performance.now();
     this.lastActive = now;
-    g.stretch?.stop();
+    // 손맛 목소리: 취소면 바로 끄고, 아니면 몸이 출렁이거나 차오르는 동안 따라가다 스스로 멈춘다
+    if (silent) {
+      this.voice?.stop();
+      this.voice = null;
+    } else {
+      this.voice?.release();
+    }
     this.lookBack();
     const spec = this.env.fxSpec;
     const shiny = this.env.shiny;
@@ -669,11 +747,17 @@ export class MalangActor {
       const kind = classifyPoke(g.zone, recent.length, level);
       const s = kind === 'pat' ? 0.25 : strength;
       this.touch = poke(release(this.touch), g.point, s);
-      this.soft = softPoke(softRelease(this.soft), g.hit, s);
+      this.soft = softPoke(softRelease(this.soft), g.hit, s, this.fingerR());
       squish.poke(kind === 'pat' ? 0.3 : strength, this.flavor);
-      // 찐득이: 콕 찔러도 손가락에 살짝 붙었다 쩍
+      // 찐득이: 콕 찔러도 손가락에 살짝 붙었다 쩍 (가는 실 두어 가닥)
       const tapPeel = peelPlan(this.env.material.feel, now - g.startT, true);
-      if (tapPeel.delayMs > 0) this.later(() => squish.peel(0.3), tapPeel.delayMs);
+      if (tapPeel.delayMs > 0) {
+        this.startGoo(g, Math.min(2, this.env.material.skin.strands), tapPeel.delayMs, tapPeel.lift);
+        this.later(() => {
+          squish.peel(0.3);
+          this.buzz('peel');
+        }, tapPeel.delayMs);
+      }
       squish.chime(spec.chime, recent.length - 1, { shiny });
       const px = g.source === 'pointer' ? g.lastX : undefined;
       const py = g.source === 'pointer' ? g.lastY : undefined;
@@ -724,25 +808,34 @@ export class MalangActor {
       if (g.hit && lift > 0) this.soft = softPull(this.soft, { x: 0, y: lift * BODY_UNIT });
 
       this.showFace('wide', plan.delayMs + 200);
+      // 손가락과 몸 사이에 실이 늘어나다 끊어진다 (움직임 줄이기면 입자 캔버스가 없어 소리만)
+      this.startGoo(g, this.env.material.skin.strands, plan.delayMs, 0.25 + lift);
       this.env.requestFrame();
       this.later(() => {
         if (!this.peeling) return;
         this.peeling = false;
         this.touch = release(this.touch);
-        this.soft = softRelease(this.soft);
+        this.soft = softRelease(this.soft, undefined, 0.5);
         squish.peel(0.4 + 0.6 * plan.lift);
-        squish.squishRelease(0.3 + 0.5 * intensity, wobbleHz(feel) * 2, this.flavor);
+        this.buzz('peel');
         this.showFace('happy', 900);
         this.env.requestFrame();
       }, plan.delayMs);
       return { ...none };
     }
+    const snap = snapStrength(this.touch);
+    const pressed = Math.max(squashAmount(this.touch), stretchAmount(this.touch));
     this.touch = release(this.touch);
-    this.soft = softRelease(this.soft, flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined);
+    this.soft = softRelease(this.soft, flicking ? { x: g.vx * toBody, y: -g.vy * toBody } : undefined, pressed);
     if (!silent) {
-      squish.squishRelease(0.25 + 0.75 * intensity, wobbleHz(feel) * 2, this.flavor);
-      // 슬로우 라이징: 천천히 차오르는 동안 작은 공기 소리
-      if (feel.riseTauMs > 0 && squashAmount(this.touch) > 0.3) squish.riseSigh(recoverMs(feel) / 1000);
+      // 놓는 소리: 젤리 "뾰잉" 은 목소리가 출렁임을 따라 내고, 폼의 들숨도 목소리가 차오름을 따른다.
+      // 쭉쭉이는 늘어났던 만큼 고무 "퉁", 젤리·고무는 부드러운 진동
+      if (feel.snap > 1.4 && snap > 0.2) {
+        squish.thwap(snap);
+        this.buzz('thud');
+      } else if (feel.snap > 1 && intensity > 0.3) {
+        this.buzz('thud');
+      }
       const px = g.source === 'pointer' ? g.startX : undefined;
       const py = g.source === 'pointer' ? g.startY : undefined;
       if (!g.carrying) fx?.emit('release', px, py, intensity);
@@ -776,11 +869,10 @@ export class MalangActor {
       const spec = this.env.fxSpec;
       if (g.squishCount === 0 && held > TAP_MS) {
         g.squishCount = 1;
-        squish.squishPress(0.45, this.flavor);
+        this.pressSound(0.45);
         this.env.fx()?.emit('press', px, py, 0.45);
       } else if (g.squishCount === 1 && held > 900) {
         g.squishCount = 2;
-        squish.squishPress(1, this.flavor);
         this.env.fx()?.emit('press', px, py, 1);
         squish.chime(spec.chime, 1, { shiny: this.env.shiny });
         this.env.view()?.pulse(spec.auraPulse);
@@ -803,18 +895,115 @@ export class MalangActor {
 
     this.touch = step(this.touch, dt);
     if (drawing3d) this.soft = stepSoft(this.soft, dt);
+    // 2D: 3D 변형은 없지만 물결(겹 그림)은 같은 시계로 퍼진다
+    else if (this.soft.ripple) this.soft = { ...this.soft, ripple: stepRipple(this.soft.ripple, dt) };
+    this.listen(dt, now);
     let filling = false;
     if (this.env.filling) {
       this.fill = stepFill(this.fill, this.squeezeLevel(), dt, this.env.reduced());
       filling = !isFillAtRest(this.fill);
     }
     const resting =
-      !g && !this.peeling && !gazeMoving && !filling && isAtRest(this.touch) && (!drawing3d || isSoftAtRest(this.soft));
+      !g &&
+      !this.peeling &&
+      !this.goo &&
+      !gazeMoving &&
+      !filling &&
+      isAtRest(this.touch) &&
+      (drawing3d ? isSoftAtRest(this.soft) : !this.soft.ripple);
     if (resting) {
       this.touch = snapToTargets(this.touch);
       this.soft = snapSoft(this.soft);
+      this.contact = null;
+      // 몸이 멈추면 목소리도 끝 (그리기 루프가 쉬면 update 가 오지 않는다)
+      this.voice?.stop();
+      this.voice = null;
     }
     return !resting;
+  }
+
+  /** 누르기 시작 소리 — 촉감마다 (폼·고무는 목소리의 "스읍"·삐걱만으로 충분하다) */
+  private pressSound(strength: number) {
+    const id = this.env.material.id;
+    if (id === 'jelly') squish.squelch(strength, 'jelly');
+    else if (id === 'sticky') squish.squelch(strength * 0.8, 'sticky');
+  }
+
+  /** 한 프레임 손맛 읽기 → 목소리·진동 */
+  private listen(dt: number, now: number) {
+    const touching = this.g !== null || this.peeling;
+    this.goo = stepGoo(this.goo, dt);
+    const r = readSense(this.touch, this.senseMem, dt, {
+      held: touching,
+      fingerSpeed: this.fingerSpeed,
+      peel: gooPeelSpeed(this.goo),
+    });
+    this.senseMem = r.mem;
+    this.fingerSpeed = 0;
+    const v = this.voice;
+    if (v) {
+      v.update(r.sense);
+      if (v.done) this.voice = null;
+    }
+    // 진동: 폼 부스럭·찐득이 칙칙 알갱이만큼 톡톡 (소리를 꺼도 손맛은 남는다)
+    const id = this.env.material.id;
+    if (VOICE_TIMBRES[id].grains.haptic && (touching || this.goo)) {
+      const rate = touchVoiceParams(id, r.sense).grains.rate;
+      const t = grainTick(this.hapticMem, rate, dt, now);
+      this.hapticMem = t.mem;
+      if (t.tick && touchHaptic('tick', this.env.reduced())) this.hapticMem = markHaptic(this.hapticMem, 'tick', now);
+    }
+  }
+
+  /** 찐득이 실 가닥 시작 (손가락이 닿았던 곳에서) */
+  private startGoo(g: Gesture, count: number, durMs: number, liftR: number) {
+    if (count <= 0 || durMs <= 0) return;
+    const box = this.bodyBox();
+    const geo = this.env.geom();
+    const px = g.source === 'pointer' ? g.lastX : box?.x ?? 0;
+    const py = g.source === 'pointer' ? g.lastY : box ? box.y - box.r * 0.3 : 0;
+    const contact = box ? { x: (px - box.x) / box.r, y: (py - box.y) / box.r } : { x: 0, y: -0.3 };
+    // 손가락은 화면 쪽(3/4 시점에서 위)으로 들린다: 몸 윗면 너머까지 가야 실이 매트 바탕 위에 보인다
+    const k = geo ? geo.size / VIEWBOX.w : 1;
+    const topR = box && geo ? (geo.top + (this.env.shape.top - VIEWBOX.y) * k - box.y) / box.r : -1;
+    const lift = box && geo ? Math.max((liftR * geo.size) / 2 / box.r, contact.y - topR + 0.4) : liftR;
+    this.goo = createGoo(count, contact, durMs, lift, Math.random);
+    if (this.goo) this.env.fx()?.goo(this.goo);
+  }
+
+  /** 2D 겹 그림: 손끝 자국(폼은 주름까지)과 젤리 물결 — 스프라이트 상자 비율 */
+  surface2d(): Surface2d {
+    const skin = this.env.material.skin;
+    let dent: Surface2d['dent'] = null;
+    const c = this.contact;
+    if (c) {
+      const depth = Math.min(1, squashAmount(this.touch) * (this.g ? 1 : 1.1));
+      if (depth > 0.02) {
+        const geo = this.env.geom();
+        const r = fingerRadius(geo && geo.size > 0 ? VIEWBOX.w / geo.size : 0) / VIEWBOX.w;
+        dent = {
+          x: 0.5 + c.x / 2,
+          y: 0.5 + c.y / 2,
+          r,
+          depth,
+          crease: skin.crease * Math.max(0, Math.min(1, (depth - 0.5) / 0.4)),
+        };
+      }
+    }
+    let ripple: Surface2d['ripple'] = null;
+    const rp = this.soft.ripple;
+    if (rp) {
+      const h = rippleHeight(rp) / SURFACE_TUNING.waveMaxAmp;
+      if (h > 0.02) {
+        ripple = {
+          x: (rp.x + 60 - VIEWBOX.x) / VIEWBOX.w,
+          y: (this.env.shape.bottom - rp.y - VIEWBOX.y) / VIEWBOX.w,
+          r: rippleFront(rp) / VIEWBOX.w,
+          alpha: Math.min(1, h * 1.6),
+        };
+      }
+    }
+    return { dent, ripple };
   }
 
   /** 지금 눌리고 늘어난 정도 0..1 (몸속 속이 반응하는 양) */
@@ -840,8 +1029,9 @@ export class MalangActor {
   dispose() {
     this.disposed = true;
     this.peeling = false;
-
-    this.g?.stretch?.stop();
+    this.voice?.stop();
+    this.voice = null;
+    this.goo = null;
     this.g = null;
     if (this.faceTimer !== null) window.clearTimeout(this.faceTimer);
     if (this.gazeReturn !== null) window.clearTimeout(this.gazeReturn);

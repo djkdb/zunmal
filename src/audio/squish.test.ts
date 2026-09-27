@@ -14,7 +14,6 @@ import {
   happy,
   jitter,
   poke,
-  releaseParams,
   setSquishRandom,
   shimmer,
   purr,
@@ -26,19 +25,18 @@ import {
   shutter,
   squelchParams,
   squishPress,
-  squishRelease,
-  startStretch,
-  stretchTargets,
   flavorSquelch,
-  flavorRelease,
   FLAVOR_TONES,
   peel,
-  riseSigh,
   cheekRub,
   groan,
   boing,
   land,
   bump,
+  squelch,
+  thwap,
+  thwapParams,
+  wetSquelchParams,
 } from './squish';
 
 describe('squish pure helpers', () => {
@@ -89,26 +87,29 @@ describe('squish pure helpers', () => {
     expect(squelchParams(0.5, createSeededRng(3))).toEqual(squelchParams(0.5, createSeededRng(3)));
   });
 
-  it('stretch gets brighter and louder with amount and speed', () => {
-    const still = stretchTargets(0.2, 0);
-    const pulled = stretchTargets(1, 0);
-    const fast = stretchTargets(1, 1);
-    expect(pulled.cutoff).toBeGreaterThan(still.cutoff);
-    expect(pulled.noiseGain).toBeGreaterThan(still.noiseGain);
-    expect(fast.noiseGain).toBeGreaterThan(pulled.noiseGain);
-    expect(fast.creakRate).toBeGreaterThan(pulled.creakRate);
-    expect(fast.noiseGain).toBeLessThanOrEqual(0.2);
-    expect(stretchTargets(Number.NaN, 5)).toEqual(stretchTargets(0, 1));
+  it('젖은 "쮸웁": 공명이 빠르게 내려가고, 세게 누를수록 크고 높게 시작한다', () => {
+    const soft = wetSquelchParams(0, () => 0.5);
+    const hard = wetSquelchParams(1, () => 0.5);
+    expect(soft.from).toBeGreaterThan(soft.to * 2);
+    expect(hard.from).toBeGreaterThan(soft.from);
+    expect(hard.gain).toBeGreaterThan(soft.gain);
+    expect(hard.gain).toBeLessThanOrEqual(0.45);
+    // 폰 스피커 대역: 끝나는 곳도 200Hz 위
+    expect(soft.to).toBeGreaterThan(200);
+    // 찐득이는 더 낮고 느리다
+    const sticky = wetSquelchParams(1, () => 0.5, 'sticky');
+    expect(sticky.from).toBeLessThan(hard.from);
+    expect(sticky.duration).toBeGreaterThan(hard.duration);
   });
 
-  it('release params: stronger release is lower, louder and wobblier', () => {
-    const soft = releaseParams(0, () => 0.5);
-    const hard = releaseParams(1, () => 0.5);
-    expect(hard.baseFreq).toBeLessThan(soft.baseFreq);
-    expect(hard.gain).toBeGreaterThan(soft.gain);
-    expect(hard.vibratoDepth / hard.baseFreq).toBeGreaterThan(soft.vibratoDepth / soft.baseFreq);
-    expect(hard.endFreq).toBeLessThan(hard.baseFreq);
-    expect(releaseParams(0.5, () => 0.5, 3).vibratoRate).toBeCloseTo(3);
+  it('고무 "퉁": 많이 늘였을수록 크고 길게, 몸통 음도 200Hz 위에서 시작', () => {
+    const a = thwapParams(0.2, () => 0.5);
+    const b = thwapParams(1, () => 0.5);
+    expect(b.bodyGain).toBeGreaterThan(a.bodyGain);
+    expect(b.ringDur).toBeGreaterThan(a.ringDur);
+    expect(a.bodyFrom).toBeGreaterThan(200);
+    expect(b.bodyTo).toBeLessThan(b.bodyFrom);
+    expect(b.bodyGain + b.slapGain + b.ringGain).toBeLessThan(0.5);
   });
 });
 
@@ -116,8 +117,6 @@ describe('촉감별 소리 맛', () => {
   it('기본(plain)은 예전 소리 그대로', () => {
     const p = squelchParams(0.5, createSeededRng(3));
     expect(flavorSquelch(p, 'plain')).toBe(p);
-    const r = releaseParams(0.5, () => 0.5);
-    expect(flavorRelease(r, 'plain')).toBe(r);
   });
 
   it('젤리는 높고, 슬로우 라이징은 낮고 조용하고 길다', () => {
@@ -128,10 +127,6 @@ describe('촉감별 소리 맛', () => {
     expect(slow.gain).toBeLessThan(p.gain);
     expect(slow.duration).toBeGreaterThan(p.duration);
     expect(slow.filterStart).toBeLessThan(p.filterStart);
-    const r = releaseParams(0.7, () => 0.5);
-    expect(flavorRelease(r, 'jelly').baseFreq).toBeGreaterThan(flavorRelease(r, 'slowRise').baseFreq * 1.5);
-    // 슬로우 라이징은 거의 출렁이지 않는다
-    expect(flavorRelease(r, 'slowRise').vibratoDepth).toBeLessThan(r.vibratoDepth * 0.3);
   });
 
   it('찐득이는 거품이 더 많고, 모든 맛이 편한 음량 안', () => {
@@ -144,15 +139,6 @@ describe('촉감별 소리 맛', () => {
     }
   });
 
-  it('쭉쭉이 "쭈우욱"은 늘어난 길이만큼 올라간다 (다른 맛은 없다)', () => {
-    const short = stretchTargets(0.5, 0.5, 'stretchy', 0.5);
-    const long = stretchTargets(0.5, 0.5, 'stretchy', 2.4);
-    expect(long.squeakFreq).toBeGreaterThan(short.squeakFreq * 1.8);
-    expect(long.squeakGain).toBeGreaterThan(short.squeakGain);
-    expect(long.squeakGain).toBeLessThan(0.08);
-    expect(stretchTargets(0.5, 0.5, 'jelly', 2.4).squeakGain).toBe(0);
-    expect(stretchTargets(0.5, 0.5, 'sticky').creakRate).toBeLessThan(stretchTargets(0.5, 0.5).creakRate);
-  });
 });
 
 describe('rarity chimes', () => {
@@ -303,13 +289,11 @@ describe('squish audio graph', () => {
     vi.stubGlobal('window', { AudioContext: FakeAudioContext });
     // 전역 sfx 는 이 테스트 파일에서 아직 unlock 되지 않았다
     squishPress(1);
-    squishRelease(1);
+    squelch(1);
+    thwap(1);
     poke();
     giggle();
     happy();
-    const h = startStretch();
-    h.update(1, 1);
-    h.stop();
     expect(created).toBe(0);
     expect(starts).toBe(0);
   });
@@ -320,34 +304,28 @@ describe('squish audio graph', () => {
     expect(created).toBe(1);
     squishPress(0);
     squishPress(1);
-    squishRelease(0.2);
-    squishRelease(1, 2.6);
+    squelch(0);
+    squelch(1, 'sticky');
+    thwap(0.2);
+    vi.runAllTimers();
+    thwap(1);
     poke(1);
     giggle();
     happy();
-    const h = startStretch();
-    for (let i = 0; i <= 10; i++) h.update(i / 10, 1 - i / 10);
-    h.stop();
-    h.stop();
-    h.update(1, 1); // 멈춘 뒤 호출해도 안전
     for (const k of ['none', 'ping', 'sparkle', 'bell', 'celestial', 'heavenly'] as const) {
       chime(k, 2, { fanfare: true, shiny: true });
       vi.runAllTimers();
     }
     shimmer();
-    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter, () => peel(1), () => riseSigh(2), cheekRub, groan, () => boing(1)]) {
+    for (const fn of [purr, yawn, surprised, laugh, dizzy, jump, shutter, () => peel(1), cheekRub, groan, () => boing(1)]) {
       fn();
       vi.runAllTimers();
     }
     for (const f of ['plain', 'slowRise', 'jelly', 'stretchy', 'sticky'] as const) {
       squishPress(1, f);
-      squishRelease(1, 3, f);
       poke(0.5, f);
       land(0.8, f);
       bump(0.8, f);
-      const s = startStretch(f);
-      s.update(1, 1, 2.5);
-      s.stop();
       vi.runAllTimers();
     }
 

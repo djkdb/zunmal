@@ -46,6 +46,7 @@ import {
 } from '../components/playroom/ReactionGuide';
 import { PropArt } from '../components/playroom/PropArt';
 import { Shelf } from '../components/playroom/Shelf';
+import { drawSkin2d } from '../components/playroom/SkinArt';
 import { createFxLayer, type FxLayer } from '../components/touch3d/fxLayer';
 import type { JellyStage } from '../components/touch3d/jellyScene';
 import {
@@ -387,7 +388,7 @@ function Playroom() {
         actor: null,
         fx: null,
         view: null,
-        els: { wrap: null, sprite: null, shadow: null, button: null },
+        els: { wrap: null, sprite: null, shadow: null, button: null, dent: null, ripple: null },
         listeners: new Set(),
         still: false,
         lastSqueeze: 0,
@@ -427,6 +428,7 @@ function Playroom() {
         styles,
         spec: TOUCH_FX[rec.character.rarity],
         shiny: rec.shiny,
+        bodyColor: rec.character.color,
         getBody: () => {
           const box = spriteBox(rec);
           if (!box) return null;
@@ -1018,6 +1020,12 @@ function Playroom() {
     rafRef.current = null;
     const L = layoutRef.current;
     if (!L) return;
+    // 개발 중 스크린숏: 손짓 도중 한 순간을 멈춰 찍는다 (느린 소프트웨어 WebGL 에서도 같은 순간)
+    if (import.meta.env.DEV && devPaused()) {
+      lastTsRef.current = ts;
+      rafRef.current = requestAnimationFrame((t) => frameRef.current(t));
+      return;
+    }
     const last = lastTsRef.current;
     lastTsRef.current = ts;
     const dt = last === null ? 16 : Math.min(50, ts - last);
@@ -1116,6 +1124,7 @@ function Playroom() {
           els.sprite.style.setProperty('--fill-glow', fill.glow.toFixed(3));
           els.sprite.style.setProperty('--fill-swirl', `${fill.swirl.toFixed(3)}rad`);
         }
+        drawSkin2d(els, actor.surface2d());
       }
     }
     const worldMoving = !isWorldAtRest(world);
@@ -1154,10 +1163,12 @@ function Playroom() {
   // 개발 중 확인용: 브라우저 자동 검사에서 세계 상태를 읽는다
   useEffect(() => {
     if (!import.meta.env.DEV) return undefined;
-    const w = window as unknown as { __playroomWorld?: unknown };
+    const w = window as unknown as { __playroomWorld?: unknown; __playroomRecs?: unknown };
     w.__playroomWorld = worldRef.current;
+    w.__playroomRecs = recsRef.current;
     return () => {
       delete w.__playroomWorld;
+      delete w.__playroomRecs;
     };
   }, []);
 
@@ -2253,6 +2264,11 @@ function PhotoDialog({
 }
 
 /** 개발 서버에서만: 소프트웨어 WebGL(swiftshader)로 3D 화면을 확인할 때 성능 조절(2D 전환·상한 줄이기)을 끈다 */
+/** 개발 중 스크린숏용: window.__playroomPause = true 면 물리·그리기를 멈춘다 (배포 빌드에서는 늘 false) */
+function devPaused(): boolean {
+  return import.meta.env.DEV && (window as unknown as { __playroomPause?: boolean }).__playroomPause === true;
+}
+
 function keep3dForTests(): boolean {
   if (!import.meta.env.DEV) return false;
   try {

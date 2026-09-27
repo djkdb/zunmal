@@ -6,6 +6,7 @@
  * - 자체 requestAnimationFrame 루프: 입자가 있거나 떠다니는 입자(시크릿)가 켜져 있을 때만 돈다.
  *   떠다니는 입자만 있을 때는 30fps 로 그린다. 탭이 숨으면 브라우저가 rAF 를 멈춘다.
  * - 3D 장면을 다시 그리게 하지 않는다 (젤리가 쉬는 동안에도 입자만 가볍게).
+ * - 찐득이 실 가닥(`touch/goo.ts`)도 같은 캔버스에 입자 위로 그린다 — 몸을 따라가도록 몸 가운데 기준으로.
  */
 import type { TouchFxSpec } from '../../data/rarity';
 import type { RNG } from '../../lib/rng';
@@ -22,7 +23,8 @@ import {
   type FxStyleSet,
   type Point,
 } from '../../touch/touchFx';
-import { drawFx } from '../../touch/touchFxDraw';
+import { drawFx, drawGoo } from '../../touch/touchFxDraw';
+import { gooDraws, stepGoo, type Goo } from '../../touch/goo';
 
 export interface BodyBox {
   /** 몸 가운데 (client px) */
@@ -41,6 +43,8 @@ export interface FxSourceOptions {
   shiny: boolean;
   /** 몸 위치 (client 좌표) */
   getBody: () => BodyBox | null;
+  /** 몸 색 (실 가닥) */
+  bodyColor?: string;
 }
 
 export interface FxLayerOptions {
@@ -57,6 +61,8 @@ export interface FxSource {
   /** 반응 입자: 하트(손가락/머리), 졸음 z(머리), 빙글빙글 별(머리 둘레) */
   react(kind: ReactionFx, count: number, clientX?: number, clientY?: number): void;
   setAmbient(on: boolean): void;
+  /** 찐득이 실 가닥 (몸이 사라지면 함께 사라진다) */
+  goo(goo: Goo): void;
   dispose(): void;
 }
 
@@ -75,6 +81,7 @@ interface SourceInternal {
   opts: FxSourceOptions;
   ambient: boolean;
   acc: number;
+  goo: Goo | null;
 }
 
 export function createFxLayer(opts: FxLayerOptions): FxLayer {
@@ -129,6 +136,12 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
   const frame = (ts: number) => {
     raf = null;
     if (disposed || !ctx) return;
+    // 개발 중 스크린숏: 놀이방과 함께 멈춘다
+    if (import.meta.env.DEV && (window as unknown as { __playroomPause?: boolean }).__playroomPause === true) {
+      lastTs = ts;
+      raf = requestAnimationFrame(frame);
+      return;
+    }
     const dt = lastTs === null ? 1 / 60 : (ts - lastTs) / 1000;
     lastTs = ts;
     for (const src of sources) {
@@ -143,14 +156,27 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
       }
     }
     const alive = stepFx(sys, dt);
+    let goos = 0;
+    for (const src of sources) {
+      if (!src.goo) continue;
+      src.goo = stepGoo(src.goo, dt * 1000);
+      if (src.goo) goos++;
+    }
     const ambientOn = anyAmbient();
     // 떠다니는 입자만 있으면 30fps 로 충분하다 (배터리)
-    const onlyAmbient = ambientOn && ts > burstUntil;
+    const onlyAmbient = ambientOn && ts > burstUntil && goos === 0;
     if (!onlyAmbient || ts - lastDraw >= AMBIENT_FRAME_MS || alive === 0) {
       drawFx(ctx, sys, w, h, dpr);
+      if (goos > 0) {
+        for (const src of sources) {
+          if (!src.goo) continue;
+          const b = bodyOf(src);
+          drawGoo(ctx, gooDraws(src.goo), b.center.x, b.center.y, b.radius, src.opts.bodyColor ?? '#ffb3d9', dpr);
+        }
+      }
       lastDraw = ts;
     }
-    if (alive > 0 || ambientOn) raf = requestAnimationFrame(frame);
+    if (alive > 0 || ambientOn || goos > 0) raf = requestAnimationFrame(frame);
     else lastTs = null;
   };
 
@@ -168,7 +194,7 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
 
   return {
     source(so) {
-      const src: SourceInternal = { opts: so, ambient: false, acc: 0 };
+      const src: SourceInternal = { opts: so, ambient: false, acc: 0, goo: null };
       sources.add(src);
       let trailLast: Point | null = null;
       let gone = false;
@@ -214,6 +240,11 @@ export function createFxLayer(opts: FxLayerOptions): FxLayer {
               ? emitStyle(sys, REACTION_STYLES.dizzy, count, { x: head.x, y: head.y - 6 }, rng, b.radius * 0.6)
               : emitStyle(sys, REACTION_STYLES[kind], count, kind === 'zzz' ? zAt : at, rng);
           if (n > 0) burst();
+        },
+        goo(g) {
+          if (disposed || gone) return;
+          src.goo = g;
+          burst();
         },
         setAmbient(on) {
           src.ambient = on && so.spec.ambientPerSec > 0 && !gone;
