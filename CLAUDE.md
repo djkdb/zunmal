@@ -208,8 +208,9 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - 서비스 워커: 페이지는 네트워크 우선, 해시 이름 빌드 파일과 글꼴은 캐시 우선. 캐시 구조를 바꾸면 `VERSION`을 올린다.
 - 설치 안내는 `components/InstallCard.tsx`, 환경 판별은 순수 모듈 `lib/installEnv.ts`(UA 테스트 있음).
   - **인스타그램·카카오톡 등 앱 안 브라우저**(주요 유입 경로: 인스타 DM 링크)는 홈 화면 추가가 안 되고 저장 공간도 따로다.
-    → 주요 버튼 바로 아래에 두 줄 요약 + "브라우저로 열기"(안드로이드 Chrome intent, iOS 17+ `x-safari-https`, https에서만) + 링크 복사.
-    메뉴 위치 안내와 기록 코드 복사는 "자세히"에 접어 둔다(바로 여는 주소가 없으면 처음부터 펼침).
+    → 주요 버튼 바로 아래에 **늘 접힌** 두 줄 요약 + 주 버튼 하나("브라우저로 열기" — 안드로이드 Chrome intent, iOS 17+ `x-safari-https`, https에서만;
+    바로 여는 주소가 없으면 "링크 복사") + "자세히". 메뉴 위치 안내·링크 복사·기록 코드 복사는 모두 "자세히" 안 — 저절로 펼치지 않는다
+    (돌아온 방문에 기록 코드 문단이 늘어나던 문제).
   - 안드로이드 Chrome은 `beforeinstallprompt`를 앱 시작 시(`app/installPrompt.ts`) 붙잡아 설치 창을 띄우고, iOS는 공유 → 홈 화면에 추가 순서를 보여 준다.
   - 이미 앱으로 열었으면(standalone) 안내하지 않는다. 설치 카드는 닫으면 7일간 숨긴다.
 
@@ -285,7 +286,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
     화살표는 글자(→) 대신 SVG(`ToIcon`, `TrendIcon`).
   가게 화면 글자(`components/shop/perks.ts`)·아이콘(`shopIcons.tsx`)은 가게 청크에만 둔다. 고르기 창은 공용 `components/Modal`
   (모든 화면이 지연 청크가 되어 Modal은 작은 공용 청크로 나뉘고 첫 화면과 무관하다).
-- **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 30 + 애정 단계 × 10, 최대 120(`GIFT_COINS`).
+- **말랑 선물**: 서울 날짜로 하루 한 번, 친밀도가 가장 높은 연 말랑이(같으면 파트너)가 선물 상자를 가져온다. 코인 = 60 + 애정 단계 × 15, 최대 195(`GIFT_COINS`, 9단계에서 최대 — 친밀도 최대 단계 그대로).
+  가져온 말랑이가 홈 무대 파트너 옆에 코드로 그린 선물 상자를 들고 나타난다(`components/home/GiftBringer`, 절대 위치라 무대 높이 그대로;
+  파트너가 가져왔으면 상자만 발치에). 상자를 톡 누르거나 말풍선 "열기" → 상자가 눌렸다 뚜껑이 날아가고 반짝이 + 코인 한 닢이 쏙,
+  코인은 상자에서 알약으로 날아간다(ref 잠금, 움직임 줄이기면 열린 모습으로 바로). 받은 뒤 한 줄 "○○의 선물 N코인을 받았어요!" 동안 말랑이가 남아 있다.
+  상자 버튼은 포인터용 지름길(`tabIndex -1`) — 키보드·화면 읽기는 말풍선 "열기".
   홈 파트너 말풍선 자리(선물 쿠폰 > 말랑 선물 > 받은 뒤 한 줄 > 인사), 선물이 떠 있으면 "꾹 눌러 봐요"는 쉰다. 새 플레이어는 다음 날부터.
   가게 코인을 받으면 미션 하루 기록에 `shop-claim`을 센다(홈 "오늘" 줄).
 
@@ -298,7 +303,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **상태는 모두 저장에서 계산**(새 저장 필드 없음): `readHub(save, nowMs)`(`goals/hubState.ts`)가 오늘(서울)·남은 일일 코인·천장까지·봉인 캡슐(선반 순서)·
   첫날 여부(가장 먼저 얻은 말랑이의 날짜)·오늘 미션·선물·가게(`ready` = 가득 참 또는 `GOAL_THRESHOLDS.shopReadyCoins` 이상 또는 받으면 바로 뽑을 수 있음)·
   도감 요약을 한 번에 만든다. 화면은 `components/home/useHub.ts`(저장 + 15초마다)로 받는다.
-- **다음 목표** (`goals/nextGoal.ts`, `GOAL_ORDER` 순, 테스트): 선물 → 첫걸음 → 미션 보상(올클리어 보너스) → 세트 보상 → 가게 → 봉인 캡슐(`/touch/:id`)
+- **다음 목표** (`goals/nextGoal.ts`, `GOAL_ORDER` 순, 테스트): 선물 → 미션 보상(올클리어 보너스) → 첫걸음 → 세트 보상 → 가게 → 봉인 캡슐(`/touch/:id`)
   → 천장 가까움(`pityCloseWithin`) → 조금 남은 미션("1판만 더 하면 +50코인", `missionNearRatio`) → 거의 다 모은 세트(`setNearMissing`)
   → 뽑기 → 코인 모으기(모자란 양, 오늘 게임 코인이 남았을 때만) → 파트너 애정(늘 있는 마지막 — `affectionProgress` 그대로:
   막대 = 단계 안 비율, 글자 "Lv.N", 설명 = 다음 단계에 생기는 첫 가지 "Lv.3이 되면 새 반응 볼 콕" 또는 "친밀도 N만 더 쌓으면 Lv.N+1이 돼요"). 문턱값은 `economy/config.ts` `GOAL_THRESHOLDS`.
@@ -311,7 +316,7 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   목표 카드 막대가 여섯 칸 + "첫걸음 N/6"으로 바뀌고, 다 하면 사라진다. 봉인 캡슐 이름은 말하지 않는다(등급만 — 선반과 같음).
 - **상태 줄**(`HubStatus`): 뽑기까지 코인(또는 뽑을 수 있는 횟수), 전설 이상까지 N회, 도감 N/32 + %. 칸마다 링크.
 - **오늘 줄**(`TodayStrip`, `goals/today.ts`): 선물 → 미션 → 가게 → 미니게임 → 뽑기 다섯 칸을 선으로 잇는다. 한 칸 = 민트 + 체크, 할 수 있음 = 레몬 고리,
-  시작한 날 선물 = "내일". 한 일은 미션 하루 기록(`missions.progress`의 `play-games`·`pull`·`shop-claim`)과 `giftDay`·`bonusClaimed`로 판단한다(출석부 아님).
+  시작한 날 선물 = "내일". 받을 미션 보상이 있으면 미션 칸 이름이 "보상 +N"(받을 코인 합, `claimableMissionCoins`). 한 일은 미션 하루 기록(`missions.progress`의 `play-games`·`pull`·`shop-claim`)과 `giftDay`·`bonusClaimed`로 판단한다(출석부 아님).
   선물·미션·가게 칸은 홈 안의 해당 카드로 스크롤·초점, 미니게임·뽑기는 그 화면으로.
 - **홈 탭 빨간 점**(`goals/alerts.ts`): 선물 도착, 받을 미션·세트 보상, 가게 가득 참, 열지 않은 캡슐. 탭 이름 뒤에 이유를 읽어 준다.
 - **도감 요약** (`data/collectionProgress.ts`, 테스트): `summarizeCollection({ owned, claimedSets })` → 전체 수·비율·화면용 %(`displayPercent`)·반짝 종류 수·
@@ -385,11 +390,11 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
 - **친밀도는 눈에 보이는 성장**이다 (`economy/affection.ts` `affectionProgress`, 순수·테스트 — 새 규칙 없이 `levelOf`·`REACTION_UNLOCKS`·
   가게 `affectionBonus`(찐득이 두 배)·선물 `giftCoins`를 한곳에 모은다. 가게·선물 공식이 economy 에 있어 data 가 아니라 economy 에 둔다).
   단계·단계 안 애정(xp)/50·남은 양·하트 5개 채움(`heartFills`, 하나 = 10)·지금 받는 것·다음 단계에 새로 생기는 것(`levelUpPerks` →
-  `perkLines`: "새 반응 녹아내리기", "가게 보너스 +20%", "선물 +10코인")·다 열었나(`maxed`: 반응·가게·선물이 마지막으로 오르는 단계,
+  `perkLines`: "새 반응 녹아내리기", "가게 보너스 +20%", "선물 +15코인")·다 열었나(`maxed`: 반응·가게·선물이 마지막으로 오르는 단계,
   지금은 선물 상한이 닿는 9단계 — `affectionMaxLevel`이 표·config 에서 계산). 저장 구조는 그대로.
   - 도감 상세 `AffectionMeter`: "친밀도 Lv.4" + "다음 레벨까지 32" + 하트 5개(옅은 딸기우유 칸) + "Lv.5가 되면" 알약들.
   - 놀이방 정보 카드: 예전 막대 자리에 작은 하트 5개 + "다음 레벨까지 N"(높이 그대로), 아래 줄은 다음 반응 방법(반응이 더 없으면
-    "Lv.8이 되면 선물 +10코인").
+    "Lv.8이 되면 선물 +15코인").
   - 단계가 오르면 기존 축하 딱지 하나가 "○○와 조금 더 친해졌어요! Lv.5" + 새 반응(방법) + 가게·선물 알약으로 바뀌고 둘레에서
     하트가 퐁퐁 떠오른다(움직임 줄이기면 멈춘 하트). 새 반응 손가락 시범은 그대로.
 - **촉감** (`data/materials.ts`, 순수 데이터 + 테스트): 32종 모두 네 촉감 중 하나(`MATERIAL_BY_ID`, 없으면 탱탱 젤리).
@@ -516,11 +521,17 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
   ```
   baseCoins    = floor(score × gameMultiplier)
   partnerBonus = floor(baseCoins × partnerRarityBonus)
-  earnedCoins  = min(baseCoins + partnerBonus, perGameCap)
+  earnedCoins  = min(baseCoins + partnerBonus, gameCap(gameId))
   granted      = min(earnedCoins, dailyCap − dailyEarned)
   ```
 - 일일 상한은 **Asia/Seoul 달력 날짜**가 바뀌면 초기화 (`daily.ts` 의 `seoulDateKey`).
-- 뽑기 가격(`PULL_PRICE`): 1회 100 코인, 10연 1000 코인(할인 없음 — 모으느라 지치지 않게 "한 판 → 한 번 뽑기"가 기본 루프. 1회 뽑기 버튼이 주인공 색).
+- **미니게임 코인은 플레이한 시간만큼**(사용자가 맡긴 결정): 예전엔 20초 게임이 분당 약 590, 2분 게임이 약 64코인이라 짧은 게임만 반복하게 됐다.
+  이제 한 판 목표 = `COINS_PER_PLAY_MINUTE`(90) × (`GAME_PLAY_SECONDS[id].typical` + `PLAY_OVERHEAD_SECONDS` 15) ÷ 60 — 20초 게임 약 50,
+  45초 약 90, 2분 약 200. 배율(`GAME_MULTIPLIERS`)은 보통 점수(`GAME_TYPICAL_SCORES`) × 배율 ≈ 목표가 되게 맞춘다(떨어지면 끝나는 게임은 보통 버티는 시간).
+  한 판 상한 = `gameCap(id)`: 가장 긴 판(`GAME_PLAY_SECONDS.max` = durationMs, registry 테스트) 목표 × `PER_GAME_CAP_FACTOR` 1.5, 10 단위(20초 80 · 2분 300).
+  테스트(`playReward.test.ts`): 모든 게임 보통 한 판의 분당 코인이 90 ±15%, 로비 "약 N코인"이 목표 ±20%, 최고/최저 효율 1.3배 안, 보통 날(게임 15분 + 미션 + 가게 + 선물)이면 10연 하루.
+  "미니게임 코인 N개" 미션도 150/300/500으로 맞췄다. 결과 영수증·상한 문구는 `reward.gameCap`("이 게임은 한 판에 N코인까지 받아요.").
+- 뽑기 가격(`PULL_PRICE`): 1회 100 코인, 10연 1000 코인(할인 없음 — 코인이 생기는 대로 1회씩 뽑는 짧은 루프. 1회 뽑기 ≈ 미니게임 1분 남짓. 1회 뽑기 버튼이 주인공 색).
 - 모든 숫자는 `economy/config.ts` 에 주석과 함께 둔다.
 
 ## 상태 저장 (`store/`)
@@ -588,12 +599,13 @@ UI는 테두리 없이 그림자로 층을 나눈다. 토큰은 모두 `global.c
    `tags`: 로비 칩 딱지 `pick`(추천)·`feel`(손맛)·`record`(기록 도전)·`focus`(집중) 중 하나 이상. "짧게"는 적지 않는다 —
    `durationMs ≤ SHORT_PLAY_MS`(30초)에서 계산(`minigames/lobby.ts`). 칩마다 2개 이상·전체보다 적게, 처음 추천 게임은 `pick`(테스트).
 3. `src/minigames/registry.ts` 의 `MINI_GAMES` 배열에 한 줄 추가.
-4. `economy/config.ts` 의 `GAME_MULTIPLIERS`(배율)와 `GAME_TYPICAL_SCORES`(보통 점수 — 로비 "약 N코인", 100~150코인이 되게)에 한 줄씩 (registry 테스트가 확인).
+4. `economy/config.ts` 의 `GAME_MULTIPLIERS`(배율)와 `GAME_TYPICAL_SCORES`(보통 점수 — 로비 "약 N코인"), `GAME_PLAY_SECONDS`(보통·최대 플레이 초 — 분당 코인과 한 판 상한)에 한 줄씩.
+   보통 점수 × 배율이 분당 90코인 ±15%가 되게 (registry·playReward 테스트가 확인).
 
 결과 화면, 최고 기록 저장, 코인 지급은 `MiniGamePage` 가 공통 처리한다.
 
 - **로비** (`/play`, `components/MiniGameLobby`): 위에서부터 오늘 받은 코인 막대("오늘 받은 코인 1,240 / 3,000", 다 받으면 민트 + 자정 안내)
-  → 파트너 카드 → 가로로 미는 칩 줄(`LOBBY_FILTERS`: 전체·추천·짧게·손맛·기록 도전·집중, 고른 칩은 `sessionStorage['malang-lobby-filter']`)
+  → 파트너 카드(바꾸기 창에 "홈 파트너도 바뀌어요", 바꾸고 닫으면 "홈 파트너도 ○○로 바뀌었어요" 알림 한 줄) → 가로로 미는 칩 줄(`LOBBY_FILTERS`: 전체·추천·짧게·손맛·기록 도전·집중, 고른 칩은 `sessionStorage['malang-lobby-filter']`)
   → 두 칸 타일(모두 같은 높이, 색은 registry 순서라 걸러도 그대로): 아이콘·이름·길이+blurb·내 기록 두 칸(최고 | 최근, 안 해 봤으면 "첫 도전")
   ·레몬 알약 "약 N코인"(`expectedCoins`: 해 본 게임은 최고와 최근의 가운데, 처음이면 보통 점수 → `computeReward`에 지금 파트너·오늘 남은 한도,
   10 단위 반올림. 오늘 다 받았으면 "오늘은 다 받았어요"). 최근 점수는 기존 `miniGameRecords.lastScore`(저장 구조 변경 없음).
