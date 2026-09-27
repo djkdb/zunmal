@@ -85,6 +85,39 @@
   line-height: 1.5;
 }
 
+/* 반짝 알약 + 촉감 알약을 한 줄에 */
+.dex-summary__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 4px;
+}
+
+.dex-summary__pills .dex-summary__shiny {
+  margin-top: 0;
+}
+
+/* 촉감 알약: 말랑 방울 + "촉감 4종 중 N종" (네 촉감을 다 만나면 민트) */
+.dex-summary__feel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--sub);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.dex-summary__feel.is-done {
+  background: var(--good-tint);
+  color: var(--good-ink);
+}
+
 .dex-summary__shiny.has-shiny {
   background: linear-gradient(110deg, #ffe07a, #fff6c9 40%, #ffc8e6 60%, #c6ecff);
   color: var(--ink);

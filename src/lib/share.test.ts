@@ -6,6 +6,9 @@ import {
   malangShareContent,
   pullShareContent,
   runShare,
+  shareCardCaption,
+  shareCardText,
+  shareFileName,
   shareMessage,
   type ShareContent,
 } from './share';
@@ -110,5 +113,90 @@ describe('runShare', () => {
       throw new Error('denied');
     });
     expect(await runShare(c, { copy })).toBe('manual');
+  });
+});
+
+describe('runShare with card image', () => {
+  const c: ShareContent = { title: 't', text: '글', url: SHARE_URL };
+  const png = new File([new Uint8Array([137, 80, 78, 71])], 'malang-peach-mochi.png', { type: 'image/png' });
+
+  it('파일 공유가 되면 그림 + 글 + 주소를 한 번에 보낸다', async () => {
+    const share = vi.fn(async () => {});
+    const canShare = vi.fn((d: { files?: File[] }) => !!d.files);
+    const copy = vi.fn(async () => {});
+    expect(await runShare(c, { share, canShare, copy }, [png])).toBe('shared-image');
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(share).toHaveBeenCalledWith({ title: 't', text: '글', url: SHARE_URL, files: [png] });
+    expect(copy).not.toHaveBeenCalled();
+  });
+
+  it('canShare가 파일을 거절하면 글만 공유 (파일 없이)', async () => {
+    const share = vi.fn(async () => {});
+    const canShare = vi.fn((d: { files?: File[] }) => !d.files);
+    expect(await runShare(c, { share, canShare }, [png])).toBe('shared');
+    expect(share).toHaveBeenCalledWith({ title: 't', text: '글', url: SHARE_URL });
+  });
+
+  it('canShare가 없으면 파일을 보내지 않는다 (지원 여부를 모름)', async () => {
+    const share = vi.fn(async () => {});
+    expect(await runShare(c, { share }, [png])).toBe('shared');
+    expect(share).toHaveBeenCalledWith({ title: 't', text: '글', url: SHARE_URL });
+  });
+
+  it('그림 공유 창을 닫으면(AbortError) 조용히 — 글 공유·복사를 다시 하지 않는다', async () => {
+    const share = vi.fn(async () => {
+      throw Object.assign(new Error('x'), { name: 'AbortError' });
+    });
+    const copy = vi.fn(async () => {});
+    expect(await runShare(c, { share, canShare: () => true, copy }, [png])).toBe('cancelled');
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(copy).not.toHaveBeenCalled();
+  });
+
+  it('그림 공유가 다른 이유로 실패하면 글 공유 → 클립보드 순서', async () => {
+    const calls: string[] = [];
+    const share = vi.fn(async (d: { files?: File[] }) => {
+      calls.push(d.files ? 'files' : 'text');
+      throw Object.assign(new Error('x'), { name: 'NotAllowedError' });
+    });
+    const copy = vi.fn(async () => {
+      calls.push('copy');
+    });
+    expect(await runShare(c, { share, canShare: () => true, copy }, [png])).toBe('copied');
+    expect(calls).toEqual(['files', 'text', 'copy']);
+  });
+
+  it('빈 파일 목록은 글 공유와 같다', async () => {
+    const share = vi.fn(async () => {});
+    expect(await runShare(c, { share, canShare: () => true }, [])).toBe('shared');
+  });
+});
+
+describe('share card text', () => {
+  it('뽑기 결과: 처음 만남 / 또 뽑음', () => {
+    expect(shareCardCaption({ kind: 'pull', isNew: true })).toBe('방금 처음 만났어요');
+    expect(shareCardCaption({ kind: 'pull', isNew: false })).toBe('방금 뽑았어요');
+  });
+
+  it('도감: 친밀도 단계 (파트너면 앞에 붙임, 1 아래는 1)', () => {
+    expect(shareCardCaption({ kind: 'malang', level: 4, partner: false })).toBe('친밀도 Lv.4');
+    expect(shareCardCaption({ kind: 'malang', level: 0, partner: true })).toBe('내 파트너 친밀도 Lv.1');
+  });
+
+  it('반짝이면 제목 앞에 "반짝", 파일 이름은 영문 id만', () => {
+    const t = shareCardText({ kind: 'pull', id: 'galaxy-malang', name: '은하 말랑', shiny: true, isNew: true });
+    expect(t.title).toBe('반짝 은하 말랑');
+    expect(t.fileName).toBe('malang-galaxy-malang-shiny.png');
+    expect(t.footer).toBe('zunmal.pages.dev');
+    expect(t.footer).not.toContain('?');
+    expect(shareFileName('../x y', false)).toBe('malang-xy.png');
+    expect(shareFileName('한글', false)).toBe('malang-malang.png');
+  });
+
+  it('같은 말랑이라도 반짝·한 줄이 다르면 다른 그림', () => {
+    const a = shareCardText({ kind: 'malang', id: 'peach-mochi', name: '복숭아 모찌', shiny: false, level: 2, partner: false });
+    const b = shareCardText({ kind: 'malang', id: 'peach-mochi', name: '복숭아 모찌', shiny: true, level: 2, partner: false });
+    const c2 = shareCardText({ kind: 'malang', id: 'peach-mochi', name: '복숭아 모찌', shiny: false, level: 3, partner: false });
+    expect(new Set([a.key, b.key, c2.key]).size).toBe(3);
   });
 });

@@ -253,7 +253,9 @@ export function GachaPage() {
         <PullResult
           items={pending.items}
           totalRefund={pending.totalRefund}
-          seenIndex={epicItem ? pending.items.indexOf(epicItem) : undefined}
+          // 신화 이상은 전체 화면 연출이, 1회는 머신 캡슐을 누른 순간이 이미 "열기"다 — 결과 창에서 다시 까지 않는다
+          seenIndex={epicItem ? pending.items.indexOf(epicItem) : pending.kind === 'single' ? 0 : undefined}
+          seenByMachine={!epicItem && pending.kind === 'single'}
           kind={pending.kind}
           coins={coins}
           ownedCount={ownedCount}

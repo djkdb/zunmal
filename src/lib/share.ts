@@ -3,7 +3,8 @@
  *
  * 공유 글은 친구에게 나가는 글이라 짧고 구체적으로: 무엇을 뽑았는지 한 줄 + 내 도감 + "나도 말랑이 뽑기" + 주소.
  * 주소는 해시 없는 첫 화면(`SHARE_URL`) 그대로 — 쿠폰(`?c=`)이나 추적 값은 붙이지 않는다.
- * 보내기 순서(`runShare`): Web Share(글 + 주소) → 안 되면 클립보드 복사 → 그것도 안 되면 직접 복사(`manual`).
+ * 보내기 순서(`runShare`): 카드 그림이 있고 파일 공유가 되면 Web Share(그림 + 글 + 주소) → Web Share(글 + 주소)
+ * → 안 되면 클립보드 복사 → 그것도 안 되면 직접 복사(`manual`). 인스타그램은 글보다 그림을 받아 준다.
  * 공유 창을 사용자가 닫으면(AbortError) 조용히 끝낸다. 브라우저 기능은 `ShareEnv`로 주입받는다.
  */
 import { josa } from './josa';
@@ -94,6 +95,55 @@ export interface ShareData {
   title: string;
   text: string;
   url: string;
+  /** 카드 그림 (PNG 한 장). 파일 공유가 되는 브라우저에서만 넣는다 */
+  files?: File[];
+}
+
+/** 자랑 카드 그림 한 줄 (그림 속 이름 아래, 하트 옆): 뽑기 결과면 "방금 뽑았어요", 도감이면 친밀도 */
+export function shareCardCaption(i: { kind: 'pull'; isNew: boolean } | { kind: 'malang'; level: number; partner: boolean }): string {
+  if (i.kind === 'pull') return i.isNew ? '방금 처음 만났어요' : '방금 뽑았어요';
+  const level = `친밀도 Lv.${Math.max(1, Math.floor(i.level))}`;
+  return i.partner ? `내 파트너 ${level}` : level;
+}
+
+/** 카드 그림 이름 표시: 반짝이면 "반짝 " + 이름 */
+export function shareCardTitle(name: string, shiny: boolean): string {
+  return `${shiny ? '반짝 ' : ''}${name}`;
+}
+
+/** 자랑 카드 그림에 들어가는 글 (그림 그리기는 components/share/shareCard.ts, 지연 청크) */
+export interface ShareCardText {
+  /** 카드 제목 (이름, 반짝이면 "반짝 " 붙음) */
+  title: string;
+  /** 이름 아래 하트 옆 한 줄 */
+  caption: string;
+  fileName: string;
+  /** 카드 아래 왼쪽 주소 (https:// 와 끝 / 를 뺀 SHARE_URL) */
+  footer: string;
+  /** 같은 그림인지 가리는 열쇠 (말랑이·반짝·한 줄이 같으면 다시 그리지 않는다) */
+  key: string;
+}
+
+export function shareCardText(
+  i: { id: string; name: string; shiny: boolean } & (
+    | { kind: 'pull'; isNew: boolean }
+    | { kind: 'malang'; level: number; partner: boolean }
+  ),
+): ShareCardText {
+  const caption = shareCardCaption(i);
+  return {
+    title: shareCardTitle(i.name, i.shiny),
+    caption,
+    fileName: shareFileName(i.id, i.shiny),
+    footer: SHARE_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+    key: `${i.id}|${i.shiny ? 1 : 0}|${caption}`,
+  };
+}
+
+/** 공유 파일 이름 — 영문 id 만 (앱마다 한글 파일 이름을 다르게 깨뜨린다) */
+export function shareFileName(id: string, shiny: boolean): string {
+  const safe = id.replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'malang';
+  return `malang-${safe}${shiny ? '-shiny' : ''}.png`;
 }
 
 /** 브라우저 기능 (없으면 undefined). 테스트에서 가짜로 넣는다. */
@@ -103,18 +153,37 @@ export interface ShareEnv {
   copy?: (text: string) => Promise<void>;
 }
 
-/** shared: 공유 창으로 보냄 · copied: 클립보드에 복사 · cancelled: 공유 창을 닫음 · manual: 직접 복사해야 함 */
-export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'manual';
+/** shared-image: 그림과 함께 보냄 · shared: 글만 보냄 · copied: 클립보드에 복사 · cancelled: 공유 창을 닫음 · manual: 직접 복사해야 함 */
+export type ShareOutcome = 'shared-image' | 'shared' | 'copied' | 'cancelled' | 'manual';
 
 function isAbort(e: unknown): boolean {
   return typeof e === 'object' && e !== null && (e as { name?: unknown }).name === 'AbortError';
 }
 
 /**
- * Web Share 먼저, 안 되면(없음·canShare 거절·AbortError 아닌 실패) 클립보드, 그것도 안 되면 manual.
- * 버튼 누름(사용자 입력) 안에서 바로 부른다.
+ * 그림(files)이 있으면 파일 공유부터: canShare({ files })가 참일 때만 그림 + 글 + 주소를 보낸다.
+ * 그다음 Web Share(글 + 주소), 안 되면(없음·canShare 거절·AbortError 아닌 실패) 클립보드, 그것도 안 되면 manual.
+ * 어느 단계든 공유 창을 닫으면(AbortError) 거기서 조용히 끝낸다. 버튼 누름(사용자 입력) 안에서 바로 부른다.
  */
-export async function runShare(c: ShareContent, env: ShareEnv): Promise<ShareOutcome> {
+export async function runShare(c: ShareContent, env: ShareEnv, files?: readonly File[]): Promise<ShareOutcome> {
+  if (files && files.length > 0 && env.share && env.canShare) {
+    const withFiles: ShareData = { title: c.title, text: c.text, url: c.url, files: [...files] };
+    let ok = false;
+    try {
+      ok = env.canShare(withFiles);
+    } catch {
+      ok = false;
+    }
+    if (ok) {
+      try {
+        await env.share(withFiles);
+        return 'shared-image';
+      } catch (e) {
+        if (isAbort(e)) return 'cancelled';
+        // 파일 공유만 실패 (앱이 파일을 거절·시간 초과) → 글만 보내 본다
+      }
+    }
+  }
   const data: ShareData = { title: c.title, text: c.text, url: c.url };
   let canShare = typeof env.share === 'function';
   if (canShare && env.canShare) {

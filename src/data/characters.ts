@@ -500,6 +500,13 @@ export const CHARACTERS_BY_RARITY: Readonly<Record<Rarity, readonly Character[]>
 /** 신규 플레이어가 고를 수 있는 시작 말랑이 (일반 등급 — 파트너 보너스 0%라 경제에 영향 없음). */
 export const STARTER_CHARACTER_IDS: readonly string[] = ['peach-mochi', 'soda-drop', 'matcha-bean'];
 
+/** 첫 말랑이 고르기 카드의 촉감 한 줄 (촉감 이름 아래, 아주 짧게 — 어떤 손맛인지 고를 때 보이게) */
+export const STARTER_FEELS: Readonly<Record<string, string>> = {
+  'peach-mochi': '천천히 차오르는 모찌',
+  'soda-drop': '탱글탱글 튀는 젤리',
+  'matcha-bean': '쭉 늘어나는 말차 떡',
+};
+
 /**
  * 첫 말랑이 고르기 화면 전용 소개 — 도감 설명("가장 흔한 말랑이" 같은 등급 이야기) 대신
  * 함께 지낼 파트너로서의 따뜻한 한 줄. 도감 설명은 그대로 둔다.

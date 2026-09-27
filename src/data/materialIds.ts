@@ -61,3 +61,18 @@ export const DEFAULT_MATERIAL: MaterialId = 'jelly';
 export function materialIdFor(id: string): MaterialId {
   return MATERIAL_BY_ID[id] ?? DEFAULT_MATERIAL;
 }
+
+export interface MaterialCoverage {
+  /** 가진 말랑이에 있는 촉감 (MATERIAL_IDS 순서) */
+  have: MaterialId[];
+  count: number;
+  total: number;
+}
+
+/** 모은 말랑이로 만나 본 촉감 — 도감 요약 "촉감 4종 중 N종" */
+export function materialCoverage(ownedIds: Iterable<string>): MaterialCoverage {
+  const seen = new Set<MaterialId>();
+  for (const id of ownedIds) seen.add(materialIdFor(id));
+  const have = MATERIAL_IDS.filter((m) => seen.has(m));
+  return { have, count: have.length, total: MATERIAL_IDS.length };
+}

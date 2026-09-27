@@ -72,6 +72,8 @@ export interface PhotoInput {
   mat: PhotoMat;
   /** 뒤에서 앞 순서 */
   layers: PhotoLayer[];
+  /** 카드 아래 왼쪽 작은 글 (자랑 카드의 주소 "zunmal.pages.dev") — 없으면 가게 이름만 */
+  footer?: string;
 }
 
 function cssVar(name: string, fallback: string): string {
@@ -358,6 +360,13 @@ export async function composePhoto(input: PhotoInput): Promise<Blob> {
   ctx.textAlign = 'right';
   ctx.fillStyle = PRIMARY_TEXT;
   ctx.fillText('말랑 뽑기방', L.logo.x, L.logo.y);
+  if (input.footer) {
+    // 같은 줄 왼쪽: 주소 (보조 글자색, 본문 글꼴)
+    ctx.font = `800 ${Math.round(L.logo.size * 0.82)}px ${body}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = SUB;
+    ctx.fillText(input.footer, L.card.x + 44, L.logo.y);
+  }
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');

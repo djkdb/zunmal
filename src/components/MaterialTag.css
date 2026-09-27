@@ -1,0 +1,30 @@
+/* 촉감 딱지: 흰 알약 + 촉감 그림 + 이름 (등급 배지 옆에 나란히) */
+.material-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 9px 2px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(26, 64, 128, 0.14);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-ui);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.material-tag svg {
+  flex: none;
+}
+
+/* 그림만: 작은 흰 원 */
+.material-tag--icon {
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+}

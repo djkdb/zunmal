@@ -1,4 +1,4 @@
-/* 자랑하기 버튼 + 결과 말풍선 (버튼 위에 뜬다) */
+/* 자랑하기 버튼 + 직접 복사 상자 (버튼 위에 뜬다). 복사했으면 버튼 글자가 잠깐 바뀐다 — 옆 버튼을 가리는 말풍선 없음 */
 .share {
   position: relative;
   display: inline-flex;
@@ -26,7 +26,6 @@
   }
 }
 
-.share__toast,
 .share__manual {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -37,36 +36,31 @@
   box-shadow: var(--shadow-float);
 }
 
-.share--end .share__toast,
 .share--end .share__manual {
   right: 0;
 }
 
-.share--start .share__toast,
 .share--start .share__manual {
   left: 0;
 }
 
-.share__toast {
-  padding: 8px 14px;
-  font-family: var(--font-ui);
-  font-weight: var(--fw-ui);
-  font-size: var(--fs-xs);
-  white-space: nowrap;
-  animation: share-pop 0.28s var(--ease-jelly);
+/* 복사했어요: 버튼 안에서 민트 체크 (자리·크기 그대로) */
+.share-btn.is-copied {
+  background: var(--good-tint);
+  color: var(--good-ink);
 }
 
-@keyframes share-pop {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.92);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .share__toast {
-    animation: none;
-  }
+/* 카드 그림용 원본 말랑이: 보이지 않지만 계산된 스타일은 있어야 한다 (display:none 이면 굽지 못함) */
+.share__src {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+  opacity: 0;
 }
 
 .share__manual {
