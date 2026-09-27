@@ -4,10 +4,11 @@ import { sfx } from '../audio/sfx';
 import { CHARACTERS, CHARACTERS_BY_RARITY, getCharacter } from '../data/characters';
 import { isNewInCollection, summarizeCollection } from '../data/collectionProgress';
 import { levelOf } from '../data/affection';
+import { materialCoverage } from '../data/materialIds';
 import { RARITIES, RARITY_META, RARITY_WEIGHTS, RARITY_WEIGHT_TOTAL, type Rarity } from '../data/rarity';
 import { PARTNER_RARITY_BONUS } from '../economy/config';
 import { useReducedMotion } from '../hooks/useReducedMotion';
-import { malangShareContent } from '../lib/share';
+import { malangShareContent, shareCardText } from '../lib/share';
 import { useGameStore } from '../store/useGameStore';
 import { AffectionMeter } from './AffectionMeter';
 import { CollectionGoal } from './collection/CollectionGoal';
@@ -15,6 +16,7 @@ import { CollectionSummary } from './collection/CollectionSummary';
 import { MysteryMalang } from './collection/MysteryMalang';
 import { SetList } from './collection/SetList';
 import { Malang } from './Malang';
+import { MaterialTag } from './MaterialTag';
 import { ShareButton } from './ShareButton';
 import { Modal } from './Modal';
 import { RarityBadge } from './RarityBadge';
@@ -42,6 +44,7 @@ export function Collection() {
   const claimedSets = useGameStore((s) => s.claimedSets);
   const [detailId, setDetailId] = useState<string | null>(null);
   const summary = useMemo(() => summarizeCollection({ owned, claimedSets }), [owned, claimedSets]);
+  const materials = useMemo(() => materialCoverage(Object.keys(owned)), [owned]);
   // 세트 보상을 그 자리에서 받으면 버튼이 사라지므로 화면 읽기에 한 줄 알린다
   const [claimNote, setClaimNote] = useState('');
   const announceClaim = (setId: string, coins: number) => {
@@ -76,7 +79,7 @@ export function Collection() {
 
   return (
     <div className="collection">
-      <CollectionSummary summary={summary} onJump={jump} />
+      <CollectionSummary summary={summary} materials={materials} onJump={jump} />
 
       <div className="collection__tabs" role="tablist" aria-label="도감 보기 방식">
         <button
@@ -246,6 +249,7 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
         </div>
         <div className="row">
           <RarityBadge rarity={detail.rarity} />
+          <MaterialTag characterId={detail.id} />
           {showShiny && <span className="pull-tag pull-tag--shiny">반짝</span>}
         </div>
         <h2 id="malang-detail-title" className="collection-detail__name">
@@ -302,6 +306,18 @@ function DetailModal({ id, onClose }: { id: string; onClose(): void }) {
           <ShareButton
             className="btn"
             align="start"
+            card={{
+              character: detail,
+              shiny: showShiny,
+              text: shareCardText({
+                kind: 'malang',
+                id: detail.id,
+                name: detail.name,
+                shiny: showShiny,
+                level: levelOf(affection),
+                partner: isPartner,
+              }),
+            }}
             content={() =>
               malangShareContent({
                 name: detail.name,

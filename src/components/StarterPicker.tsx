@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { sfx } from '../audio/sfx';
-import { STARTER_BLURBS, STARTER_CHARACTER_IDS, getCharacter, type Character } from '../data/characters';
+import { STARTER_BLURBS, STARTER_CHARACTER_IDS, STARTER_FEELS, getCharacter, type Character } from '../data/characters';
 import { STARTING_COINS } from '../economy/config';
 import { useGameStore } from '../store/useGameStore';
 import { Malang } from './Malang';
+import { MaterialTag } from './MaterialTag';
 import './StarterPicker.css';
 
 const starters = STARTER_CHARACTER_IDS.map(getCharacter).filter((c): c is Character => !!c);
@@ -39,11 +40,13 @@ export function StarterPicker() {
           >
             <Malang character={c} size={92} animation={selected === c.id ? 'bounce' : 'idle'} decorative />
             <span className="starter__name">{c.name}</span>
+            <MaterialTag characterId={c.id} className="starter__material" />
+            {STARTER_FEELS[c.id] && <span className="starter__feel">{STARTER_FEELS[c.id]}</span>}
           </button>
         ))}
       </div>
       <p className="starter__desc" aria-live="polite">
-        {selected ? (STARTER_BLURBS[selected] ?? getCharacter(selected)?.description) :'눌러서 한 마리를 골라 주세요.'}
+        {selected ? (STARTER_BLURBS[selected] ?? getCharacter(selected)?.description) : '눌러서 한 마리를 골라 주세요.'}
       </p>
       <button
         type="button"
