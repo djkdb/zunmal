@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  faceEllipse,
+  faceShadeFactor,
   SURFACE_TUNING,
   creaseDip,
   dentProfile,
@@ -115,3 +117,26 @@ describe('쭉쭉이 목', () => {
     expect(neckSqueeze(0.5, 0.6, 1)).toBeLessThan(neckSqueeze(0.5, 1, 1));
   });
 });
+
+describe('얼굴 비켜 가기 (faceShadeFactor)', () => {
+  const face = faceEllipse({ faceY: 72, eyeGap: 16 });
+  it('눈 위를 누르면 그늘이 거의 없고, 얼굴에서 멀면 그대로', () => {
+    expect(faceShadeFactor(face.cx, face.cy, 14, face)).toBeCloseTo(SURFACE_TUNING.faceShadeKeep);
+    expect(faceShadeFactor(face.cx - face.rx, face.cy, 14, face)).toBeLessThan(0.5);
+    expect(faceShadeFactor(face.cx, face.cy + 60, 14, face)).toBeCloseTo(1);
+    expect(faceShadeFactor(face.cx, face.cy - 60, 10, face)).toBeCloseTo(1);
+  });
+  it('가까워질수록 줄어들기만 하고, 큰 자국은 더 멀리서부터 옅어진다', () => {
+    let prev = 1;
+    for (let y = face.cy + 60; y >= face.cy; y -= 2) {
+      const f = faceShadeFactor(face.cx, y, 14, face);
+      expect(f).toBeLessThanOrEqual(prev + 1e-9);
+      prev = f;
+    }
+    expect(faceShadeFactor(face.cx, face.cy + 30, 24, face)).toBeLessThan(faceShadeFactor(face.cx, face.cy + 30, 9, face));
+  });
+  it('NaN 이면 그늘을 줄이지 않는다', () => {
+    expect(faceShadeFactor(Number.NaN, Number.NaN, Number.NaN, face)).toBeCloseTo(1);
+  });
+});
+

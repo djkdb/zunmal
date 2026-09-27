@@ -41,7 +41,29 @@ export const SURFACE_TUNING = {
   waveRestAmp: 0.03,
   /** 목: 가장 잘록할 때 옆 두께를 이만큼 줄인다 */
   neckMax: 0.3,
+  /** 얼굴(눈·입) 위에서는 자국 그늘을 이만큼만 남긴다 — 눈을 누르고 있어도 얼굴이 보이게 */
+  faceShadeKeep: 0.2,
 } as const;
+
+// ── 얼굴 비켜 가기 ─────────────────────────────────────────
+
+/** 몸 그림(SVG 단위)에서 얼굴 타원 — 3D 셰이더의 uFaceUv·uFaceR 과 같은 자리 */
+export function faceEllipse(shape: { faceY: number; eyeGap: number }): { cx: number; cy: number; rx: number; ry: number } {
+  return { cx: 60, cy: shape.faceY + 3, rx: shape.eyeGap + 17, ry: 17 };
+}
+
+/**
+ * 자국 그늘 세기 배수 (faceShadeKeep..1). 자국이 얼굴에 걸칠수록 옅게 — 몸은 눌려도 눈은 가리지 않는다.
+ * (x, y) = 자국 가운데, dentR = 자국 반지름 (모두 몸 그림 단위). 자국 둘레가 얼굴에 닿기 시작하면 옅어진다.
+ */
+export function faceShadeFactor(x: number, y: number, dentR: number, face: { cx: number; cy: number; rx: number; ry: number }): number {
+  const r = Math.max(0, finite(dentR, 0));
+  const rx = Math.max(1, face.rx + r * 0.8);
+  const ry = Math.max(1, face.ry + r * 0.8);
+  const d = Math.hypot((finite(x, 1e6) - face.cx) / rx, (finite(y, 1e6) - face.cy) / ry);
+  const keep = SURFACE_TUNING.faceShadeKeep;
+  return keep + (1 - keep) * smoothstep(0.55, 1.05, d);
+}
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;

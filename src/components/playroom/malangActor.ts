@@ -18,7 +18,15 @@ import type { Character } from '../../data/characters';
 import type { FillingSpec, MaterialSpec } from '../../data/materials';
 import { createFill, isFillAtRest, stepFill, type FillState } from '../../touch/filling';
 import { createGoo, gooPeelSpeed, stepGoo, type Goo } from '../../touch/goo';
-import { fingerRadius, rippleFront, rippleHeight, stepRipple, SURFACE_TUNING } from '../../touch/surface';
+import {
+  faceEllipse,
+  faceShadeFactor,
+  fingerRadius,
+  rippleFront,
+  rippleHeight,
+  stepRipple,
+  SURFACE_TUNING,
+} from '../../touch/surface';
 import {
   createHapticMemory,
   createSenseMemory,
@@ -76,10 +84,11 @@ import {
   stretchAmount,
   stretchUp,
   tickle,
-  toTransform,
+  toTransform2d,
   wobbleEnergy,
   type TouchState,
-  type Transform,
+  type StretchRoom,
+  type Transform2d,
 } from '../../touch/physics';
 import {
   composePose,
@@ -175,7 +184,8 @@ interface Gesture {
 
 /** 2D 겹 그림용 표면 (스프라이트 상자 비율 0..1) */
 export interface Surface2d {
-  dent: { x: number; y: number; r: number; depth: number; crease: number } | null;
+  /** shade = 그늘 세기 배수 (얼굴 위에서는 옅게 — `faceShadeFactor`) */
+  dent: { x: number; y: number; r: number; depth: number; crease: number; shade: number } | null;
   ripple: { x: number; y: number; r: number; alpha: number } | null;
 }
 
@@ -883,7 +893,8 @@ export class MalangActor {
         squish.purr();
         this.env.fx()?.react('hearts', 2);
       }
-      if (held > SLEEPY_MS && this.face !== 'sleepy') this.showFace('sleepy');
+      // 녹아내리는 중에만 스르르 졸린 눈 — 녹아내리기가 잠긴 단계에서는 오래 눌러도 기쁜 얼굴 그대로 (눈이 보이게)
+      if (meltBy > 0 && held > SLEEPY_MS && this.face !== 'sleepy') this.showFace('sleepy');
     }
     if (g) this.petNow(now);
 
@@ -981,12 +992,21 @@ export class MalangActor {
       if (depth > 0.02) {
         const geo = this.env.geom();
         const r = fingerRadius(geo && geo.size > 0 ? VIEWBOX.w / geo.size : 0) / VIEWBOX.w;
+        const x = 0.5 + c.x / 2;
+        const y = 0.5 + c.y / 2;
         dent = {
-          x: 0.5 + c.x / 2,
-          y: 0.5 + c.y / 2,
+          x,
+          y,
           r,
           depth,
           crease: skin.crease * Math.max(0, Math.min(1, (depth - 0.5) / 0.4)),
+          // 눈·입 위를 눌러도 얼굴이 보이게 (3D 셰이더도 같은 타원에서 그늘을 줄인다)
+          shade: faceShadeFactor(
+            VIEWBOX.x + x * VIEWBOX.w,
+            VIEWBOX.y + y * VIEWBOX.w,
+            r * VIEWBOX.w,
+            faceEllipse(this.env.shape),
+          ),
         };
       }
     }
@@ -1022,8 +1042,9 @@ export class MalangActor {
     return composePose(this.touch, this.soft, BODY_UNIT);
   }
 
-  transform2d(): Transform {
-    return toTransform(this.touch);
+  /** 2D 대체 화면의 몸 모양 (당긴 쪽으로 길게 늘어난다 — 촉감 한계까지) */
+  transform2d(room?: StretchRoom): Transform2d {
+    return toTransform2d(this.touch, room);
   }
 
   dispose() {

@@ -29,6 +29,12 @@ export interface TouchState {
   lean: Spring;
   offsetX: Spring;
   offsetY: Spring;
+  /**
+   * 당긴 방향·거리 (몸 반지름 단위, y 아래 +). 2D 대체 화면이 당긴 쪽으로 몸을 길게 늘리는 데만 쓴다
+   * (3D 는 softbody 의 softPull 이 같은 일을 한다). 놓으면 다른 스프링처럼 출렁이며 0 으로.
+   */
+  pullX: Spring;
+  pullY: Spring;
   /** 손가락/키로 붙잡고 있는가 */
   held: boolean;
   /** 누른 세기 0..1 (press 에서 설정) */
@@ -91,6 +97,11 @@ export const TUNING = {
   /** 누르기: 최소/최대 눌림 */
   pressMin: 0.12,
   pressMax: 0.34,
+  /**
+   * 기본 꾹 누르기의 가장 깊은 눌림 (위쪽을 눌러도 이 이상은 아님). 녹아내리기(MELT_SQUASH)와 한눈에 구별되게
+   * 충분히 얕다 — 녹아내리기는 애정 5단계에 열리는 반응이라 그 전에는 "꾹 눌렸다"로만 보여야 한다.
+   */
+  pressCap: 0.3,
   /** 늘리기 한계 (soft limit) */
   stretchUpMax: 0.5,
   stretchDownMax: 0.3,
@@ -140,6 +151,8 @@ export function createTouchState(options: { reducedMotion?: boolean; feel?: Mate
     lean: spring(),
     offsetX: spring(),
     offsetY: spring(),
+    pullX: spring(),
+    pullY: spring(),
     held: false,
     pressure: 0,
     pressX: 0,
@@ -187,10 +200,12 @@ export function press(state: TouchState, point: { x: number; y: number }, pressu
     pressure: p,
     pressX: px,
     pressY: py,
-    squash: withTarget(state.squash, pressSquash(p) * topFactor),
+    squash: withTarget(state.squash, Math.min(TUNING.pressCap, pressSquash(p) * topFactor)),
     lean: withTarget(state.lean, -px * 0.14 * (0.5 + p)),
     offsetX: withTarget(state.offsetX, 0),
     offsetY: withTarget(state.offsetY, 0),
+    pullX: withTarget(state.pullX, 0),
+    pullY: withTarget(state.pullY, 0),
   };
 }
 
@@ -216,6 +231,8 @@ export function drag(state: TouchState, displacement: { x: number; y: number }):
     lean: withTarget(state.lean, softLimit(dx * 0.55, TUNING.leanMax * stretchScale(f, 0.6))),
     offsetX: withTarget(state.offsetX, softLimit(dx * 0.18, TUNING.offsetMax * stretchScale(f, 0.8))),
     offsetY: withTarget(state.offsetY, 0),
+    pullX: withTarget(state.pullX, Number.isFinite(dx) ? clamp(dx, -PULL_MAX, PULL_MAX) : 0),
+    pullY: withTarget(state.pullY, Number.isFinite(dy) ? clamp(dy, -PULL_MAX, PULL_MAX) : 0),
   };
 }
 
@@ -234,6 +251,8 @@ export function release(state: TouchState): TouchState {
     lean: kick(withTarget(state.lean, 0), -state.lean.x * snap),
     offsetX: withTarget(state.offsetX, 0),
     offsetY: withTarget(state.offsetY, 0),
+    pullX: kick(withTarget(state.pullX, 0), -state.pullX.x * snap),
+    pullY: kick(withTarget(state.pullY, 0), -state.pullY.x * snap),
   };
 }
 
@@ -278,8 +297,10 @@ export function impact(state: TouchState, dirX: number, strength: number): Touch
   };
 }
 
-/** 녹아내렸을 때 눌림 (가장 납작한 쉬는 자세) */
-export const MELT_SQUASH = 0.46;
+/** 녹아내렸을 때 눌림 (가장 납작한 쉬는 자세) — 기본 꾹 누르기(TUNING.pressCap)보다 한눈에 납작하다 */
+export const MELT_SQUASH = 0.5;
+/** 당김 기록 한계 (몸 반지름 단위) — 2D 늘어남은 이보다 먼저 촉감 한계에 닿는다 */
+const PULL_MAX = 4;
 
 /**
  * 오래 누르고 있으면 녹아내린다: amount 0..1 만큼 누름 자세에서 납작하게 퍼진 자세로.
@@ -396,6 +417,8 @@ export function step(state: TouchState, dtMs: number): TouchState {
     lean: slow ? relaxSpring(state.lean, feel.riseTauMs * 0.6, dt, lean) : lean(),
     offsetX: integrate(state.offsetX, offT, held, r, dt, feel),
     offsetY: integrate(state.offsetY, offT, held, r, dt, feel),
+    pullX: integrate(state.pullX, TUNING.squash, held, r, dt, feel),
+    pullY: integrate(state.pullY, TUNING.squash, held, r, dt, feel),
   };
 }
 
@@ -405,7 +428,14 @@ function springSettled(s: Spring): boolean {
 
 /** 모든 스프링이 목표에 도달해 멈췄는가 (붙잡고 있어도 목표에 도달하면 true) */
 export function isSettled(state: TouchState): boolean {
-  return springSettled(state.squash) && springSettled(state.lean) && springSettled(state.offsetX) && springSettled(state.offsetY);
+  return (
+    springSettled(state.squash) &&
+    springSettled(state.lean) &&
+    springSettled(state.offsetX) &&
+    springSettled(state.offsetY) &&
+    springSettled(state.pullX) &&
+    springSettled(state.pullY)
+  );
 }
 
 /** 쉬는 자세(목표 0)에서 멈췄는가 */
@@ -416,7 +446,9 @@ export function isAtRest(state: TouchState): boolean {
     state.squash.target === state.feel.sag &&
     state.lean.target === 0 &&
     state.offsetX.target === 0 &&
-    state.offsetY.target === 0
+    state.offsetY.target === 0 &&
+    state.pullX.target === 0 &&
+    state.pullY.target === 0
   );
 }
 
@@ -429,6 +461,8 @@ export function snapToTargets(state: TouchState): TouchState {
     lean: snap(state.lean),
     offsetX: snap(state.offsetX),
     offsetY: snap(state.offsetY),
+    pullX: snap(state.pullX),
+    pullY: snap(state.pullY),
   };
 }
 
@@ -452,6 +486,78 @@ export function toTransform(state: TouchState): Transform {
     skewXDeg: (-Math.atan(lean) * 180) / Math.PI,
     translateX: clamp(state.offsetX.x, -0.5, 0.5),
     translateY: clamp(state.offsetY.x, -0.5, 0.5),
+  };
+}
+
+export interface Transform2d extends Transform {
+  /** 당긴 방향 (deg, 화면 좌표: 0 = 오른쪽, 90 = 아래). rotate(axis) scale(along, across) rotate(−axis) */
+  axisDeg: number;
+  /** 당긴 쪽으로 늘어난 배수 (1 = 그대로) */
+  along: number;
+  /** 가로지르는 쪽 배수 (부피를 대략 지켜 가늘어진다) */
+  across: number;
+}
+
+/** 2D 늘어남: 같은 거리를 당겼을 때 늘어나는 빠르기 (당김 1 → 약 +0.5) */
+const PULL_GAIN_2D = 0.55;
+
+/** 촉감별 2D 최대 늘어남 배수 — 기본 말랑 1.6배, 쭉쭉이(stretch 2.5) 2.5배 */
+export function maxStretch2d(feel: MaterialFeel): number {
+  return 1 + 0.6 * Math.max(0.5, Number.isFinite(feel.stretch) ? feel.stretch : 1);
+}
+
+/** 화면 안에 남을 만큼의 늘어남 한계 (배수). x = 옆으로, up = 위로 늘어날 수 있는 배수 */
+export interface StretchRoom {
+  x: number;
+  up: number;
+}
+
+/**
+ * 당긴 방향(axisDeg)으로 화면 안에 남는 가장 큰 늘어남 배수 — 옆·위 한계를 두 반지름으로 한 타원.
+ * 큰 쭉쭉이를 옆으로 끝까지 당겨도 매트 밖으로 나가지 않게 (1 보다 작아지지는 않는다).
+ */
+export function fitStretch(along: number, axisDeg: number, room: StretchRoom): number {
+  const a = Number.isFinite(along) ? along : 1;
+  const rx = Math.max(1, Number.isFinite(room.x) ? room.x : 1);
+  const ry = Math.max(1, Number.isFinite(room.up) ? room.up : 1);
+  const t = ((Number.isFinite(axisDeg) ? axisDeg : 0) * Math.PI) / 180;
+  const c = Math.cos(t);
+  const sn = Math.sin(t);
+  const limit = 1 / Math.sqrt((c * c) / (rx * rx) + (sn * sn) / (ry * ry));
+  return Math.max(1, Math.min(a, limit));
+}
+
+/**
+ * 2D 대체 화면의 몸 모양: toTransform + 당긴 쪽으로 길게 늘리기.
+ * 예전에는 옆으로 당기면 기울기(skew)만 보였다 → 당긴 축을 따라 늘리고(촉감 한계까지) 가로지르는 쪽은 가늘게,
+ * 그만큼 기울기와 세로 늘어남은 덜어낸다 (위로 당길 때 두 번 늘어나지 않게). 아래로 누르며 끄는 것은 예전처럼 눌림만.
+ * 원점은 몸 바닥 가운데 (페이지의 transform-origin) — 바닥은 매트에 붙은 채 늘어난다.
+ */
+export function toTransform2d(state: TouchState, room?: StretchRoom): Transform2d {
+  const f = state.feel;
+  const px = Number.isFinite(state.pullX.x) ? state.pullX.x : 0;
+  // 아래로 당기는 쪽은 눌림(squash)이 맡는다 → 늘림 축에서는 뺀다
+  const py = Math.min(0, Number.isFinite(state.pullY.x) ? state.pullY.x : 0);
+  const dist = Math.hypot(px, py);
+  const ext = softLimit(dist * PULL_GAIN_2D * stretchScale(f, 0.3), maxStretch2d(f) - 1);
+  // 당김이 뚜렷할수록 기울기·세로 늘어남을 방향 늘림으로 바꾼다 (놓고 출렁일 때도 끊기지 않게 부드럽게)
+  const w = clamp(dist / 0.25, 0, 1);
+  const up = Math.max(0, -state.squash.x);
+  const base = toTransform({
+    ...state,
+    squash: { ...state.squash, x: state.squash.x + up * w },
+    lean: { ...state.lean, x: state.lean.x * (1 - 0.75 * w) },
+  });
+  const axisDeg = dist > 1e-6 ? (Math.atan2(py, px) * 180) / Math.PI : 0;
+  const along = room ? fitStretch(1 + ext, axisDeg, room) : 1 + ext;
+  // 옆으로 당기면 반대쪽 옆구리는 덜 움직인다 — 늘어난 만큼 몸이 당긴 쪽으로 조금 옮겨 간다
+  const ux = dist > 1e-6 ? px / dist : 0;
+  return {
+    ...base,
+    translateX: base.translateX + ux * (along - 1) * 0.3,
+    axisDeg,
+    along,
+    across: 1 / Math.sqrt(along),
   };
 }
 

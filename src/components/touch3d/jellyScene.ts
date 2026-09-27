@@ -602,10 +602,15 @@ function jellyMaterial(map: Texture, u: JellyUniforms, iridescence: number, look
         float tl = uLook.x;
         // 정면은 그림 색을 지킨다 (얼굴·무늬가 또렷하게)
         outgoingLight = mix(outgoingLight, diffuseColor.rgb * 0.92 + 0.01, uLook.z * nv * nv);
+        // 얼굴(눈·입) 위에서는 자국·손가락 그늘을 옅게 — 눈 위를 꾹 눌러도 얼굴이 보인다 (touch/surface.ts faceShadeFactor 와 같은 뜻)
+        float faceKeep = 1.0;
+        #ifdef USE_MAP
+          faceKeep = mix(${SURFACE_TUNING.faceShadeKeep.toFixed(2)}, 1.0, smoothstep(0.7, 1.25, length((vMapUv - uFaceUv) / uFaceR)));
+        #endif
         // 자국 바닥: 회색이 아니라 몸색 쪽으로 짙어진다 (실제 실리콘 자국처럼)
-        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.75 + 0.05, vDent * 0.6);
+        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.75 + 0.05, vDent * 0.6 * faceKeep);
         // 손가락 아래: 살짝 그늘 (몸색 쪽으로)
-        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.7 + 0.08, uSkin.z * vContact * 0.55);
+        outgoingLight *= mix(vec3(1.0), diffuseColor.rgb * 0.7 + 0.08, uSkin.z * vContact * 0.55 * faceKeep);
         // 속 비침 (2): 두꺼운 가운데는 색이 진하고 맑게 (몸색을 한 번 더 곱한다)
         float thick = nv * mix(0.55, 1.0, vFront);
         outgoingLight = mix(outgoingLight, outgoingLight * (diffuseColor.rgb * 1.1 + 0.02), tl * thick * 0.7);
