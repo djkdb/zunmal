@@ -6,13 +6,13 @@ import { RarityBadge } from '../components/RarityBadge';
 import { DailyMissions } from '../components/DailyMissions';
 import { InstallCard } from '../components/InstallCard';
 import { CouponBox } from '../components/CouponBox';
-import { CapsuleIcon, GiftIcon, JoystickIcon, TapIcon } from '../components/icons';
+import { CapsuleIcon, JoystickIcon, TapIcon } from '../components/icons';
+import { GiftBringer, type GiftPhase } from '../components/home/GiftBringer';
 import { GoalCard } from '../components/home/GoalCard';
 import { HubStatus } from '../components/home/HubStatus';
 import { TodayStrip } from '../components/home/TodayStrip';
 import { useHub } from '../components/home/useHub';
 import { ShopCard } from '../components/shop/ShopCard';
-import { giftCoins } from '../economy/gift';
 import { josa } from '../lib/josa';
 import { clearPendingCoupon, usePendingCoupon } from '../app/couponLink';
 import { checkCoupon } from '../economy/coupons';
@@ -65,21 +65,20 @@ function GiftBubble({ code, onDone }: { code: string; onDone(text: string): void
 }
 
 /**
- * 하루 한 번 말랑 선물: 파트너 말풍선 자리에 "○○가 선물을 가져왔어요" + 열기.
- * 누르면 상자가 폭 열리고 코인이 위 코인 알약으로 날아간다. ref 로 바로 잠가 두 번 받지 않는다.
+ * 하루 한 번 말랑 선물 열기. 말풍선의 "열기"와 무대 위 상자가 같은 함수를 쓴다.
+ * 누르면 상자가 폭 열리고(0.36초) 코인이 상자에서 위 코인 알약으로 날아간다. ref 로 바로 잠가 두 번 받지 않는다.
  */
-function DailyGiftBubble({ giverId, onDone }: { giverId: string; onDone(text: string): void }) {
+function useDailyGiftOpen(onDone: (text: string) => void) {
   const claimGift = useGameStore((s) => s.claimGift);
-  const giver = getCharacter(giverId);
-  const coins = giftCoins(useGameStore((s) => s.affection[giverId] ?? 0));
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const lockRef = useRef(false);
-  const [opening, setOpening] = useState(false);
-  if (!giver) return null;
-  const open = () => {
+  const boxRef = useRef<HTMLButtonElement>(null);
+  const [phase, setPhase] = useState<GiftPhase>('waiting');
+  const [giverShown, setGiverShown] = useState<string | null>(null);
+  const open = (giverId: string, fallback: Element | null) => {
     if (lockRef.current) return;
     lockRef.current = true;
-    setOpening(true);
+    setGiverShown(giverId);
+    setPhase('opening');
     sfx.capsuleOpen();
     haptic('success');
     // 상자가 열리는 순간(0.36초 뒤)에 받는다 — 움직임 줄이기면 바로
@@ -87,30 +86,46 @@ function DailyGiftBubble({ giverId, onDone }: { giverId: string; onDone(text: st
     window.setTimeout(
       () => {
         const res = claimGift();
+        setPhase('opened');
         if (!res.ok) {
           onDone('선물은 내일 또 가져올게요');
           return;
         }
         sfx.coin();
         sfx.success();
-        if (buttonRef.current) flyCoins(buttonRef.current, res.coins);
-        onDone(`선물 ${res.coins}코인을 받았어요!`);
+        const from = boxRef.current ?? fallback;
+        if (from) flyCoins(from, res.coins);
+        const giver = getCharacter(res.giverId);
+        onDone(giver ? `${giver.name}의 선물 ${res.coins}코인을 받았어요!` : `선물 ${res.coins}코인을 받았어요!`);
       },
       reduced ? 0 : 360,
     );
   };
+  /** 받은 뒤 한 줄이 사라질 때 무대에서 내려간다 */
+  const reset = () => {
+    setGiverShown(null);
+    setPhase('waiting');
+    lockRef.current = false;
+  };
+  return { open, reset, phase, giverShown, boxRef };
+}
+
+/**
+ * 하루 한 번 말랑 선물 말풍선: "○○가 선물을 가져왔어요" + 열기. 가져온 말랑이는 무대 위에 상자를 들고 서 있다(GiftBringer).
+ */
+function DailyGiftBubble({ giverId, coins, onOpen }: { giverId: string; coins: number; onOpen(button: HTMLButtonElement | null): void }) {
+  const giver = getCharacter(giverId);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  if (!giver) return null;
   return (
-    <div className={`home__bubble home__daily-gift${opening ? ' is-opening' : ''}`} role="status">
-      <span className="home__daily-gift-box" aria-hidden="true">
-        <GiftIcon size={30} />
-      </span>
+    <div className="home__bubble home__daily-gift" role="status">
       <span className="home__gift-text">{josa(giver.name, '이/가')} 선물을 가져왔어요</span>
       <button
         ref={buttonRef}
         id="home-gift-open"
         type="button"
         className="btn btn--primary btn--small home__gift-btn"
-        onClick={open}
+        onClick={() => onOpen(buttonRef.current)}
         aria-label={`선물 열기, ${coins}코인`}
       >
         열기
@@ -138,6 +153,7 @@ export function HomePage() {
   }, [giftUsed]);
   const [giftDone, setGiftDone] = useState<string | null>(null);
   const dailyGiver = hub.gift.available ? hub.gift.giver : null;
+  const gift = useDailyGiftOpen(setGiftDone);
   const showCoupon = !!pendingCoupon && giftReady;
   // 파트너는 한 번에 말풍선 하나만: 선물 쿠폰 > 말랑 선물 > (받은 뒤 한 줄) > "꾹 눌러 봐요" > 인사
   const showDailyGift = !showCoupon && !giftDone && dailyGiver !== null;
@@ -145,9 +161,15 @@ export function HomePage() {
   const touchHint = !hub.petted && !showCoupon && !showDailyGift && !giftDone;
   useEffect(() => {
     if (!giftDone) return;
-    const t = window.setTimeout(() => setGiftDone(null), 3200);
+    const t = window.setTimeout(() => {
+      setGiftDone(null);
+      gift.reset();
+    }, 3200);
     return () => window.clearTimeout(t);
   }, [giftDone]);
+  // 무대 위 선물 말랑이: 선물이 와 있거나 방금 열었을 때
+  const bringerId = showCoupon ? null : (gift.giverShown ?? (showDailyGift ? dailyGiver : null));
+  const bringer = bringerId ? getCharacter(bringerId) : undefined;
 
   // 다음 목표: 말풍선이 이미 말랑 선물을 보여 주면 카드는 그다음 할 일을 보여 준다
   const goal = nextGoal(hub, showDailyGift ? ['gift'] : []);
@@ -168,7 +190,7 @@ export function HomePage() {
           {showCoupon && pendingCoupon ? (
             <GiftBubble code={pendingCoupon} onDone={setGiftDone} />
           ) : showDailyGift && dailyGiver ? (
-            <DailyGiftBubble giverId={dailyGiver} onDone={setGiftDone} />
+            <DailyGiftBubble giverId={dailyGiver} coins={hub.gift.coins} onOpen={(btn) => gift.open(dailyGiver, btn)} />
           ) : giftDone ? (
             <p className="home__bubble" role="status">
               {giftDone}
@@ -176,31 +198,43 @@ export function HomePage() {
           ) : touchHint ? null : (
             <p className="home__bubble">{greetingFor(hub.dailyLeft, bonus, hub.firstDay)}</p>
           )}
-          <Link
-            to="/touch"
-            className={`home__partner${touchHint ? ' has-hint' : ''}`}
-            aria-label={`말랑이 만지러 가기, ${partner.name}`}
-            onClick={() => sfx.button()}
-          >
-            <Malang
-              character={partner}
-              size={190}
-              animation="idle"
-              decorative
-              aura="auto"
-              shiny={partnerShiny && (owned[partner.id]?.shinyCount ?? 0) > 0}
-            />
-            {touchHint && (
-              <>
-                <span className="home__touch-bubble" aria-hidden="true">
-                  꾹 눌러 봐요
-                </span>
-                <span className="home__touch-finger" aria-hidden="true">
-                  <TapIcon size={34} />
-                </span>
-              </>
+          <div className="home__duo">
+            <Link
+              to="/touch"
+              className={`home__partner${touchHint ? ' has-hint' : ''}`}
+              aria-label={`말랑이 만지러 가기, ${partner.name}`}
+              onClick={() => sfx.button()}
+            >
+              <Malang
+                character={partner}
+                size={190}
+                animation="idle"
+                decorative
+                aura="auto"
+                shiny={partnerShiny && (owned[partner.id]?.shinyCount ?? 0) > 0}
+              />
+              {touchHint && (
+                <>
+                  <span className="home__touch-bubble" aria-hidden="true">
+                    꾹 눌러 봐요
+                  </span>
+                  <span className="home__touch-finger" aria-hidden="true">
+                    <TapIcon size={34} />
+                  </span>
+                </>
+              )}
+            </Link>
+            {bringer && (
+              <GiftBringer
+                ref={gift.boxRef}
+                giver={bringer}
+                isPartner={bringer.id === partner.id}
+                shiny={bringer.id === partner.id ? false : (owned[bringer.id]?.shinyCount ?? 0) > 0}
+                phase={gift.phase}
+                onOpen={() => gift.open(bringer.id, null)}
+              />
             )}
-          </Link>
+          </div>
           <div className="home__pedestal" aria-hidden="true" />
           <p className="home__name">
             {partner.name} <RarityBadge rarity={partner.rarity} compact />

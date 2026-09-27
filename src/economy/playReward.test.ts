@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { COINS_PER_PLAY_MINUTE, DAILY_CAP, GAME_MULTIPLIERS, GAME_PLAY_SECONDS, GAME_TYPICAL_SCORES } from './config';
+import {
+  COINS_PER_PLAY_MINUTE,
+  DAILY_CAP,
+  GAME_MULTIPLIERS,
+  GAME_PLAY_SECONDS,
+  GAME_TYPICAL_SCORES,
+  GIFT_COINS,
+  MISSION_REWARD_COINS,
+  PULL_PRICE,
+  SHOP_EXPECTED_HOURS_PER_DAY,
+  SHOP_RATE_PER_HOUR,
+} from './config';
 import { seoulDateKey } from './daily';
 import { computeReward, gameCap, playMinutes, targetCoinsPerPlay } from './economy';
 import {
@@ -68,13 +79,16 @@ describe('보통 점수', () => {
     }
   });
 
-  it('보통 날(미니게임 15분 + 미션 + 가게 + 선물)이면 10연 뽑기까지 이틀이 넘지 않는다', () => {
-    const games = 15 * COINS_PER_PLAY_MINUTE;
-    const missionsHalf = 50 + 80; // 쉬움·보통만
-    const shopStarter = 150; // 일반 직원 하나, 하루 16시간
-    const gift = 60;
-    expect(games + missionsHalf + shopStarter + gift).toBeGreaterThanOrEqual(1000 / 2);
-    expect(games).toBeLessThan(DAILY_CAP);
+  it('보통 날(미니게임 15분 + 미션 + 가게 + 선물)이면 10연 뽑기를 하루에, 가볍게 해도 이틀에', () => {
+    const shopStarter = SHOP_RATE_PER_HOUR.common * SHOP_EXPECTED_HOURS_PER_DAY; // 일반 직원 하나
+    const gift = GIFT_COINS.base + GIFT_COINS.perLevel; // 1단계
+    const missions = MISSION_REWARD_COINS.easy + MISSION_REWARD_COINS.normal; // 쉬움·보통만
+    const normalDay = 15 * COINS_PER_PLAY_MINUTE + missions + shopStarter + gift;
+    expect(normalDay).toBeGreaterThanOrEqual(PULL_PRICE.multi);
+    const lightDay = 5 * COINS_PER_PLAY_MINUTE + shopStarter + gift; // 미니게임 5분, 미션 없음
+    expect(2 * lightDay).toBeGreaterThanOrEqual(PULL_PRICE.multi);
+    // 미니게임만으로는 일일 상한(약 33분)에 닿기 전까지
+    expect(15 * COINS_PER_PLAY_MINUTE).toBeLessThan(DAILY_CAP);
   });
 
   it('모르는 게임도 보통 점수가 있다', () => {

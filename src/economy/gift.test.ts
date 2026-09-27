@@ -21,7 +21,9 @@ describe('말랑 선물', () => {
     expect(giftGiver({ unboxed: [], affection: {}, partnerId: null })).toBeNull();
   });
 
-  it('코인 = 기본 + 단계 × 10, 최대 120', () => {
+  it('코인 = 기본 60 + 단계 × 15, 최대 195', () => {
+    expect(GIFT_COINS).toEqual({ base: 60, perLevel: 15, max: 195 });
+    expect(giftCoins(0)).toBe(75);
     expect(giftCoins(0)).toBe(GIFT_COINS.base + GIFT_COINS.perLevel);
     expect(giftCoins(AFFECTION_PER_LEVEL * 3)).toBe(GIFT_COINS.base + 4 * GIFT_COINS.perLevel);
     expect(giftCoins(99_999)).toBe(GIFT_COINS.max);

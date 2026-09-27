@@ -79,7 +79,7 @@ describe('affectionProgress', () => {
 
 describe('perkLines', () => {
   it('반응 → 가게 → 선물 순 짧은 줄', () => {
-    expect(perkLines(levelUpPerks(5)).map((l) => l.text)).toEqual(['새 반응 녹아내리기', '가게 보너스 +20%', '선물 +10코인']);
+    expect(perkLines(levelUpPerks(5)).map((l) => l.text)).toEqual(['새 반응 녹아내리기', '가게 보너스 +20%', '선물 +15코인']);
     expect(perkLines(levelUpPerks(5))[0]?.howTo).toBe(REACTION_UNLOCKS.find((r) => r.level === 5)?.howTo);
   });
   it('반응이 없는 단계는 선물만, 끝난 뒤에는 없음', () => {

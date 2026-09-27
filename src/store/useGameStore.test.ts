@@ -464,8 +464,9 @@ describe('디저트 가게 / 말랑 선물', () => {
     store.setState({ affection: { 'peach-mochi': 120 } });
     const coins = store.getState().coins;
     const next = new Date(T0.getTime() + 24 * H);
-    expect(store.getState().claimGift(next)).toEqual({ ok: true, coins: 60, giverId: 'peach-mochi' });
-    expect(store.getState().coins).toBe(coins + 60);
+    // 애정 120 = 3단계 → 60 + 3 × 15
+    expect(store.getState().claimGift(next)).toEqual({ ok: true, coins: 105, giverId: 'peach-mochi' });
+    expect(store.getState().coins).toBe(coins + 105);
     expect(store.getState().claimGift(next)).toEqual({ ok: false });
   });
 });
