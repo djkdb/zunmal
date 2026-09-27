@@ -1361,3 +1361,29 @@
   opacity: 0.8;
   animation: holo 1.8s ease-in-out infinite;
 }
+
+/* 촉감: 10연 카드는 안쪽 위 왼쪽에 작은 그림만 (이름은 카드 이름표가 읽어 준다) */
+.pull-card .pull-card__material {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+}
+
+.pull-card .pull-card__material svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* 1회 캡슐(머신이 열지 않은 경우의 대체)도 윗뚜껑은 등급 색 — 회색 빈 캡슐로 보이지 않게 */
+.pull-bigcap .pull-capsule__top {
+  fill: var(--r);
+}
+
+/* 좁은 10연 카드: 중복 코인 딱지를 조금 좁혀 왼쪽 촉감 그림과 겹치지 않게 */
+.pull-card .pull-tag--dup {
+  right: 2px;
+  padding: 0 4px 0 3px;
+}

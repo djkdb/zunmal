@@ -2,15 +2,17 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, ty
 import { Link } from 'react-router-dom';
 import { playRarityFanfare, sfx } from '../audio/sfx';
 import { CHARACTERS } from '../data/characters';
+import { MATERIAL_LABELS, materialIdFor } from '../data/materialIds';
 import { GACHA_RULES, RARITY_META, rarityRank, type Rarity } from '../data/rarity';
 import { PULL_COUNT, PULL_PRICE } from '../economy/config';
 import { coinsNeededForPull, type PullKind } from '../economy/economy';
 import type { ResolvedPull } from '../gacha/engine';
 import { releaseDeferredCoins } from '../lib/coinFx';
-import { pullShareContent } from '../lib/share';
+import { pullShareContent, shareCardText } from '../lib/share';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { CapsuleIcon, CapsuleStackIcon, CoinIcon, JoystickIcon, PetIcon } from './icons';
 import { Malang } from './Malang';
+import { MaterialTag } from './MaterialTag';
 import { Modal } from './Modal';
 import { buzz } from './pullHaptics';
 import {
@@ -28,15 +30,20 @@ import {
   type CardPhase,
 } from './pullReveal';
 import { RarityBadge } from './RarityBadge';
-import { ShareButton } from './ShareButton';
+import { ShareButton, type ShareCardSpec } from './ShareButton';
 import './PullResult.css';
 
 interface PullResultProps {
   items: readonly ResolvedPull[];
   totalRefund: number;
   onClose(): void;
-  /** 전체 화면 연출(신화 이상)로 이미 보여 준 결과의 위치. 이 카드는 처음부터 앞면이고 결과음도 생략한다. */
+  /**
+   * 이미 보여 준 결과의 위치 — 이 카드는 처음부터 앞면이다.
+   * 전체 화면 연출(신화 이상)이 보여 줬으면 결과음·번쩍도 생략하고, 머신 캡슐을 눌러 연 1회(`seenByMachine`)면 창이 뜨며 낸다.
+   */
   seenIndex?: number;
+  /** seenIndex 카드를 머신 캡슐이 열었다 (1회 뽑기): 결과음·빛 조각·전설 번쩍을 창이 뜰 때 낸다 */
+  seenByMachine?: boolean;
   /** 방금 뽑은 방식 — "다시 뽑기"는 같은 방식으로 */
   kind: PullKind;
   /** 다시 뽑기 버튼용 현재 코인 */
@@ -86,10 +93,11 @@ function OwnershipTag({ item, compact = false }: { item: ResolvedPull; compact?:
   );
 }
 
-/** 열린 카드의 스크린리더 이름: "해파리 말랑, 레어, 새 말랑이" */
+/** 열린 카드의 스크린리더 이름: "해파리 말랑, 레어, 찐득이, 새 말랑이" */
 function describe(item: ResolvedPull): string {
   const own = item.isNewShiny ? '새 반짝 말랑이' : item.isNew ? '새 말랑이' : `이미 있어서 ${item.refund}코인 돌려받음`;
-  return `${item.shiny ? '반짝 ' : ''}${item.character.name}, ${RARITY_META[item.rarity].label}, ${own}`;
+  const feel = MATERIAL_LABELS[materialIdFor(item.character.id)];
+  return `${item.shiny ? '반짝 ' : ''}${item.character.name}, ${RARITY_META[item.rarity].label}, ${feel}, ${own}`;
 }
 
 function Burst({ rarity }: { rarity: Rarity }) {
@@ -104,7 +112,7 @@ function Burst({ rarity }: { rarity: Rarity }) {
   );
 }
 
-/** 캡슐 뒷면: 모두 같은 크림색. 누르면(모으기) 등급 색으로 물든다 */
+/** 캡슐 뒷면: 윗뚜껑이 등급 색 (캡슐 머신과 같은 색 — CSS `--r`). 누르면(모으기) 빛나며 떨린다 */
 function CapsuleBack() {
   return (
     <svg className="pull-capsule" viewBox="-20 -20 40 40" aria-hidden="true" focusable="false">
@@ -167,22 +175,26 @@ function PullCard({
             <CapsuleBack />
             <RarityBadge rarity={item.rarity} compact />
           </span>
-          <span className="pull-card__face" aria-hidden="true">
-            <span className="pull-card__art">
-              <Malang
-                character={item.character}
-                size={96}
-                animation="none"
-                decorative
-                shiny={item.shiny}
-                poke={poke}
-                className="pull-card__malang"
-              />
+          {/* 열기 전에는 앞면(이름·그림)을 그리지 않는다 — 스크린리더·DOM 에 결과가 미리 새지 않게 */}
+          {phase !== 'back' && (
+            <span className="pull-card__face" aria-hidden="true">
+              <span className="pull-card__art">
+                <Malang
+                  character={item.character}
+                  size={96}
+                  animation="none"
+                  decorative
+                  shiny={item.shiny}
+                  poke={poke}
+                  className="pull-card__malang"
+                />
+              </span>
+              <span className="pull-card__name">{item.character.name}</span>
+              <RarityBadge rarity={item.rarity} compact />
+              <OwnershipTag item={item} compact />
+              <MaterialTag characterId={item.character.id} variant="icon" decorative className="pull-card__material" />
             </span>
-            <span className="pull-card__name">{item.character.name}</span>
-            <RarityBadge rarity={item.rarity} compact />
-            <OwnershipTag item={item} compact />
-          </span>
+          )}
         </span>
       </button>
       {face && item.shiny && !best && <ShinyTag className="pull-card__shiny" />}
@@ -305,6 +317,7 @@ function ResultActions({
   newItem,
   newCount,
   share,
+  shareCard,
   onPullAgain,
   onClose,
   closeRef,
@@ -314,6 +327,8 @@ function ResultActions({
   newItem: ResolvedPull | undefined;
   newCount: number;
   share: (() => ReturnType<typeof pullShareContent>) | null;
+  /** 자랑 카드 그림에 넣을 말랑이 (자랑할 결과) */
+  shareCard: ShareCardSpec | undefined;
   onPullAgain(kind: PullKind): void;
   onClose(): void;
   closeRef: RefObject<HTMLButtonElement | null>;
@@ -333,7 +348,9 @@ function ResultActions({
       {newItem ? (
         <>
           <p className="pull-cta__note">
-            {newCount > 1 ? `새 말랑이 ${newCount}마리가` : '새 말랑이는'} 놀이방에서 캡슐째 기다려요
+            {newCount > 1
+              ? `새 말랑이 ${newCount}마리는 놀이방에서 직접 까 보세요`
+              : '새 말랑이는 캡슐째 기다려요. 놀이방에서 직접 까 보세요'}
           </p>
           <Link
             to={`/touch/${newItem.character.id}`}
@@ -372,7 +389,7 @@ function ResultActions({
             {price.toLocaleString()}
           </span>
         </button>
-        {share && <ShareButton content={share} squeeze />}
+        {share && <ShareButton content={share} card={shareCard} squeeze />}
         <button ref={closeRef} type="button" className="btn btn--small btn--secondary pull-cta__close" onClick={onClose}>
           닫기
         </button>
@@ -410,6 +427,7 @@ function SingleResult({ item, animate }: { item: ResolvedPull; animate: boolean 
       <div className="pull-single__badges">
         {item.shiny && <ShinyTag />}
         <RarityBadge rarity={item.rarity} />
+        <MaterialTag characterId={item.character.id} />
         <OwnershipTag item={item} />
         {item.byPity && <span className="pull-tag pull-tag--note">천장 확정</span>}
       </div>
@@ -446,6 +464,7 @@ export function PullResult({
   totalRefund,
   onClose,
   seenIndex,
+  seenByMachine = false,
   kind,
   coins,
   ownedCount,
@@ -465,7 +484,8 @@ export function PullResult({
   const [pokes, setPokes] = useState<number[]>(() => Array<number>(n).fill(0));
   const [flash, setFlash] = useState<{ key: number; rarity: Rarity } | null>(null);
   const [announce, setAnnounce] = useState('');
-  const fanfareDone = useRef(seenIndex === summary.bestIndex);
+  // 전체 화면 연출이 이미 결과음을 냈으면 생략. 머신 캡슐로 연 1회는 창이 뜨며 낸다(다 열린 채 시작 → 아래 done 효과)
+  const fanfareDone = useRef(seenIndex === summary.bestIndex && !seenByMachine);
   const openAllRequested = useRef(false);
   const escAt = useRef(-Infinity);
   const timers = useRef<number[]>([]);
@@ -477,6 +497,19 @@ export function PullResult({
   useEffect(() => {
     const list = timers.current;
     return () => list.forEach((id) => window.clearTimeout(id));
+  }, []);
+
+  // 머신 캡슐을 눌러 바로 연 1회: 카드를 뒤집을 때와 같은 알림·번쩍·진동 (결과음은 done 효과가)
+  useEffect(() => {
+    if (!seenByMachine || seenIndex === undefined) return;
+    const item = items[seenIndex];
+    if (!item) return;
+    setAnnounce(describe(item));
+    if (item.shiny && seenIndex !== summary.bestIndex) sfx.shinyChime();
+    if (rarityRank(item.rarity) >= rarityRank('legendary')) {
+      setFlash({ key: seenIndex, rarity: item.rarity });
+      buzz([20, 40, 36], reduced);
+    }
   }, []);
 
   const later = (ms: number, fn: () => void) => {
@@ -638,7 +671,7 @@ export function PullResult({
         </div>
         {single ? (
           phases[0] === 'face' ? (
-            <SingleResult item={single} animate={!reduced && seenIndex !== 0} />
+            <SingleResult item={single} animate={!reduced && (seenIndex !== 0 || seenByMachine)} />
           ) : (
             <SingleCapsule item={single} phase={phases[0] ?? 'back'} onPress={() => pressCard(0)} />
           )
@@ -675,6 +708,19 @@ export function PullResult({
                 newItem={newItem}
                 newCount={summary.newCount}
                 share={share}
+                shareCard={
+                  shareItem && {
+                    character: shareItem.character,
+                    shiny: shareItem.shiny,
+                    text: shareCardText({
+                      kind: 'pull',
+                      id: shareItem.character.id,
+                      name: shareItem.character.name,
+                      shiny: shareItem.shiny,
+                      isNew: shareItem.isNew || shareItem.isNewShiny,
+                    }),
+                  }
+                }
                 onPullAgain={onPullAgain}
                 onClose={onClose}
                 closeRef={closeRef}
