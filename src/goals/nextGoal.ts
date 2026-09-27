@@ -7,8 +7,8 @@
  * | # | kind | 언제 | 버튼 |
  * |---|---|---|---|
  * | 1 | gift | 오늘 말랑 선물이 왔다 | 열기 (바로 받기) |
- * | 2 | first-run | 첫걸음을 아직 다 안 했다 (`firstRun.ts`) | 단계마다 |
- * | 3 | mission-claim | 받을 미션 보상(또는 올클리어 보너스)이 있다 | 받기 |
+ * | 2 | mission-claim | 받을 미션 보상(또는 올클리어 보너스)이 있다 | 받기 |
+ * | 3 | first-run | 첫걸음을 아직 다 안 했다 (`firstRun.ts`) | 단계마다 |
  * | 4 | set-claim | 다 모으고 아직 안 받은 세트 보상이 있다 | 받기 |
  * | 5 | shop-ready | 가게 코인이 가득 찼거나 충분히 쌓였다 | 받기 |
  * | 6 | sealed | 놀이방 선반에 봉인된 캡슐이 있다 | 열기 → /touch/:id |
@@ -20,7 +20,8 @@
  * | 12 | affection | 파트너의 다음 애정 단계 (파트너가 있으면 늘 있는 마지막 목표) | 만지기 |
  *
  * 공짜로 바로 받는 것(선물·보상)을 먼저, 그다음 새 말랑이를 만나는 일, 그다음 뽑기·코인 모으기 순이다.
- * 첫걸음은 선물 다음 — 처음 온 사람은 흐름대로 따라가는 게 가장 좋다.
+ * 첫걸음은 선물·미션 보상 다음 — 처음 온 사람은 흐름대로 따라가는 게 가장 좋지만, 코인이 떨어진 사람에게 "게임하기"를
+ * 권하면서 이미 받을 수 있는 미션 코인을 숨기면 안 된다(받기는 한 번 누르면 끝나고 곧바로 첫걸음으로 돌아온다).
  */
 import { getCharacter } from '../data/characters';
 import { GACHA_RULES, RARITY_META } from '../data/rarity';
@@ -35,8 +36,8 @@ import type { HubState } from './hubState';
 /** 우선순위 순서 (앞일수록 먼저) */
 export const GOAL_ORDER = [
   'gift',
-  'first-run',
   'mission-claim',
+  'first-run',
   'set-claim',
   'shop-ready',
   'sealed',
@@ -196,11 +197,11 @@ export function goalCandidates(hub: HubState): Goal[] {
     });
   }
 
-  // 2. 첫걸음
+  // 3. 첫걸음
   const first = firstRunGoal(hub, fr);
   if (first) out.push(first);
 
-  // 3. 미션 보상
+  // 2. 미션 보상
   const claimable = hub.missions.claimable[0];
   if (claimable) {
     out.push({

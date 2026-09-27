@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { STARTING_COINS } from '../economy/config';
+import { MISSION_ALL_CLEAR_BONUS, STARTING_COINS } from '../economy/config';
 import { generateDailyMissions } from '../missions/missions';
 import { readHub } from './hubState';
 import { HOUR, NOW, TODAY, YESTERDAY, ownedMap, starterSave } from './testSave';
 import { homeAlerts } from './alerts';
-import { TODAY_ITEMS, todayLoop } from './today';
+import { TODAY_ITEMS, claimableMissionCoins, todayLoop } from './today';
 
 const hub = (patch: Parameters<typeof starterSave>[0] = {}, now = NOW) => readHub(starterSave(patch), now);
 const stateOf = (patch: Parameters<typeof starterSave>[0], id: (typeof TODAY_ITEMS)[number]) =>
@@ -55,6 +55,21 @@ describe('todayLoop', () => {
       'ready',
     );
     expect(stateOf({ missions: { date: TODAY, progress: {}, claimed: list.map((m) => m.id), bonusClaimed: true } }, 'missions')).toBe('done');
+  });
+
+  it('받을 미션 보상이 있으면 칸 이름이 "보상 +N" (받을 코인 합)', () => {
+    const list = generateDailyMissions(TODAY);
+    const first = list[0]!;
+    const h = hub({ missions: { date: TODAY, progress: { [first.kind]: first.target }, claimed: [], bonusClaimed: false } });
+    const cell = todayLoop(h).items.find((i) => i.id === 'missions')!;
+    expect(claimableMissionCoins(h)).toBe(first.reward);
+    expect(cell.label).toBe(`보상 +${first.reward}`);
+    expect(cell.description).toContain(`${first.reward}코인`);
+    // 보너스만 남으면 보너스 코인
+    const bonus = hub({ missions: { date: TODAY, progress: {}, claimed: list.map((m) => m.id), bonusClaimed: false } });
+    expect(todayLoop(bonus).items.find((i) => i.id === 'missions')!.label).toBe(`보상 +${MISSION_ALL_CLEAR_BONUS}`);
+    // 받을 게 없으면 진행 수
+    expect(todayLoop(hub()).items.find((i) => i.id === 'missions')!.label).toMatch(/^미션 \d\/3$/);
   });
 
   it('done 수 세기', () => {

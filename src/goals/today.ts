@@ -7,12 +7,13 @@
  * | 칸 | 했음(done) | 할 수 있음(ready) | 나중(later) |
  * |---|---|---|---|
  * | 선물 | 오늘 받았다(`giftDay` = 오늘, 시작한 날 제외) | 선물이 왔다 | 시작한 날 (첫 선물은 다음 날부터) |
- * | 미션 | 올클리어 보너스까지 받았다 | 받을 보상이 있다 | — |
+ * | 미션 | 올클리어 보너스까지 받았다 | 받을 보상이 있다 — 칸 이름이 "보상 +N"(받을 코인 합) | — |
  * | 가게 | 오늘 한 번 이상 받았다(하루 기록 `shop-claim`) | 받기를 권할 만큼 쌓였다 | — |
  * | 미니게임 | 오늘 한 판 이상 (하루 기록 `play-games`) | — | — |
  * | 뽑기 | 오늘 한 번 이상 (하루 기록 `pull`) | 뽑을 코인이 있다 | — |
  * "ready" 가 "done" 보다 먼저다 (가게를 받았어도 다시 가득 차면 받을 수 있음으로).
  */
+import { MISSION_ALL_CLEAR_BONUS } from '../economy/config';
 import type { HubState } from './hubState';
 
 export const TODAY_ITEMS = ['gift', 'missions', 'shop', 'play', 'pull'] as const;
@@ -48,6 +49,12 @@ function item(id: TodayItemId, state: TodayItemState, label: string): TodayItem 
   return { id, state, label, description: `${label}, ${STATE_TEXT[state]}` };
 }
 
+/** 지금 받을 수 있는 미션 코인 합 (받을 수 있는 미션 보상 + 올클리어 보너스) */
+export function claimableMissionCoins(hub: HubState): number {
+  const { missions } = hub;
+  return missions.claimable.reduce((sum, m) => sum + m.reward, 0) + (missions.bonusReady ? MISSION_ALL_CLEAR_BONUS : 0);
+}
+
 export function todayLoop(hub: HubState): TodayLoop {
   const progress = hub.missions.state.progress;
   const { gift, missions, shop } = hub;
@@ -68,9 +75,20 @@ export function todayLoop(hub: HubState): TodayLoop {
   const playState: TodayItemState = (progress['play-games'] ?? 0) > 0 ? 'done' : 'todo';
   const pullState: TodayItemState = (progress.pull ?? 0) > 0 ? 'done' : hub.canPull ? 'ready' : 'todo';
 
+  const missionCoins = claimableMissionCoins(hub);
+  const missionItem =
+    missionState === 'ready' && missionCoins > 0
+      ? {
+          id: 'missions' as const,
+          state: missionState,
+          label: `보상 +${missionCoins.toLocaleString()}`,
+          description: `미션 받을 보상 ${missionCoins.toLocaleString()}코인, 지금 받을 수 있어요`,
+        }
+      : item('missions', missionState, `미션 ${missions.claimedCount}/${missions.list.length}`);
+
   const items: TodayItem[] = [
     item('gift', giftState, '선물'),
-    item('missions', missionState, `미션 ${missions.claimedCount}/${missions.list.length}`),
+    missionItem,
     item('shop', shopState, '가게'),
     item('play', playState, '미니게임'),
     item('pull', pullState, '뽑기'),

@@ -70,6 +70,20 @@ describe('첫걸음', () => {
 });
 
 describe('받을 것 먼저', () => {
+  it('코인이 떨어졌는데 미션 보상이 있으면 첫걸음(게임하기)보다 받기가 먼저', () => {
+    const m = missions[0]!;
+    const h = hub({
+      coins: 20,
+      totalPulls: 1,
+      unboxed: ['peach-mochi'],
+      missions: { date: TODAY, progress: { [m.kind]: m.target }, claimed: [], bonusClaimed: false },
+    });
+    expect(h.canPull).toBe(false);
+    const list = kinds(h);
+    expect(list).toContain('first-run');
+    expect(nextGoal(h)).toMatchObject({ kind: 'mission-claim', cta: '받기', action: { type: 'claim-mission', id: m.id } });
+  });
+
   it('말랑 선물이 가장 먼저 (시작한 날은 없음)', () => {
     expect(nextGoal(hub({ coins: STARTING_COINS }))?.kind).not.toBe('gift');
     const g = nextGoal(hub({ coins: STARTING_COINS, giftDay: YESTERDAY }));
