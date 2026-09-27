@@ -88,6 +88,31 @@ export interface MaterialLook {
   wet: number;
 }
 
+/**
+ * 표면 질감 — 실제 장난감을 만질 때 보이는 모양 (`touch/surface.ts`·`softbody.ts` 가 3D 로, 2D 겹 그림·입자 캔버스가 흉내 낸다).
+ *  - 손끝 자국: 바닥이 평평하고 벽이 가파른 타원 자국 + 둘레가 살짝 솟은 테 (밀려난 살)
+ *  - 주름: 폼을 깊게 누르면 자국에서 바퀴살처럼 퍼지는 골
+ *  - 물결: 젤리를 놓거나 찌르면 몸을 가로질러 퍼지는 잔물결 (반사도 따라 흔들린다)
+ *  - 목: 쭉쭉이를 당기면 가운데가 가늘어진다 (반사가 늘어난 방향으로 길게 선다)
+ *  - 실: 찐득이를 떼어낼 때 손가락과 몸 사이에 늘어나다 끊어지는 가닥
+ */
+export interface MaterialSkin {
+  /** 자국 둘레 솟은 테 (자국 깊이 대비 0..0.4) */
+  rim: number;
+  /** 자국 바닥 평평함 0..1 (0 = 둥근 그릇, 1 = 손끝처럼 평평한 바닥 + 가파른 벽) */
+  flat: number;
+  /** 깊게 누르면 자국에서 퍼지는 주름 골 0..1 */
+  crease: number;
+  /** 놓거나 찌르면 몸을 가로지르는 물결 0..1 */
+  wave: number;
+  /** 당길 때 가운데가 가늘어지는 정도 0..1 */
+  neck: number;
+  /** 떼어낼 때 늘어나는 실 가닥 수 (0 = 없음) */
+  strands: number;
+  /** 손가락이 닿은 자리가 가려져 어두워지는 정도 0..1 */
+  contactDark: number;
+}
+
 export interface MaterialSpec {
   id: MaterialId;
   /** 표시 이름 */
@@ -102,6 +127,8 @@ export interface MaterialSpec {
   carryFrac: number;
   /** 3D 겉모습 */
   look: MaterialLook;
+  /** 표면 질감 (자국·주름·물결·목·실) */
+  skin: MaterialSkin;
 }
 
 export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
@@ -129,6 +156,8 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
       albedoHold: 0.3,
       wet: 0,
     },
+    // 폼: 손끝 모양 그대로 평평하게 들어가 오래 남고, 깊게 누르면 둘레에 주름 골이 퍼진다
+    skin: { rim: 0.1, flat: 0.85, crease: 1, wave: 0, neck: 0.1, strands: 0, contactDark: 0.35 },
   },
   jelly: {
     id: 'jelly',
@@ -154,6 +183,8 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
       albedoHold: 0.22,
       wet: 0.55,
     },
+    // 구미: 둥글게 들어가 둘레가 불룩, 놓으면 잔물결이 몸을 가로지른다
+    skin: { rim: 0.22, flat: 0.35, crease: 0, wave: 1, neck: 0.15, strands: 0, contactDark: 0.2 },
   },
   stretchy: {
     id: 'stretchy',
@@ -179,6 +210,8 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
       albedoHold: 0.26,
       wet: 0.15,
     },
+    // 실리콘 고무: 당기면 가운데가 잘록해진다
+    skin: { rim: 0.16, flat: 0.55, crease: 0.12, wave: 0.35, neck: 1, strands: 0, contactDark: 0.25 },
   },
   sticky: {
     id: 'sticky',
@@ -204,6 +237,8 @@ export const MATERIALS: Readonly<Record<MaterialId, MaterialSpec>> = {
       albedoHold: 0.2,
       wet: 1,
     },
+    // 슬라임: 둘레가 가장 많이 밀려 솟고, 떼면 실이 늘어난다
+    skin: { rim: 0.3, flat: 0.5, crease: 0, wave: 0.12, neck: 0.45, strands: 5, contactDark: 0.3 },
   },
 };
 

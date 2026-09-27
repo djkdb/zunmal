@@ -13,11 +13,25 @@
  *
  * 촉감(feel): 스프링 강성·감쇠 배수, 당김 한계(쭉쭉이는 훨씬 멀리), 놓을 때 반동, 그리고 슬로우 라이징의
  * 느린 자국 — 놓은 자국은 스프링 대신 지수 곡선으로 천천히 차오른다 (physics.relaxSpring 과 같은 곡선).
+ *
+ * 표면 질감(skin, `touch/surface.ts`): 자국은 손끝 크기의 평평한 타원 + 둘레 테, 폼은 깊게 누르면 주름 골,
+ * 젤리는 놓거나 찌르면 몸을 가로지르는 물결(ripple), 쭉쭉이는 당기면 가운데가 잘록(목).
  */
-import type { MaterialFeel } from '../data/materials';
+import type { MaterialFeel, MaterialSkin } from '../data/materials';
 import type { JellyMesh } from './jellyMesh';
 import { meshVolume } from './jellyMesh';
 import { NEUTRAL_FEEL, relaxSpring, toTransform, type Spring, type TouchState } from './physics';
+import {
+  SURFACE_TUNING,
+  creaseDip,
+  creasePhase,
+  dentProfile,
+  kickRipple,
+  neckSqueeze,
+  rippleAt,
+  stepRipple,
+  type Ripple,
+} from './surface';
 
 export interface Vec3 {
   x: number;
@@ -35,7 +49,14 @@ export interface Dent {
   center: Vec3;
   /** 들어가는 방향 (단위 벡터, 안쪽) */
   dir: Vec3;
+  /** 자국 면의 두 방향 (t1 가로, t2 세로 쪽) — 손끝 타원과 주름 각도 */
+  t1: Vec3;
+  t2: Vec3;
   radius: number;
+  /** 손끝 크기 (누르면 radius 가 여기서 조금 넓어진다) */
+  baseRadius: number;
+  /** 주름 골 위치 */
+  phase: number;
   depth: Spring;
   /** 아직 손가락이 누르고 있는 자국 */
   active: boolean;
@@ -62,6 +83,10 @@ export interface SoftState {
   doze?: boolean;
   /** 촉감 (없으면 기본 말랑) */
   feel?: MaterialFeel;
+  /** 표면 질감 (없으면 예전 둥근 자국, 물결·목·주름 없음) */
+  skin?: MaterialSkin;
+  /** 퍼지는 물결 (젤리) */
+  ripple?: Ripple | null;
 }
 
 /** 변형에 쓰는 전체 자세 */
@@ -146,9 +171,11 @@ function finite(n: number, fallback = 0): number {
 
 // ── 상태 ──────────────────────────────────────────────────
 
-export function createSoftState(options: { reducedMotion?: boolean; feel?: MaterialFeel } = {}): SoftState {
+export function createSoftState(options: { reducedMotion?: boolean; feel?: MaterialFeel; skin?: MaterialSkin } = {}): SoftState {
   return {
     feel: options.feel,
+    skin: options.skin,
+    ripple: null,
     dents: [],
     grab: null,
     pullX: spring(),
@@ -179,27 +206,48 @@ function pushDent(dents: readonly Dent[], dent: Dent): Dent[] {
   return next.slice(-SOFT_TUNING.maxDents);
 }
 
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+
 function makeDent(hit: SoftHit, radius: number): Dent {
   const n = norm(hit.normal);
+  // 자국 면의 가로(t1)·세로(t2): 세로는 몸의 위쪽(y)에 가깝게
+  const up = Math.abs(n.y) > 0.92 ? { x: 0, y: 0, z: 1 } : { x: 0, y: 1, z: 0 };
+  const t1 = norm(cross(up, n));
+  const t2 = norm(cross(n, t1));
   return {
     center: { ...hit.point },
     dir: { x: -n.x, y: -n.y, z: -n.z },
+    t1,
+    t2,
     radius,
+    baseRadius: radius,
+    phase: creasePhase(hit.point.x, hit.point.y),
     depth: spring(),
     active: true,
   };
 }
 
+/** 손끝 크기 → 자국 깊이 배수 (작은 자국은 조금 얕게) */
+function depthScale(baseRadius: number): number {
+  return clamp(baseRadius / SOFT_TUNING.dentRadius, 0.75, 1.15);
+}
+
 // ── 입력 ──────────────────────────────────────────────────
 
-/** 손가락을 댄 순간: 그 자리에 자국을 새로 만든다. */
-export function softTouch(state: SoftState, hit: SoftHit): SoftState {
+/**
+ * 손가락을 댄 순간: 그 자리에 자국을 새로 만든다.
+ * radius = 손끝 크기 (몸 좌표 단위, `surface.fingerRadius`). 없으면 예전 기본 크기.
+ */
+export function softTouch(state: SoftState, hit: SoftHit, radius: number = SOFT_TUNING.dentRadius): SoftState {
+  const r = Number.isFinite(radius) && radius > 0 ? radius : SOFT_TUNING.dentRadius;
   return {
     ...state,
     held: true,
     idleMs: 0,
     grab: { ...hit.point },
-    dents: pushDent(state.dents, makeDent(hit, SOFT_TUNING.dentRadius)),
+    dents: pushDent(state.dents, makeDent(hit, r)),
   };
 }
 
@@ -214,8 +262,8 @@ export function softPress(state: SoftState, pressure: number): SoftState {
       d.active
         ? {
             ...d,
-            radius: SOFT_TUNING.dentRadius + SOFT_TUNING.dentRadiusPress * p,
-            depth: { ...d.depth, target: SOFT_TUNING.dentMax * (0.35 + 0.65 * p) },
+            radius: d.baseRadius * (1 + (state.skin ? SURFACE_TUNING.fingerGrow : SOFT_TUNING.dentRadiusPress / SOFT_TUNING.dentRadius) * p),
+            depth: { ...d.depth, target: SOFT_TUNING.dentMax * (0.35 + 0.65 * p) * depthScale(d.baseRadius) },
           }
         : d,
     ),
@@ -244,19 +292,26 @@ export function softPull(state: SoftState, displacement: { x: number; y: number 
   };
 }
 
-/** 콕 찌르기: 자국이 순간 쑥 들어갔다 튀어나오고 몸이 뒤로 한 번 흔들린다. strength 0..1 */
-export function softPoke(state: SoftState, hit: SoftHit | null, strength: number): SoftState {
+/**
+ * 콕 찌르기: 자국이 순간 쑥 들어갔다 튀어나오고 몸이 뒤로 한 번 흔들린다. strength 0..1.
+ * radius = 손끝 크기 (없으면 기본). 젤리는 찌른 자리에서 물결이 퍼진다.
+ */
+export function softPoke(state: SoftState, hit: SoftHit | null, strength: number, radius?: number): SoftState {
   const s = clamp(finite(strength), 0, 1);
   let dents = state.dents.filter((d) => !d.active);
+  const r = radius !== undefined && Number.isFinite(radius) && radius > 0 ? radius : SOFT_TUNING.dentRadius;
   if (hit) {
-    const dent = makeDent(hit, SOFT_TUNING.dentRadius * 0.9);
+    const dent = makeDent(hit, r * 0.9);
     dent.active = false;
-    dent.depth = { x: 0, v: 150 + 150 * s, target: 0 };
+    dent.depth = { x: 0, v: (150 + 150 * s) * depthScale(r), target: 0 };
     dents = pushDent(dents, dent);
   }
   const side = hit ? clamp(hit.point.x / 40, -1, 1) : 0;
+  const ripple =
+    hit && !state.reducedMotion && state.skin ? kickRipple(state.ripple ?? null, hit.point, 0.35 + 0.4 * s, state.skin.wave) : state.ripple;
   return {
     ...state,
+    ripple,
     dents,
     sway: { ...state.sway, v: state.sway.v - (0.8 + 1.2 * s) },
     twist: { ...state.twist, v: state.twist.v + side * (1 + s) },
@@ -272,13 +327,27 @@ export function softTickle(state: SoftState, direction: number): SoftState {
 /**
  * 놓기. velocity 는 놓는 순간 손가락 속도 (몸 좌표 단위/초, y 위 +).
  * 빠르게 튕기듯 놓으면(flick) 비틀림·앞뒤 흔들림이 크게 붙는다.
+ * press = 놓는 순간 몸 전체가 눌린 정도 0..1 (physics) — 물결 세기에 더한다 (2D 는 자국 스프링을 돌리지 않는다).
  */
-export function softRelease(state: SoftState, velocity: { x: number; y: number } = { x: 0, y: 0 }): SoftState {
+export function softRelease(state: SoftState, velocity: { x: number; y: number } = { x: 0, y: 0 }, press = 0): SoftState {
   const vx = clamp(finite(velocity.x), -2000, 2000);
   const vy = clamp(finite(velocity.y), -2000, 2000);
   const snap = 1.4 * (state.feel ?? NEUTRAL_FEEL).snap;
+  // 젤리: 놓은 자리(누르던 자국, 없으면 잡은 곳)에서 물결이 퍼진다. 세게 누르거나 멀리 당겼을수록 크게
+  let ripple = state.ripple ?? null;
+  if (state.skin && state.skin.wave > 0 && !state.reducedMotion) {
+    const active = state.dents.find((d) => d.active);
+    const origin = active?.center ?? state.grab;
+    if (origin) {
+      const pull = Math.hypot(state.pullX.x, state.pullY.x) / pullLimits(state.feel).max;
+      const dent = active ? active.depth.x / SOFT_TUNING.dentMax : 0;
+      const fling = Math.min(1, Math.hypot(vx, vy) / 900);
+      ripple = kickRipple(ripple, origin, Math.max(pull, dent, fling, clamp(finite(press), 0, 1)), state.skin.wave);
+    }
+  }
   return {
     ...state,
+    ripple,
     held: false,
     idleMs: 0,
     grab: state.grab,
@@ -360,6 +429,7 @@ export function stepSoft(state: SoftState, dtMs: number): SoftState {
     pullZ: integrate(state.pullZ, T.pull, held, r, dt, feel),
     twist: { ...twist, x: clamp(twist.x, -T.twistMax * 2, T.twistMax * 2) },
     sway: { ...sway, x: clamp(sway.x, -T.swayMax * 2, T.swayMax * 2) },
+    ripple: stepRipple(state.ripple ?? null, ms),
     idleMs: held ? 0 : state.idleMs + ms,
     timeMs: state.timeMs + ms,
   };
@@ -378,6 +448,7 @@ export function breathLevel(state: SoftState): number {
 export function isSoftAtRest(state: SoftState): boolean {
   if (state.held) return false;
   if (state.dents.length > 0) return false;
+  if (state.ripple) return false;
   const springs = [state.pullX, state.pullY, state.pullZ];
   if (!springs.every((s) => settled(s) && s.target === 0)) return false;
   if (!settled(state.twist, 0.002) || !settled(state.sway, 0.002)) return false;
@@ -391,6 +462,7 @@ export function snapSoft(state: SoftState): SoftState {
     ...state,
     dents: [],
     grab: null,
+    ripple: null,
     pullX: z(state.pullX),
     pullY: z(state.pullY),
     pullZ: z(state.pullZ),
@@ -482,35 +554,66 @@ function localDisplace(
   let w = 0;
   // 가장자리(앞면 높이가 낮은 곳)는 덜 들어간다 → 뒤쪽 카드가 비치지 않게
   const edge = smoothstep(0.02, 0.45, frontness);
+  const skin = soft.skin;
+  const aspect = skin ? SURFACE_TUNING.fingerAspect : 1;
   for (const d of soft.dents) {
     const depth = d.depth.x;
     if (depth === 0) continue;
     const dx = px - d.center.x;
     const dy = py - d.center.y;
     const dz = pz - d.center.z;
-    const g = Math.exp(-(dx * dx + dy * dy + dz * dz) / (d.radius * d.radius));
-    if (g < 1e-4) continue;
-    const m = depth * g * edge;
+    const r2 = d.radius * d.radius;
+    // 손끝 타원: 자국 면의 세로(t2) 방향으로 조금 길다
+    let u = (dx * dx + dy * dy + dz * dz) / r2;
+    if (aspect !== 1 && d.t2) {
+      const along = dx * d.t2.x + dy * d.t2.y + dz * d.t2.z;
+      u -= ((along * along) / r2) * (1 - 1 / (aspect * aspect));
+    }
+    if (u > 9) continue;
+    const g = skin ? dentProfile(u, skin.flat, skin.rim) : Math.exp(-u);
+    const inside = Math.max(0, g);
+    let m = depth * g * edge;
+    // 폼: 깊게 누르면 둘레에 바퀴살 주름 골
+    if (skin && skin.crease > 0 && d.t1 && d.t2 && depth > 0) {
+      const a = dx * d.t1.x + dy * d.t1.y + dz * d.t1.z;
+      const b = dx * d.t2.x + dy * d.t2.y + dz * d.t2.z;
+      m += depth * edge * creaseDip(Math.atan2(b, a), Math.sqrt(u), depth / SOFT_TUNING.dentMax, skin.crease, d.phase ?? 0);
+    }
     // 안으로 들어가면서 둘레 표면이 손가락 쪽으로 끌려 들어간다 (그림도 오므라들어 정면에서도 보인다)
-    const pinch = (m / d.radius) * SOFT_TUNING.dentPinch;
+    const pinch = ((depth * inside * edge) / d.radius) * SOFT_TUNING.dentPinch;
     x += d.dir.x * m - dx * pinch;
     y += d.dir.y * m - dy * pinch;
     z += d.dir.z * m - dz * pinch;
-    w = Math.max(w, g);
+    w = Math.max(w, inside);
   }
   const g0 = soft.grab;
   if (g0 && (soft.pullX.x !== 0 || soft.pullY.x !== 0 || soft.pullZ.x !== 0)) {
     const dx = px - g0.x;
     const dy = py - g0.y;
     const dz = pz - g0.z;
-    const r = pullLimits(soft.feel).radius;
+    const lim = pullLimits(soft.feel);
+    const r = lim.radius;
 
     const g = Math.exp(-(dx * dx + dy * dy + dz * dz * 0.25) / (r * r));
     // 바닥은 접시에 붙어 있어 덜 딸려 온다
     const floor = smoothstep(0, 18, py);
-    x += soft.pullX.x * g * floor;
-    y += soft.pullY.x * g * floor;
-    z += soft.pullZ.x * g * floor;
+    const gf = g * floor;
+    x += soft.pullX.x * gf;
+    y += soft.pullY.x * gf;
+    z += soft.pullZ.x * gf;
+    // 목: 잡은 곳과 몸 사이가 잘록해진다 (당긴 방향에 수직인 두께가 준다)
+    const len = Math.hypot(soft.pullX.x, soft.pullY.x);
+    if (skin && skin.neck > 0 && len > 1e-3) {
+      const squeeze = neckSqueeze(gf, len / lim.max, skin.neck);
+      if (squeeze > 0) {
+        const ux = soft.pullX.x / len;
+        const uy = soft.pullY.x / len;
+        const along = dx * ux + dy * uy;
+        x -= (dx - along * ux) * squeeze;
+        y -= (dy - along * uy) * squeeze;
+        z -= pz * squeeze * 0.3;
+      }
+    }
     w = Math.max(w, g);
   }
   out[o] = x;
@@ -541,13 +644,30 @@ export function deformJelly(
     weight[v] = w;
     if (w > 0) anyLocal = true;
   }
+  // 젤리 물결: 놓은 자리에서 앞면을 가로질러 퍼지는 잔물결 (법선 방향). 바닥은 접시에 붙어 덜 움직인다
+  const ripple = soft.ripple ?? null;
+  if (ripple) {
+    anyLocal = true;
+    for (let v = 0; v < vertexCount; v++) {
+      const o = v * 3;
+      const px = rest[o]!;
+      const py = rest[o + 1]!;
+      const pz = rest[o + 2]!;
+      const dist = Math.hypot(px - ripple.x, py - ripple.y, pz - ripple.z);
+      const h = rippleAt(ripple, dist) * smoothstep(0.02, 0.45, front[v]!) * smoothstep(0, 16, py);
+      if (h === 0) continue;
+      out[o] = out[o]! + restNormal[o]! * h;
+      out[o + 1] = out[o + 1]! + restNormal[o + 1]! * h;
+      out[o + 2] = out[o + 2]! + restNormal[o + 2]! * h;
+    }
+  }
   if (anyLocal && options.preserveVolume !== false) {
     const vol = meshVolume(out, mesh.index);
     let area = 0;
     for (let v = 0; v < vertexCount; v++) area += vertexArea[v]! * (1 - weight[v]!);
     if (area > 1e-6) {
       // 부피 차이를 나머지 표면의 두께로 나눠 법선 방향으로 밀어낸다
-      const delta = clamp((mesh.volume - vol) / area, -4, 4);
+      const delta = clamp((mesh.volume - vol) / area, -6, 6);
       for (let v = 0; v < vertexCount; v++) {
         const o = v * 3;
         const k = delta * (1 - weight[v]!);

@@ -72,6 +72,38 @@ describe('3D 겉모습', () => {
   });
 });
 
+describe('표면 질감', () => {
+  it('값이 유효한 범위에 있다', () => {
+    for (const m of MATERIAL_IDS) {
+      const k = MATERIALS[m].skin;
+      for (const [key, v] of Object.entries(k)) {
+        expect(Number.isFinite(v), `${m}.${key}`).toBe(true);
+        expect(v, `${m}.${key}`).toBeGreaterThanOrEqual(0);
+      }
+      expect(k.rim).toBeLessThanOrEqual(0.4);
+      for (const key of ['flat', 'crease', 'wave', 'neck', 'contactDark'] as const) expect(k[key], `${m}.${key}`).toBeLessThanOrEqual(1);
+      expect(Number.isInteger(k.strands)).toBe(true);
+    }
+  });
+
+  it('촉감마다 실제 장난감의 표면이 드러난다', () => {
+    const { slowRise, jelly, stretchy, sticky } = MATERIALS;
+    // 폼: 가장 평평한 손끝 자국 + 주름, 물결 없음
+    for (const o of [jelly, stretchy, sticky]) {
+      expect(slowRise.skin.flat).toBeGreaterThan(o.skin.flat);
+      expect(slowRise.skin.crease).toBeGreaterThan(o.skin.crease);
+      // 젤리가 가장 잘 출렁인다
+      if (o !== jelly) expect(jelly.skin.wave).toBeGreaterThan(o.skin.wave);
+      // 쭉쭉이가 가장 잘록해진다
+      if (o !== stretchy) expect(stretchy.skin.neck).toBeGreaterThan(o.skin.neck);
+    }
+    expect(slowRise.skin.wave).toBe(0);
+    // 실은 찐득이만
+    expect(sticky.skin.strands).toBeGreaterThan(0);
+    for (const o of [slowRise, jelly, stretchy]) expect(o.skin.strands).toBe(0);
+  });
+});
+
 describe('특별한 속', () => {
   it('전설 이상만 속이 있고 모두 있다', () => {
     for (const c of CHARACTERS) {
