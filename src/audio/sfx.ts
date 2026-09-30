@@ -52,6 +52,14 @@ export interface Sfx {
   epicImplode(seconds: number): void;
   /** 시크릿 연출: 두 번째 초신성 폭발 + 하늘에서 울리는 화음 */
   secretBoom(): void;
+  /** 신화 이상 연출: 컷을 넘기는 짧은 바람 소리 */
+  whoosh(): void;
+  /** 시크릿 연출: 혜성이 캡슐에 쾅 내려앉는 소리 */
+  cometLand(): void;
+  /** 시크릿 연출: 빛 고리가 제자리에 딸깍 잠기는 금속 "팅" (index가 클수록 높다) */
+  ringLock(index: number): void;
+  /** 시크릿 연출: 수축 직후 배경음악까지 완전히 끄는 정적 (초) */
+  hush(seconds: number): void;
   success(): void;
   fail(): void;
   /** 미니게임: 가벼운 탭음. level이 높을수록 음이 5음 음계로 올라간다 (콤보 표현, 1.5옥타브 상한). */
@@ -594,6 +602,35 @@ export class SfxEngine implements Sfx {
     this.noise(0.6, { freq: 400, gain: 0.55, q: 0.5 });
     this.sweep(2.6, { from: 12000, to: 1800, gain: 0.14, q: 0.7, delay: 0.03 });
     [1046.5, 1318.5, 1568, 1975.5, 2637].forEach((f, i) => this.bell(f, 0.12 + i * 0.07, 1.4));
+  }
+
+  whoosh() {
+    if (!this.gate('whoosh', 0.12)) return;
+    // 공기가 휙 지나가는 소리: 올라갔다 내려오는 두 겹 띠 잡음 (폰 스피커 대역 400Hz~4kHz)
+    this.sweep(0.2, { from: 450, to: 3800, gain: 0.16, q: 1.4 });
+    this.sweep(0.3, { from: 3200, to: 520, gain: 0.1, q: 1.1, delay: 0.16 });
+  }
+
+  cometLand() {
+    this.duck(1, -12);
+    this.boom({ freq: 120, slideTo: 48, duration: 0.55, gain: 0.5 });
+    this.noise(0.25, { freq: 1400, gain: 0.22, q: 0.8 });
+    this.bell(NOTE.E6 * 2, 0.02, 0.5);
+  }
+
+  ringLock(index: number) {
+    const notes = [NOTE.E6, NOTE.G6, NOTE.C6 * 2] as const;
+    const f = notes[Math.max(0, Math.min(notes.length - 1, index))] ?? NOTE.E6;
+    // 금속 걸쇠 딸깍 + 맑은 "팅" + 폰에서도 느껴지는 짧은 노크
+    this.noise(0.05, { freq: 3200, gain: 0.2, q: 2.5 });
+    this.knock(260 + index * 40, 0.3);
+    this.bell(f, 0.01, 1.1);
+    this.tone({ freq: f * 1.5, duration: 0.5, type: 'triangle', gain: 0.03, delay: 0.02 });
+  }
+
+  hush(seconds: number) {
+    // 효과음은 이미 끝났고 배경음악만 남아 있다 — 그마저 거의 없앤다
+    this.duck(Math.max(0.1, seconds), -40);
   }
 
   private arpeggio(notes: readonly number[], step: number, opts: Omit<ToneOptions, 'freq'> & { startDelay?: number }) {

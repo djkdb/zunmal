@@ -109,6 +109,11 @@ describe('SfxEngine', () => {
     engine.epicImpact();
     engine.epicImplode(0.45);
     engine.secretBoom();
+    engine.whoosh();
+    engine.cometLand();
+    engine.ringLock(0);
+    engine.ringLock(5);
+    engine.hush(0.7);
     engine.resultSecret();
     expect(engine.hasContext()).toBe(true);
     expect(created).toBe(1);
