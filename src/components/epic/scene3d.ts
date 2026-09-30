@@ -76,6 +76,8 @@ export interface EpicSceneOptions {
   shiny: boolean;
   /** 타임라인 시각 (ms) — EpicReveal과 같은 시계. 건너뛰면 마지막 카드 시작으로 뛴다 */
   clock(): number;
+  /** 첫 프레임을 그린 뒤 한 번 (셰이더 컴파일이 끝났다 — 이때부터 시계를 돌린다) */
+  onFirstFrame?(): void;
 }
 
 const MAX_PARTICLES = 2400;
@@ -1248,6 +1250,7 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
   let width = 1;
   let height = 1;
   let manualShake = 0;
+  let firstDone = false;
 
   const resize = () => {
     width = Math.max(1, window.innerWidth);
@@ -1815,6 +1818,10 @@ export function createEpicScene(container: HTMLElement, opts: EpicSceneOptions):
 
     pool.update(dt);
     composer.render(dt);
+    if (!firstDone) {
+      firstDone = true;
+      opts.onFirstFrame?.();
+    }
   };
 
   // ── 모티프 장치 배치 도우미 ──

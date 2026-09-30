@@ -20,6 +20,8 @@ const LOAD_WAIT_MS = 1500;
 const SKIP_GUARD_MS = 500;
 /** 움직임 줄이기: 정지 카드만 이만큼 보여 준다 */
 const STILL_MS = 2200;
+/** 3D 첫 프레임(셰이더 컴파일)을 이만큼까지만 기다렸다가 시계를 켠다 */
+const FIRST_FRAME_WAIT_MS = 700;
 
 const TITLE1 = { mythic: '신화!', secret: '시크릿!!' } as const;
 
@@ -67,9 +69,26 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
   const timersRef = useRef<number[]>([]);
   const playedRef = useRef(new Set<string>());
 
-  const clock = useCallback(() => performance.now() - originRef.current, []);
+  /** 시계가 돌기 시작했는지 (3D는 첫 프레임을 그린 뒤 — 셰이더 컴파일 동안 첫 컷이 잘리지 않게) */
+  const [clockOn, setClockOn] = useState(false);
+  const clockOnRef = useRef(false);
+  const clock = useCallback(() => (clockOnRef.current ? performance.now() - originRef.current : 0), []);
   const shot = timeline.shots[Math.min(shotIndex, finalIndex)]!;
+  const shotIndexRef = useRef(shotIndex);
+  shotIndexRef.current = shotIndex;
   const started = mode !== 'loading';
+  const startClock = useCallback(() => setClockOn(true), []);
+
+  // 2D·움직임 줄이기는 바로, 3D는 첫 프레임 뒤(늦어도 FIRST_FRAME_WAIT_MS) 시계를 켠다
+  useEffect(() => {
+    if (!started || clockOn) return;
+    if (mode !== '3d' || reduced) {
+      setClockOn(true);
+      return;
+    }
+    const id = window.setTimeout(startClock, FIRST_FRAME_WAIT_MS);
+    return () => window.clearTimeout(id);
+  }, [started, clockOn, mode, reduced, startClock]);
 
   const finish = useCallback(() => {
     if (doneRef.current) return;
@@ -141,20 +160,21 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
 
   // 시계 시작 + 예약 (움직임 줄이기면 정지 카드 + 팡파레만)
   useEffect(() => {
-    if (!started) return;
+    if (!clockOn) return;
     if (reduced) {
       playRarityFanfare(sfx, item.rarity, item.shiny);
       const id = window.setTimeout(finish, STILL_MS);
       return () => window.clearTimeout(id);
     }
     originRef.current = performance.now();
+    clockOnRef.current = true;
     setShotIndex(0);
     schedule(0);
     return () => {
       timersRef.current.forEach((id) => window.clearTimeout(id));
       timersRef.current = [];
     };
-  }, [started, reduced, schedule, finish, item.rarity, item.shiny]);
+  }, [clockOn, reduced, schedule, finish, item.rarity, item.shiny]);
 
   // 3D 장면 만들기 — 실패하면 2D로
   useEffect(() => {
@@ -163,7 +183,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     const box = glRef.current;
     if (!mod || !box) return;
     try {
-      sceneRef.current = mod.createEpicScene(box, { theme, timeline, shiny: item.shiny, clock });
+      sceneRef.current = mod.createEpicScene(box, { theme, timeline, shiny: item.shiny, clock, onFirstFrame: startClock });
     } catch {
       setMode('2d');
       return;
@@ -172,7 +192,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };
-  }, [mode, reduced, theme, timeline, item.shiny, clock]);
+  }, [mode, reduced, theme, timeline, item.shiny, clock, startClock]);
 
   // 2D 대체 캔버스 루프
   useEffect(() => {
@@ -185,8 +205,9 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
   /** 건너뛰기: 마지막 카드 전이면 마지막 카드로, 마지막 카드면 끝 */
   const skip = useCallback(() => {
     if (performance.now() - mountedAt.current < SKIP_GUARD_MS) return;
-    if (reduced || !started) return finish();
-    const target = skipTarget(timeline, clock());
+    if (reduced || !clockOn) return finish();
+    // 화면에 아직 마지막 카드가 안 보이면(바쁜 기기에서 예약이 밀려도) 끝내지 말고 마지막 카드로 간다
+    const target = skipTarget(timeline, clock()) ?? (shotIndexRef.current < finalIndex ? timeline.finalStart : null);
     if (target === null) return finish();
     originRef.current = performance.now() - target;
     setShotIndex(finalIndex);
@@ -196,7 +217,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
       playRarityFanfare(sfx, item.rarity, item.shiny);
     }
     schedule(target);
-  }, [reduced, started, finish, timeline, clock, finalIndex, schedule, item.rarity, item.shiny]);
+  }, [reduced, clockOn, finish, timeline, clock, finalIndex, schedule, item.rarity, item.shiny]);
 
   // 전체 화면 창이 뜨면 초점을 안으로 (화면 읽기가 뒤 뽑기 화면에 머물지 않게). 끝나면 결과 창이 초점을 가져간다
   useEffect(() => {
@@ -215,7 +236,7 @@ export function EpicReveal({ item, onDone }: EpicRevealProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [skip]);
 
-  const live = started && !reduced;
+  const live = clockOn && !reduced;
   const flat = mode !== '3d';
   const isFinal = shotIndex >= finalIndex;
   const style = {
