@@ -3,6 +3,7 @@
  * 말랑이마다 상징(모티프)이 달라서 같은 등급이라도 전혀 다른 장면이 나온다.
  */
 import type { Character, MalangEffect } from '../../data/characters';
+import { pose, type WorldShot } from './director';
 
 /**
  * 장면의 핵심 장치.
@@ -15,6 +16,22 @@ import type { Character, MalangEffect } from '../../data/characters';
 export type EpicMotif = 'galaxy' | 'phoenix' | 'rainbow' | 'ocean' | 'prism';
 
 export type EpicParticleShape = 'dot' | 'star' | 'ember' | 'heart' | 'shard';
+
+/**
+ * 모티프 세계 컷 — 말랑이마다 하나뿐인 장면 (director가 "world" 컷에 넣는다).
+ *  - spiral-travel: 위에서 내려다본 나선 은하 속으로 별줄기를 가르며 날아 들어간다
+ *  - fire-ascent: 불씨를 뚫고 솟구치며 빛 뒤로 불꽃 날개가 펼쳐진다
+ *  - rainbow-sky: 꿈빛 하늘을 올려다보면 무지개 아치가 차례로 걸리고 하트가 떠오른다
+ *  - starsea-warp: 별빛 바다를 워프하다 고래 그림자가 지나가며 별 물줄기를 뿜는다
+ *  - prism-sanctum: 수정 조각이 궤도를 돌고 후광 뒤로 프리즘 광선이 갈라진다
+ */
+export type EpicWorldId = 'spiral-travel' | 'fire-ascent' | 'rainbow-sky' | 'starsea-warp' | 'prism-sanctum';
+
+export interface EpicWorld extends WorldShot {
+  id: EpicWorldId;
+  /** 장면 한 줄 (문서·테스트용) */
+  label: string;
+}
 
 export interface EpicTheme {
   motif: EpicMotif;
@@ -46,6 +63,8 @@ export interface EpicTheme {
   bloom: number;
   /** 이름 아래 한 줄 */
   tagline: string;
+  /** 모티프 세계 컷 */
+  world: EpicWorld;
 }
 
 const RAINBOW = ['#ff8fab', '#ffd23f', '#7ed957', '#5cc8ff', '#b98cff'] as const;
@@ -69,6 +88,11 @@ export const EPIC_THEMES: Record<EpicMotif, EpicTheme> = {
     rayColors: ['#ff8fd1', '#b98cff', '#7fb8ff'],
     bloom: 1.25,
     tagline: '은하 한가운데서 굴러 나왔어요',
+    world: {
+      id: 'spiral-travel',
+      label: '나선 은하 속으로 날아 들어가기',
+      camera: { kind: 'travel', from: pose({ dist: 24, pitch: 1.15, yaw: 0.5 }), to: pose({ dist: 10, pitch: 0.5, yaw: -0.3, roll: -0.12 }), ease: 'inOut' },
+    },
   },
   phoenix: {
     motif: 'phoenix',
@@ -89,6 +113,12 @@ export const EPIC_THEMES: Record<EpicMotif, EpicTheme> = {
     rayColors: ['#ffe14d', '#ff7a45'],
     bloom: 1.45,
     tagline: '불꽃 속에서 다시 태어났어요',
+    world: {
+      id: 'fire-ascent',
+      label: '불씨를 뚫고 솟구쳐 날개 펼치기',
+      camera: { kind: 'travel', from: pose({ dist: 12, pitch: -0.35, lift: -3.5, roll: 0.1 }), to: pose({ dist: 10.5, pitch: 0.02, lift: 0.4 }), ease: 'out' },
+      cues: [{ kind: 'whoosh', at: 650 }],
+    },
   },
   rainbow: {
     motif: 'rainbow',
@@ -108,6 +138,12 @@ export const EPIC_THEMES: Record<EpicMotif, EpicTheme> = {
     rayColors: RAINBOW,
     bloom: 1.1,
     tagline: '꿈속에서 무지개를 건너왔어요',
+    world: {
+      id: 'rainbow-sky',
+      label: '꿈빛 하늘에 무지개 아치가 걸리기',
+      camera: { kind: 'low', from: pose({ dist: 12.5, pitch: -0.4, lift: -1.2 }), to: pose({ dist: 10.5, pitch: 0.02, lift: 0.3 }), ease: 'out' },
+      cues: [{ kind: 'chime', at: 700 }],
+    },
   },
   ocean: {
     motif: 'ocean',
@@ -127,6 +163,12 @@ export const EPIC_THEMES: Record<EpicMotif, EpicTheme> = {
     rayColors: ['#7fe0ff'],
     bloom: 1.2,
     tagline: '은하수 바다를 헤엄쳐 왔어요',
+    world: {
+      id: 'starsea-warp',
+      label: '별빛 바다 워프, 고래가 지나가며 물줄기',
+      camera: { kind: 'travel', from: pose({ dist: 13, yaw: -0.3, roll: 0.1 }), to: pose({ dist: 9.5, yaw: 0.22, roll: -0.05 }), ease: 'inOut' },
+      cues: [{ kind: 'whoosh', at: 450 }],
+    },
   },
   prism: {
     motif: 'prism',
@@ -146,6 +188,12 @@ export const EPIC_THEMES: Record<EpicMotif, EpicTheme> = {
     rayColors: ['#ffe07a', '#fff6c9', ...RAINBOW],
     bloom: 1.35,
     tagline: '여섯 날개로 빛을 가르고 내려왔어요',
+    world: {
+      id: 'prism-sanctum',
+      label: '수정 조각 궤도와 후광, 프리즘 광선',
+      camera: { kind: 'orbit', from: pose({ dist: 11, yaw: -0.8, pitch: 0.2 }), to: pose({ dist: 9, yaw: 0.6, pitch: -0.12 }), ease: 'inOut' },
+      cues: [{ kind: 'chime', at: 600 }],
+    },
   },
 };
 
