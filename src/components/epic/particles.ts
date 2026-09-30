@@ -148,6 +148,55 @@ export function spawnWarp(rng: RNG, n: number, cx: number, cy: number, colors: r
 }
 
 /**
+ * 소용돌이치며 빨려 드는 입자 (신화 "떠오르기" 컷): 안쪽 속도 + 접선 속도.
+ * swirl = 접선 속도 / 안쪽 속도 비율.
+ */
+export function spawnSpiral(
+  rng: RNG,
+  n: number,
+  w: number,
+  h: number,
+  cx: number,
+  cy: number,
+  colors: readonly string[],
+  swirl: number,
+): Particle[] {
+  return spawnInward(rng, n, w, h, cx, cy, colors).map((p) => ({
+    ...p,
+    // 접선 성분을 더하되 수명 안에 중심 근처로 오도록 안쪽 속도는 그대로 둔다
+    vx: p.vx - p.vy * swirl,
+    vy: p.vy + p.vx * swirl,
+    kind: 'dot' as const,
+    size: p.size + 0.5,
+  }));
+}
+
+/**
+ * 화면을 세로로 가로지르는 빛줄기 (불사조 "솟구치기": dir = 1이면 위에서 아래로 쏟아진다 = 카메라가 올라간다).
+ */
+export function spawnStream(rng: RNG, n: number, w: number, h: number, colors: readonly string[], dir: 1 | -1): Particle[] {
+  return Array.from({ length: n }, () => {
+    const speed = 700 + rng() * 900;
+    const life = ((h + 80) / speed) * 1000;
+    return {
+      x: rng() * w,
+      y: dir > 0 ? -20 - rng() * 60 : h + 20 + rng() * 60,
+      vx: (rng() - 0.5) * 40,
+      vy: dir * speed,
+      life,
+      maxLife: life,
+      size: 1.5 + rng() * 2.5,
+      color: pick(rng, colors),
+      kind: 'streak',
+      drag: 1,
+      gravity: 0,
+      spin: 0,
+      angle: 0,
+    };
+  });
+}
+
+/**
  * dt(ms)만큼 입자를 진행한다. 수명이 다한 입자는 빠진다.
  * drag는 "1초 뒤 남는 속도 비율"이다 (0.2면 1초 뒤 20%, 2.2면 1초 뒤 220%로 가속).
  */
